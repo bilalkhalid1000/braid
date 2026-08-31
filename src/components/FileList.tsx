@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { badgeFor, type StatusEntry } from "../lib/api";
+import { useTip } from "./Tip";
 
 const ROW_HEIGHT = 22;
 
@@ -28,6 +29,8 @@ interface Props {
   onToggle: (entry: StatusEntry) => void;
   onToggleAll: () => void;
   actionLabel: string;
+  /** The command the action button runs, so its tip can show the key. */
+  actionCommand?: string;
   emptyMessage: string;
 }
 
@@ -44,9 +47,11 @@ export function FileList({
   onToggle,
   onToggleAll,
   actionLabel,
+  actionCommand,
   emptyMessage,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const tip = useTip();
 
   const virtualizer = useVirtualizer({
     count: entries.length,
@@ -66,7 +71,12 @@ export function FileList({
       <header className="pane-header">
         <span className="pane-title">{title}</span>
         <span className="pane-count">{entries.length}</span>
-        <button className="link-button" disabled={entries.length === 0} onClick={onToggleAll}>
+        <button
+          className="link-button"
+          disabled={entries.length === 0}
+          onClick={onToggleAll}
+          {...tip(actionLabel, actionCommand)}
+        >
           {actionLabel}
         </button>
       </header>

@@ -1,4 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { useTip } from "./Tip";
 
 export interface CommitBoxHandle {
   focus: () => void;
@@ -37,6 +38,8 @@ export const CommitBox = forwardRef<CommitBoxHandle, Props>(
       setAmend(false);
     };
 
+    const tip = useTip();
+
     useImperativeHandle(ref, () => ({
       focus: () => textarea.current?.focus(),
       submit: () => void submit(),
@@ -68,7 +71,12 @@ export const CommitBox = forwardRef<CommitBoxHandle, Props>(
 
           <span className="commit-hint">{stagedCount} staged</span>
 
-          <button className="btn-primary" disabled={!canCommit} onClick={() => void submit()}>
+          <button
+            className="btn-primary"
+            disabled={!canCommit}
+            onClick={() => void submit()}
+            {...tip("Commit", "status.commit")}
+          >
             Commit
           </button>
         </div>

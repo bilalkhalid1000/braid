@@ -15,6 +15,7 @@ import { ConflictBar } from "./ConflictBar";
 import { CommitBox, type CommitBoxHandle } from "./CommitBox";
 import { useCommands } from "../lib/useCommands";
 import { useSettings } from "../lib/settings";
+import { shortcutLabel } from "../lib/shortcutLabel";
 import { FilterInput, matchesFilter } from "./FilterInput";
 import { Splitter, usePaneSize } from "./Splitter";
 
@@ -56,7 +57,7 @@ export function FileStatusView({
   const [selection, setSelection] = useState<Selection | null>(null);
   const [filter, setFilter] = useState("");
   const [columnWidth, setColumnWidth] = usePaneSize("status-column", 380);
-  const { settings } = useSettings();
+  const { settings, keymap } = useSettings();
 
   const staged = useMemo(
     () => (status?.entries ?? []).filter(isStaged).filter((e) => matchesFilter(e.path, filter)),
@@ -166,6 +167,7 @@ export function FileStatusView({
           onToggle={(e) => onUnstage([e.path])}
           onToggleAll={() => onUnstage(staged.map((e) => e.path))}
           actionLabel="Unstage all"
+          actionCommand="status.unstageAll"
           emptyMessage={filter ? "No matches" : "Nothing staged yet"}
         />
 
@@ -178,6 +180,7 @@ export function FileStatusView({
           onToggle={(e) => onStage([e.path])}
           onToggleAll={() => onStage(unstaged.map((e) => e.path))}
           actionLabel="Stage all"
+          actionCommand="status.stageAll"
           emptyMessage={
             filter ? "No matches" : total === 0 ? "Working tree clean" : "Everything is staged"
           }
@@ -189,6 +192,17 @@ export function FileStatusView({
           busy={busy}
           onCommit={onCommit}
         />
+
+        {/* Shown exactly while these keys are live, so its presence is itself
+            the answer to whether the panel has the keyboard. */}
+        {keyboardActive && (
+          <p className="pane-hint">
+            <kbd>{shortcutLabel(keymap["status.next"])}</kbd>
+            <kbd>{shortcutLabel(keymap["status.previous"])}</kbd> move ·{" "}
+            <kbd>{shortcutLabel(keymap["status.toggle"])}</kbd> stage ·{" "}
+            <kbd>{shortcutLabel(keymap["status.discard"])}</kbd> discard
+          </p>
+        )}
       </div>
 
       <Splitter

@@ -677,9 +677,21 @@ kbd.key-live {
   outline: none;
 }
 
+/* A column for the same reason .app is one: the key hint at the bottom comes
+   and goes with the keyboard, and a row template would hand its row to the
+   commit box the moment the hint disappeared. */
 .fs-left {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.fs-left > .fs-filter,
+.fs-left > .commit-box,
+.fs-left > .pane-hint {
+  flex: none;
+}
+.fs-left > .file-list {
+  flex: 1;
   min-height: 0;
 }
 
@@ -2443,10 +2455,12 @@ kbd.key-live {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
+/* The one way a panel lists its keys. Shared so a key cap in the sidebar and a
+   key cap under the file lists are the same object, not two that happen to
+   resemble each other. */
+.pane-hint,
 .sidebar-hint {
-  position: sticky;
-  bottom: 0;
-  margin: var(--s5) 0 0;
+  margin: 0;
   padding: var(--s3) var(--s4);
   background: var(--chrome);
   border-top: 1px solid var(--border-soft);
@@ -2455,8 +2469,16 @@ kbd.key-live {
   line-height: 1.8;
 }
 
+.pane-hint kbd,
 .sidebar-hint kbd {
   margin-right: var(--s1);
+}
+
+/* The sidebar scrolls behind its hint; the file column does not. */
+.sidebar-hint {
+  position: sticky;
+  bottom: 0;
+  margin-top: var(--s5);
 }
 
 /* --- toolbar tips ------------------------------------------------------ */
