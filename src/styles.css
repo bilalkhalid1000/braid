@@ -2923,3 +2923,101 @@ kbd.key-live {
   color: var(--text-faint);
   font-size: var(--fs-micro);
 }
+
+/* --- syntax ------------------------------------------------------------ */
+
+/* One palette, two themes, set as variables so a token rule is written once.
+   Every colour here clears 4.5:1 against all three backgrounds it can land on
+   — the plain surface and the added and removed tints of a diff — which is
+   checked rather than judged by eye. Four of them had to move to get there,
+   including dark punctuation, which failed even on the plain surface.
+   The hues are the familiar ones — red keywords, blue strings, purple calls —
+   because a code view is the last place to be inventive: anyone reading this
+   has spent years with an editor, and matching that costs nothing and saves
+   them relearning what a colour means here. */
+:root {
+  --syn-comment: #5f6873;
+  --syn-keyword: #cf222e;
+  --syn-string: #0a3069;
+  --syn-number: #0550ae;
+  --syn-function: #7a45d6;
+  --syn-type: #953800;
+  --syn-tag: #116329;
+  --syn-punct: var(--n6);
+}
+
+:root[data-theme="dark"] {
+  --syn-comment: #8b949e;
+  --syn-keyword: #ff7b72;
+  --syn-string: #a5d6ff;
+  --syn-number: #79c0ff;
+  --syn-function: #d2a8ff;
+  --syn-type: #ffa657;
+  --syn-tag: #7ee787;
+  --syn-punct: #9aa4b0;
+}
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: var(--syn-comment);
+  font-style: italic;
+}
+
+.token.keyword,
+.token.rule,
+.token.important,
+.token.atrule {
+  color: var(--syn-keyword);
+}
+
+.token.string,
+.token.char,
+.token.attr-value,
+.token.regex {
+  color: var(--syn-string);
+}
+
+.token.number,
+.token.boolean,
+.token.constant,
+.token.symbol,
+.token.attr-name {
+  color: var(--syn-number);
+}
+
+.token.function,
+.token.function-variable,
+.token.method {
+  color: var(--syn-function);
+}
+
+.token.class-name,
+.token.builtin,
+.token.namespace,
+.token.macro,
+.token.annotation {
+  color: var(--syn-type);
+}
+
+.token.tag,
+.token.selector,
+.token.inserted {
+  color: var(--syn-tag);
+}
+
+/* Brackets, commas and operators are structure rather than meaning. They stay
+   quiet so the words carry the colour — highlighting everything highlights
+   nothing. */
+.token.punctuation,
+.token.operator {
+  color: var(--syn-punct);
+}
+
+/* A key in JSON or YAML is closer to a label than to a string, and reading it
+   as one is what makes a config file scannable. */
+.token.property,
+.token.key {
+  color: var(--syn-type);
+}

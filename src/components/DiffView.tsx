@@ -3,6 +3,8 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 
 import type { DiffLine, FileDiff } from "../lib/api";
 import { useSettings } from "../lib/settings";
+import { highlightHunks, languageOf } from "../lib/highlight";
+import { Code } from "./Code";
 
 const LINE_HEIGHT = 18;
 
@@ -52,6 +54,14 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
       ...hunk.lines.map<DiffRow>((line, index) => ({ kind: "line", hunk: h, index, line })),
     ]);
   }, [diff]);
+
+  // Keyed on the diff alone, deliberately. This component re-renders on every
+  // click while lines are being picked for partial staging, and a dependency
+  // that moved with `picked` would re-tokenize the file on each one.
+  const highlighted = useMemo(
+    () => (diff ? highlightHunks(diff.hunks, languageOf(diff.path)) : null),
+    [diff],
+  );
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -187,7 +197,12 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
                   <span className="gutter">{line.oldLine ?? ""}</span>
                   <span className="gutter">{line.newLine ?? ""}</span>
                   <span className="diff-marker">{markerFor(line.kind)}</span>
-                  <span className="diff-text">{line.content}</span>
+                  <span className="diff-text">
+                    <Code
+                      tokens={highlighted?.[row.hunk]?.[row.index]}
+                      text={line.content}
+                    />
+                  </span>
                 </div>
               );
             })}
