@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Braid</title>
+
+    <!--
+      Painted before the stylesheet bundle arrives. Without this the webview
+      shows its own white page for as long as the CSS takes to load, which on a
+      dark theme is a bright flash straight in the face.
+
+      These two values are --chrome from styles.css. They are duplicated on
+      purpose: nothing that has to run before the stylesheet can read from it.
+    -->
+    <style>
+      :root {
+        background: #edeff3;
+        color-scheme: light;
+      }
+
+      :root[data-theme="dark"] {
+        background: #1e222a;
+        color-scheme: dark;
+      }
+
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        background: inherit;
+      }
+    </style>
+
+    <script>
+      // Resolve the theme before the first paint rather than in React, which
+      // only runs after the bundle has downloaded and parsed. Kept in sync with
+      // useTheme.ts: same storage key, same three values, same resolution.
+      (function () {
+        try {
+          var stored = localStorage.getItem("theme");
+          var choice =
+            stored === "light" || stored === "dark" || stored === "system"
+              ? stored
+              : "system";
+
+          var dark =
+            choice === "dark" ||
+            (choice === "system" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+          document.documentElement.dataset.theme = dark ? "dark" : "light";
+        } catch {
+          // Private mode, or storage disabled: light is the app's default.
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

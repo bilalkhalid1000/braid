@@ -1,0 +1,3 @@
+# Throwaway repositories, rebuilt by generate.mjs. A 200k-commit fixture is
+# hundreds of megabytes and means nothing outside the machine that made it.
+fixtures/

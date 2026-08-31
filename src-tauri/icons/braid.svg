@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!--
+    Braid app mark.
+
+    The name is the picture: braided rivers divide and rejoin, which is what a
+    commit graph does and what this draws.
+
+    The one thing this client is built around is the lane graph, so the icon is
+    that graph rather than a generic branch glyph: a trunk, one lane that
+    diverges and merges back, and the merge drawn as a ring exactly as the
+    history view draws it. The curves use the same construction as
+    CommitGraph.tsx — cubic control points held on each lane's vertical — so the
+    line leaves and rejoins the trunk tangent instead of kinking.
+
+    The proportions are the whole difficulty. The parallel run has to carry
+    roughly a third of the branch's length: when the two transition curves meet
+    in the middle the shape closes into a balloon and stops reading as a lane.
+    Each transition is about as tall as the lane is wide, which is the shallowest
+    an S-curve can be before it kinks.
+
+    Two colours from the app's lane palette, picked for contrast at 16px, where
+    nothing survives but the silhouette.
+  -->
+
+  <defs>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e232d"/>
+      <stop offset="1" stop-color="#0e1117"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="228" fill="url(#plate)"/>
+
+  <!-- The plate is nearly black, which on a dark taskbar has no edge at all.
+       A hairline rim gives it one without lightening the field behind the
+       lanes. It falls below a pixel under 64px and simply disappears, which is
+       the right behaviour: at that size the coloured strokes carry the mark. -->
+  <rect x="5" y="5" width="1014" height="1014" rx="223"
+        fill="none" stroke="#39404c" stroke-width="10"/>
+
+  <g fill="none" stroke-width="74" stroke-linecap="round">
+    <!-- Trunk, overshooting both commits by the same amount: history continues
+         either way, and an uneven overshoot reads as a pin rather than a lane. -->
+    <path d="M 392 142 L 392 882" stroke="#4d8dff"/>
+
+    <!-- Out, along, and back in. -->
+    <path
+      d="M 392 212 C 392 312, 632 312, 632 412
+         L 632 612
+         C 632 712, 392 712, 392 812"
+      stroke="#e8459b"/>
+  </g>
+
+  <!-- Commits. The branch point and the commit on the lane are solid; the
+       merge is a ring, which is how a merge reads everywhere else in the app. -->
+  <circle cx="392" cy="212" r="74" fill="#4d8dff"/>
+  <circle cx="632" cy="512" r="74" fill="#e8459b"/>
+  <circle cx="392" cy="812" r="74" fill="#0e1117" stroke="#4d8dff" stroke-width="44"/>
+</svg>

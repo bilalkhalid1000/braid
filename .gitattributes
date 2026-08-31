@@ -1,0 +1,17 @@
+# Line endings are decided here rather than by each machine's core.autocrlf,
+# so a checkout on Windows and one on Linux produce identical files and nobody
+# sees a diff that is only carriage returns.
+* text=auto eol=lf
+
+# Never touched: a "line ending fix" applied to these corrupts them.
+*.png binary
+*.ico binary
+*.icns binary
+*.jpg binary
+*.woff binary
+*.woff2 binary
+
+# Generated, and noisy in review. Still committed — a lockfile is the record of
+# what actually built.
+pnpm-lock.yaml linguist-generated=true
+src-tauri/Cargo.lock linguist-generated=true

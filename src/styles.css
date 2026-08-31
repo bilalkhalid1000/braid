@@ -1,0 +1,2610 @@
+/* Braid design tokens
+   ---------------------------------------------------------------------------
+   One typographic rule runs through the whole app: chrome is set in the system
+   sans, and anything that is a literal string git would print — a path, a hash,
+   a branch name, a diff line — is set in mono. Buttons and section titles are
+   things you click; refs and paths are things you type. Letting the two look
+   different makes the window read as an instrument rather than a web page, and
+   it means a branch name is recognisable at a glance anywhere it appears.
+
+   Light is the default because SourceTree ships light and this layout is meant
+   to be familiar on sight. Dark overrides the same variables, so no rule below
+   needs to know which theme is active. */
+
+:root {
+  /* Neutral ramp, light to dark */
+  --n0: #ffffff;
+  --n1: #f7f8fa;
+  --n2: #edeff3;
+  --n3: #e2e6ec;
+  --n4: #ccd2dc;
+  --n5: #98a1b0;
+  --n6: #5a6473;
+  --n7: #191d25;
+
+  --surface: var(--n0);
+  --surface-alt: var(--n1);
+  --chrome: var(--n2);
+  --chrome-alt: var(--n3);
+  --border: var(--n4);
+  --border-soft: var(--n3);
+  --text-faint: var(--n5);
+  --text-dim: var(--n6);
+  --text: var(--n7);
+
+  --accent: #1f6feb;
+  --accent-soft: #dbe7ff;
+  --select: #e4edfd;
+
+  --added: #147a35;
+  --added-bg: #e7f6ec;
+  --removed: #c9303c;
+  --removed-bg: #fdebec;
+  --modified: #9a6700;
+  --modified-bg: #fff6e0;
+  --conflict: #c9303c;
+  --hunk-bg: #eff2f7;
+
+  /* Type scale */
+  --fs-micro: 10px;
+  --fs-small: 11px;
+  --fs-body: 12px;
+  --fs-ui: 13px;
+  --fs-lead: 15px;
+  --fs-display: 22px;
+
+  --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+
+  /* Spacing */
+  --s1: 2px;
+  --s2: 4px;
+  --s3: 6px;
+  --s4: 8px;
+  --s5: 12px;
+  --s6: 16px;
+  --s7: 24px;
+
+  --radius: 3px;
+  --radius-lg: 5px;
+
+  --row: 22px;
+  --row-lg: 26px;
+
+  --shadow: 0 6px 20px rgb(16 22 34 / 14%);
+  --shadow-lg: 0 14px 40px rgb(16 22 34 / 20%);
+
+  color-scheme: light;
+  font-family: var(--sans);
+  font-size: var(--fs-ui);
+}
+
+:root[data-theme="dark"] {
+  --n0: #12151a;
+  --n1: #171b21;
+  --n2: #1e222a;
+  --n3: #262c35;
+  --n4: #39404c;
+  --n5: #6b7583;
+  --n6: #98a2b1;
+  --n7: #e0e5ed;
+
+  --accent: #58a6ff;
+  --accent-soft: #14304f;
+  --select: #1a2f4a;
+
+  --added: #4fc76a;
+  --added-bg: #10261a;
+  --removed: #f26a63;
+  --removed-bg: #2c1517;
+  --modified: #d5a03a;
+  --modified-bg: #2a2314;
+  --conflict: #f26a63;
+  --hunk-bg: #1b212b;
+
+  --shadow: 0 6px 20px rgb(0 0 0 / 40%);
+  --shadow-lg: 0 14px 40px rgb(0 0 0 / 55%);
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--chrome);
+  color: var(--text);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+/* One key cap, used wherever a key appears: the sidebar rail, tooltips, menus,
+   the palette, the settings list. A key has to look identical everywhere or it
+   stops reading as a key and starts reading as a number or a chip.
+   The heavier bottom edge is the one flourish — it is what separates a key from
+   the badges and ref chips it sits near. */
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 16px;
+  padding: 0 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* The key for whatever currently has the keyboard. */
+kbd.key-live {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.app {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: 100%;
+  outline: none;
+}
+
+/* With no repo open there is no toolbar, so the welcome pane takes the middle
+   row directly instead of leaving the status bar floating mid-window. */
+.app-empty {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+/* --- repo tabs --------------------------------------------------------- */
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+  height: 30px;
+  overflow-x: auto;
+  background: var(--chrome-alt);
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  max-width: 220px;
+  padding: 0 var(--s5);
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.tab:hover {
+  background: var(--chrome);
+}
+
+.tab-active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-close {
+  color: var(--text-faint);
+  font-size: var(--fs-lead);
+  line-height: 1;
+}
+
+.tab-close:hover {
+  color: var(--removed);
+}
+
+.tab-add {
+  padding: 0 var(--s5);
+  font-size: var(--fs-lead);
+  cursor: pointer;
+}
+
+/* --- toolbar ----------------------------------------------------------- */
+
+.toolbar {
+  display: flex;
+  align-items: stretch;
+  height: 54px;
+  padding: 0 var(--s3);
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: stretch;
+  padding: 0 var(--s5);
+}
+
+.toolbar-group + .toolbar-group {
+  border-left: 1px solid var(--border-soft);
+}
+
+.toolbar-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s1);
+  min-width: 60px;
+  margin: var(--s3) var(--s1);
+  padding: var(--s2) var(--s4);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.toolbar-button:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--border-soft);
+}
+
+.toolbar-button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* One filled button at a time: whatever the current state is asking for. */
+.toolbar-button-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.toolbar-button-primary:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  filter: brightness(1.08);
+}
+
+.toolbar-button-primary .toolbar-badge {
+  background: #fff;
+  color: var(--accent);
+}
+
+.toolbar-icon {
+  position: relative;
+  display: block;
+  line-height: 0;
+}
+
+.toolbar-badge {
+  position: absolute;
+  top: -5px;
+  right: -9px;
+  min-width: 15px;
+  padding: 0 var(--s2);
+  background: var(--accent);
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  line-height: 15px;
+  text-align: center;
+}
+
+.toolbar-label {
+  font-size: var(--fs-small);
+}
+
+/* --- body and splitters ------------------------------------------------ */
+
+.body {
+  display: grid;
+  min-height: 0;
+}
+
+/* A column, so the operation banner can sit above whichever view is showing
+   and the view takes what is left rather than overflowing. */
+.content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.content > .op-banner {
+  flex: none;
+}
+
+.content > .file-status,
+.content > .history {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+/* --- in-progress operation --------------------------------------------- */
+
+.op-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) var(--s5);
+  background: var(--modified-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.op-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--modified);
+  border-radius: 50%;
+}
+
+.op-title {
+  font-weight: 600;
+}
+
+.op-detail {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.op-actions {
+  display: flex;
+  gap: var(--s3);
+  margin-left: auto;
+}
+
+.op-actions button {
+  padding: 3px var(--s5);
+  font-size: var(--fs-small);
+}
+
+.splitter {
+  position: relative;
+  background: var(--border-soft);
+  transition: background 90ms;
+}
+
+.splitter:hover,
+.splitter-active {
+  background: var(--accent);
+}
+
+.splitter-x {
+  cursor: col-resize;
+}
+
+.splitter-y {
+  cursor: row-resize;
+}
+
+/* Widen the grab target well past the visible line: a 4px hit area is a
+   frustration, a 4px line is correct. */
+.splitter::after {
+  position: absolute;
+  content: "";
+  inset: -3px;
+}
+
+/* --- sidebar ----------------------------------------------------------- */
+
+.sidebar {
+  overflow-y: auto;
+  padding-bottom: var(--s5);
+  background: var(--chrome);
+}
+
+.sidebar-filter,
+.fs-filter {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--s3) var(--s4);
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.fs-filter {
+  background: var(--surface-alt);
+}
+
+.filter {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: 0 var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.filter:focus-within {
+  border-color: var(--accent);
+}
+
+.filter-input {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  background: none;
+  border: none;
+  font-size: var(--fs-body);
+  outline: none;
+}
+
+.filter-input::placeholder {
+  color: var(--text-faint);
+}
+
+.filter-count {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+
+.side-header-row {
+  display: flex;
+  align-items: center;
+  padding-right: var(--s4);
+}
+
+/* Hover actions keep the sidebar quiet without hiding the feature: they are
+   revealed on hover, always reachable by keyboard, and every one of them also
+   exists in the right-click menu. */
+.hover-only {
+  opacity: 0;
+}
+
+.side-header-row:hover .hover-only,
+.side-item:hover .hover-only,
+.hover-only:focus-visible {
+  opacity: 1;
+}
+
+.side-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex: 1;
+  min-width: 0;
+  padding: var(--s3) var(--s2) var(--s2) 0;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* Counts sit hard right, opposite the key rail. */
+.side-count {
+  padding-left: var(--s3);
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.side-section-nested > .side-header-row > .side-header {
+  padding-left: var(--s5);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.side-empty {
+  padding: 0 var(--s4) var(--s2) 28px;
+  color: var(--text-faint);
+  font-size: var(--fs-small);
+}
+
+.side-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  height: var(--row);
+  padding: 0 var(--s4) 0 var(--s2);
+  border-left: 2px solid transparent;
+  color: var(--text);
+  cursor: default;
+}
+
+.side-item:hover {
+  background: var(--surface-alt);
+}
+
+/* A tinted row with an accent edge, rather than a saturated fill: the branch
+   name has to stay the most legible thing in the row. */
+.side-item-active {
+  background: var(--select);
+  border-left-color: var(--accent);
+}
+
+.side-item-bold {
+  font-weight: 600;
+}
+
+.side-item-nested {
+  padding-left: var(--s6);
+}
+
+/* Refs are literals you type, so they are set like literals. */
+.side-item-label {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-badge {
+  margin-left: auto;
+  min-width: 18px;
+  padding: 0 5px;
+  background: var(--accent);
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  line-height: 15px;
+  text-align: center;
+}
+
+.side-note {
+  max-width: 96px;
+  margin-left: auto;
+  padding-left: var(--s3);
+  overflow: hidden;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  background: var(--text-faint);
+  border-radius: 50%;
+}
+
+.sub-upToDate {
+  background: var(--added);
+}
+
+.sub-modified {
+  background: var(--modified);
+}
+
+.sub-conflicted {
+  background: var(--conflict);
+}
+
+.sub-uninitialized {
+  background: transparent;
+  border: 1px solid var(--text-faint);
+}
+
+.tracking-pill {
+  display: flex;
+  gap: var(--s2);
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+
+.ahead {
+  color: var(--added);
+}
+
+.behind {
+  color: var(--removed);
+}
+
+/* --- file status ------------------------------------------------------- */
+
+.file-status {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  outline: none;
+}
+
+.fs-left {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  min-height: 0;
+}
+
+.fs-right {
+  min-width: 0;
+  min-height: 0;
+}
+
+.file-list {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.pane-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  height: 24px;
+  padding: 0 var(--s4);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.pane-count {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-weight: 400;
+}
+
+.link-button {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.link-button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.pane-body {
+  position: relative;
+  overflow-y: auto;
+  background: var(--surface);
+}
+
+.pane-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--s6);
+  color: var(--text-faint);
+  text-align: center;
+  pointer-events: none;
+}
+
+.virtual-canvas {
+  position: relative;
+  width: 100%;
+}
+
+.file-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  padding: 0 var(--s4);
+  border-left: 2px solid transparent;
+  cursor: default;
+}
+
+.file-row:hover {
+  background: var(--surface-alt);
+}
+
+.file-row-selected,
+.file-row-selected:hover {
+  background: var(--select);
+  border-left-color: var(--accent);
+}
+
+.file-row input[type="checkbox"] {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.badge {
+  width: 13px;
+  font-family: var(--mono);
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.badge-m {
+  color: var(--modified);
+}
+
+.badge-a {
+  color: var(--added);
+}
+
+.badge-d {
+  color: var(--removed);
+}
+
+.badge-r,
+.badge-c {
+  color: var(--accent);
+}
+
+.badge-untracked {
+  color: var(--text-faint);
+}
+
+.badge-conflict {
+  color: var(--conflict);
+}
+
+.file-path {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.path-dir {
+  color: var(--text-dim);
+}
+
+.file-orig {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  white-space: nowrap;
+}
+
+/* --- commit box -------------------------------------------------------- */
+
+.commit-box {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+  background: var(--surface-alt);
+  border-top: 1px solid var(--border);
+}
+
+.commit-message {
+  min-height: 78px;
+  max-height: 220px;
+  padding: var(--s3);
+  resize: vertical;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+}
+
+.commit-message:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.commit-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+}
+
+.amend-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.amend-toggle input {
+  accent-color: var(--accent);
+}
+
+.commit-hint {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+}
+
+/* --- diff -------------------------------------------------------------- */
+
+.diff {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.diff-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  height: 26px;
+  padding: 0 var(--s5);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: var(--fs-small);
+}
+
+.diff-path {
+  overflow: hidden;
+  font-family: var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-path.muted {
+  color: var(--text-faint);
+  font-family: var(--sans);
+}
+
+.diff-stat {
+  display: flex;
+  gap: var(--s4);
+  font-family: var(--mono);
+}
+
+.diff-stat .added {
+  color: var(--added);
+}
+
+.diff-stat .removed {
+  color: var(--removed);
+}
+
+.diff-timing {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-family: var(--mono);
+}
+
+.diff-body {
+  overflow: auto;
+  background: var(--surface);
+}
+
+.diff-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  min-width: 100%;
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+  line-height: 18px;
+  white-space: pre;
+}
+
+.gutter {
+  flex: none;
+  width: 44px;
+  padding-right: var(--s4);
+  color: var(--text-faint);
+  text-align: right;
+  user-select: none;
+}
+
+.diff-marker {
+  flex: none;
+  width: 16px;
+  text-align: center;
+  user-select: none;
+}
+
+.diff-text {
+  padding-right: var(--s6);
+}
+
+.diff-added {
+  background: var(--added-bg);
+  color: var(--added);
+}
+
+.diff-removed {
+  background: var(--removed-bg);
+  color: var(--removed);
+}
+
+.diff-meta {
+  color: var(--text-faint);
+}
+
+.diff-hunk {
+  background: var(--hunk-bg);
+  color: var(--text-dim);
+}
+
+.diff-notice {
+  padding: var(--s3) var(--s5);
+  background: var(--surface-alt);
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+/* --- history ----------------------------------------------------------- */
+
+.history {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+}
+
+.history-table {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  outline: none;
+}
+
+.history-head,
+.history-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 92px 148px 74px;
+  align-items: center;
+  gap: var(--s4);
+  padding-right: var(--s5);
+}
+
+.history-head {
+  height: 24px;
+  padding-left: var(--s5);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  font-weight: 600;
+}
+
+.history-body {
+  position: relative;
+  overflow-y: auto;
+  background: var(--surface);
+}
+
+.history-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding-left: var(--s5);
+  border-left: 2px solid transparent;
+  cursor: default;
+}
+
+.history-row:hover {
+  background: var(--surface-alt);
+}
+
+.history-row-selected,
+.history-row-selected:hover {
+  background: var(--select);
+  border-left-color: var(--accent);
+}
+
+/* The lane graph. Rows draw only their own cell, which is what keeps the
+   history list virtualized while still reading as continuous lines. */
+.graph {
+  display: block;
+  overflow: visible;
+}
+
+.col-subject,
+.col-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.col-date,
+.col-author {
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.col-oid {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+}
+
+.ref-chip {
+  display: inline-block;
+  margin-right: var(--s3);
+  padding: 0 var(--s3);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  line-height: 15px;
+  vertical-align: 1px;
+}
+
+.ref-head {
+  background: var(--accent);
+  color: #fff;
+}
+
+.ref-local {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ref-remote {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.ref-tag {
+  background: var(--added-bg);
+  color: var(--added);
+}
+
+.history-detail {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  background: var(--surface);
+}
+
+/* --- commit detail ------------------------------------------------------ */
+
+/* Same shape as the File Status view — list on the left, diff on the right —
+   so the two places you read a change work the same way. */
+.commit {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+}
+
+.commit-left {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-height: 0;
+  border-right: 1px solid var(--border);
+}
+
+.commit-right {
+  min-width: 0;
+  min-height: 0;
+}
+
+.commit-head {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.commit-subject {
+  margin: 0;
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+.commit-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.commit-oid {
+  padding: 0 var(--s2);
+  background: var(--surface-alt);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  cursor: pointer;
+}
+
+.commit-oid:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.commit-merge {
+  padding: 0 var(--s3);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: var(--fs-micro);
+}
+
+.commit-body {
+  margin: var(--s2) 0 0;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.commit-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  height: 24px;
+  padding: 0 var(--s5);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.commit-summary .added,
+.commit-summary .removed {
+  font-family: var(--mono);
+  font-weight: 600;
+}
+
+.commit-files {
+  position: relative;
+  overflow-y: auto;
+  background: var(--surface);
+}
+
+.commit-file {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  padding: 0 var(--s5);
+  border-left: 2px solid transparent;
+  cursor: default;
+}
+
+.commit-file:hover {
+  background: var(--surface-alt);
+}
+
+.commit-file-selected,
+.commit-file-selected:hover {
+  background: var(--select);
+  border-left-color: var(--accent);
+}
+
+/* Two parts, laid out left to right in path order. Only the directory shrinks;
+   the filename keeps its full width because it is what names the row. */
+.commit-file-path {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+/* `dir="rtl"` on this span alone moves its ellipsis to the front, so a long
+   directory loses its root rather than the folder next to the file.
+   `unicode-bidi: plaintext` keeps the text itself in reading order — without
+   it the segments themselves would reverse. */
+.commit-file-path .path-dir {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  text-overflow: ellipsis;
+  unicode-bidi: plaintext;
+}
+
+.commit-file-path .path-name {
+  flex: none;
+}
+
+.commit-file-stat {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.commit-file-counts {
+  display: flex;
+  gap: var(--s3);
+  justify-content: flex-end;
+  min-width: 76px;
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+
+.commit-file-binary {
+  min-width: 76px;
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  text-align: right;
+}
+
+/* The meter. Additions then deletions, always in that order, with the counts
+   beside it — red and green alone would not be readable to everyone. */
+.meter {
+  display: flex;
+  gap: 2px;
+  width: 64px;
+  height: 6px;
+  background: var(--border-soft);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.meter-add,
+.meter-del {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.meter-add {
+  background: var(--added);
+}
+
+.meter-del {
+  background: var(--removed);
+}
+
+/* --- welcome ----------------------------------------------------------- */
+
+.welcome {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--s4);
+  padding: var(--s7);
+  background: var(--surface);
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.welcome h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-display);
+  font-weight: 300;
+  letter-spacing: -0.015em;
+}
+
+.welcome p {
+  max-width: 34ch;
+  margin: 0 0 var(--s2);
+  line-height: 1.5;
+}
+
+.welcome-actions {
+  display: flex;
+  gap: var(--s4);
+}
+
+.welcome-hint {
+  margin-top: var(--s5);
+  color: var(--text-faint);
+  font-size: var(--fs-small);
+}
+
+/* --- status bar -------------------------------------------------------- */
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s6);
+  height: 24px;
+  padding: 0 var(--s4);
+  overflow: hidden;
+  background: var(--chrome);
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+.branch {
+  padding: 0 var(--s3);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.branch:hover {
+  background: var(--accent-soft);
+}
+
+.statusbar-spacer {
+  margin-left: auto;
+}
+
+.timing {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+
+.statusbar-button {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: 0 var(--s3);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.statusbar-button:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+.statusbar-error-count {
+  min-width: 15px;
+  padding: 0 var(--s2);
+  background: var(--removed);
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  line-height: 14px;
+  text-align: center;
+}
+
+/* --- busy indicator ---------------------------------------------------- */
+
+.activity {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  max-width: 300px;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+}
+
+.spinner {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 620ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- toasts ------------------------------------------------------------ */
+
+.toaster {
+  position: fixed;
+  right: var(--s5);
+  bottom: 34px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--s4);
+  width: 340px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.toast {
+  padding: var(--s4) var(--s5);
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-faint);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  animation: toast-in 140ms ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.toast-success {
+  border-left-color: var(--added);
+}
+
+.toast-error {
+  border-left-color: var(--removed);
+}
+
+.toast-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+}
+
+.toast-mark {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+.toast-success .toast-mark {
+  background: var(--added);
+}
+
+.toast-error .toast-mark {
+  background: var(--removed);
+}
+
+.toast-label {
+  flex: 1;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toast-time {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: var(--fs-lead);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.toast-close:hover {
+  color: var(--text);
+}
+
+.toast-detail {
+  margin: var(--s2) 0 0 23px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.toast-detail.muted {
+  color: var(--text-faint);
+  font-family: var(--sans);
+}
+
+/* The interpretation leads and git's own words follow, so the actionable
+   sentence is read first without hiding what actually happened. */
+.toast-hint {
+  margin: var(--s3) 0 0 23px;
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: 1.45;
+}
+
+.toast-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  margin-left: 23px;
+}
+
+.toast-footer:empty {
+  display: none;
+}
+
+.btn-small {
+  padding: 2px var(--s4);
+  font-size: var(--fs-small);
+}
+
+.toast-expand {
+  padding: var(--s1) 0 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.toast-output {
+  max-height: 180px;
+  margin: var(--s3) 0 0 23px;
+  padding: var(--s3);
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* --- activity log ------------------------------------------------------ */
+
+.log-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  background: var(--chrome);
+  border-left: 1px solid var(--border);
+}
+
+.log-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  height: 26px;
+  padding: 0 var(--s4);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: var(--fs-small);
+  font-weight: 600;
+}
+
+.log-count {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-weight: 400;
+}
+
+.log-close {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: var(--fs-lead);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.log-body {
+  position: relative;
+  overflow-y: auto;
+}
+
+.log-entry {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.log-entry-row {
+  display: grid;
+  grid-template-columns: 9px minmax(0, auto) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  padding: var(--s3) var(--s4);
+  background: none;
+  border: none;
+  font-size: var(--fs-small);
+  text-align: left;
+  cursor: pointer;
+}
+
+.log-entry-row:hover {
+  background: var(--surface-alt);
+}
+
+.log-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--text-faint);
+  border-radius: 50%;
+}
+
+.log-success {
+  background: var(--added);
+}
+
+.log-error {
+  background: var(--removed);
+}
+
+.log-running {
+  background: var(--accent);
+  animation: pulse 900ms ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.log-label {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-summary {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-meta {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  white-space: nowrap;
+}
+
+.log-output {
+  max-height: 240px;
+  margin: 0;
+  padding: var(--s3) var(--s4) var(--s4) 26px;
+  overflow: auto;
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* --- buttons, menus, dialogs ------------------------------------------- */
+
+.btn,
+.btn-primary,
+.btn-danger {
+  padding: var(--s2) var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--surface-alt);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-danger {
+  background: var(--removed);
+  border-color: var(--removed);
+  color: #fff;
+}
+
+.btn-primary:disabled {
+  background: var(--border-soft);
+  border-color: var(--border-soft);
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+}
+
+.menu {
+  position: fixed;
+  min-width: 200px;
+  padding: var(--s2);
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  padding: 5px var(--s4);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  font-size: var(--fs-body);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.menu-item:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+}
+
+.menu-item:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.menu-item-danger {
+  color: var(--removed);
+}
+
+.menu-item-danger:hover:not(:disabled) {
+  background: var(--removed);
+  color: #fff;
+}
+
+.menu-separator {
+  height: 1px;
+  margin: var(--s2);
+  background: var(--border-soft);
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: grid;
+  place-items: center;
+  background: rgb(10 14 20 / 42%);
+}
+
+.dialog {
+  display: grid;
+  gap: var(--s5);
+  width: 400px;
+  /* The git flow setup form is eight fields tall; it scrolls rather than
+     running off a short window. */
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: var(--s6);
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.dialog-message {
+  margin: 0;
+  color: var(--text-dim);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.dialog-field {
+  display: grid;
+  gap: var(--s2);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.dialog-input-row {
+  display: flex;
+  gap: var(--s3);
+}
+
+.dialog-field input {
+  padding: 5px var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+}
+
+.dialog-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.dialog-field input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.dialog-check {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.dialog-check input {
+  accent-color: var(--accent);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .spinner {
+    animation: spin 1.2s linear infinite !important;
+  }
+}
+
+/* --- settings ---------------------------------------------------------- */
+
+.settings {
+  position: relative;
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  width: min(880px, 92vw);
+  height: min(640px, 88vh);
+  overflow: hidden;
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  outline: none;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  padding: var(--s6) var(--s4) var(--s4);
+  background: var(--chrome-alt);
+  border-right: 1px solid var(--border);
+}
+
+.settings-title {
+  margin: 0 0 var(--s5) var(--s3);
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) var(--s3);
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--text-dim);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-tab:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+.settings-tab-active {
+  background: var(--select);
+  border-left-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* The digit is the key that gets you here, so it is set as a key. */
+.settings-tab-active .settings-tab-key {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.settings-nav-hint {
+  margin: auto 0 0;
+  padding: var(--s3);
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  line-height: 2;
+}
+
+.settings-nav-hint kbd {
+  margin: 0 1px;
+}
+
+.settings-body {
+  padding: var(--s6) var(--s7) var(--s7);
+  overflow-y: auto;
+}
+
+.settings-header {
+  margin-bottom: var(--s5);
+  padding-bottom: var(--s4);
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-heading {
+  margin: 0;
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.settings-blurb {
+  margin: var(--s1) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.settings-close {
+  position: absolute;
+  top: var(--s4);
+  right: var(--s5);
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.settings-close:hover {
+  color: var(--text);
+}
+
+.setting {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s7);
+  padding: var(--s5) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.setting-text {
+  display: grid;
+  flex: 1;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+.setting-label {
+  font-weight: 600;
+}
+
+.setting-hint {
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  line-height: 1.5;
+}
+
+.setting-control {
+  flex: none;
+  padding-top: var(--s1);
+}
+
+.setting-control select,
+.setting-control input[type="number"] {
+  padding: 4px var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--fs-body);
+}
+
+.setting-control input[type="number"] {
+  width: 88px;
+  font-family: var(--mono);
+  text-align: right;
+}
+
+.setting-control input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+}
+
+.settings-static {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+}
+
+.settings-note {
+  margin: var(--s5) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  line-height: 1.55;
+}
+
+.settings-note-tight {
+  margin: 0 0 var(--s5);
+}
+
+.settings-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  margin-bottom: var(--s3);
+}
+
+.settings-toolbar .filter {
+  flex: 1;
+}
+
+.settings-warning {
+  margin: 0 0 var(--s5);
+  padding: var(--s3) var(--s4);
+  background: var(--modified-bg);
+  border-left: 3px solid var(--modified);
+  border-radius: var(--radius);
+  font-size: var(--fs-small);
+  line-height: 1.5;
+}
+
+.settings-empty {
+  color: var(--text-faint);
+}
+
+.shortcut-group {
+  margin-bottom: var(--s6);
+}
+
+.shortcut-heading {
+  margin: 0 0 var(--s2);
+  color: var(--text-dim);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.shortcut-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  row-gap: 0;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s2) var(--s3) var(--s2) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.shortcut-row:hover {
+  background: var(--surface-alt);
+}
+
+.shortcut-row-conflict {
+  box-shadow: inset 3px 0 0 var(--modified);
+}
+
+.shortcut-label {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A quiet mark for a row that no longer matches what shipped. */
+.shortcut-changed {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+/* Each key is its own control: click it to record a replacement, use the cross
+   to drop it. A command with no slots left is simply unbound. */
+.shortcut-keys {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  justify-content: flex-end;
+  min-width: 150px;
+}
+
+.shortcut-slot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.shortcut-key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 2px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.shortcut-key:hover {
+  border-color: var(--border);
+}
+
+.shortcut-remove {
+  margin-left: 1px;
+  padding: 0 2px;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: var(--fs-body);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.shortcut-remove:hover {
+  color: var(--removed);
+}
+
+.shortcut-add {
+  padding: 0 var(--s3);
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-faint);
+  font-size: var(--fs-body);
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.shortcut-add:hover {
+  border-color: var(--accent);
+  border-style: solid;
+  color: var(--accent);
+}
+
+.shortcut-key-recording {
+  padding: 2px var(--s3);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+.shortcut-unbound {
+  color: var(--text-faint);
+  font-size: var(--fs-small);
+}
+
+.shortcut-row:hover .hover-only,
+.shortcut-row:focus-within .hover-only {
+  opacity: 1;
+}
+
+.shortcut-conflict {
+  grid-column: 1 / -1;
+  padding-bottom: var(--s2);
+  color: var(--modified);
+  font-size: var(--fs-micro);
+}
+
+/* --- command palette --------------------------------------------------- */
+
+.scrim-top {
+  align-items: flex-start;
+  padding-top: 14vh;
+}
+
+.palette {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(620px, 92vw);
+  max-height: 60vh;
+  overflow: hidden;
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.palette-input {
+  padding: var(--s5);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-lead);
+  outline: none;
+}
+
+.palette-list {
+  overflow-y: auto;
+  padding: var(--s2);
+}
+
+.palette-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) var(--s4);
+  border-radius: var(--radius);
+  cursor: default;
+}
+
+.palette-row-selected {
+  background: var(--select);
+}
+
+.palette-category {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.palette-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-keys {
+  display: flex;
+  gap: var(--s2);
+}
+
+.palette-empty {
+  padding: var(--s6);
+  color: var(--text-faint);
+  text-align: center;
+}
+
+/* A menu entry names its key on the right, so the menu teaches the keyboard
+   rather than competing with it. */
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s6);
+}
+
+.menu-label {
+  flex: 1;
+}
+
+.menu-item:hover:not(:disabled) .menu-hint {
+  background: rgb(255 255 255 / 18%);
+  border-color: rgb(255 255 255 / 35%);
+  color: #fff;
+}
+
+/* --- panel focus ------------------------------------------------------- */
+
+/* The digit that jumps to a panel, shown where the panel is. It is the literal
+   key, so it is set like a key rather than styled as a badge. */
+/* The rail: one fixed column down the left of the sidebar that holds keys and
+   nothing else. Counts live on the right. A digit's position is what says
+   which kind of number it is, so the two can never be confused. */
+.side-rail {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  width: 21px;
+}
+
+.side-key {
+  height: 15px;
+  min-width: 15px;
+  padding: 0 3px;
+}
+
+.side-section-focused > .side-header-row > .side-header {
+  color: var(--accent);
+}
+
+.side-section-focused > .side-header-row .side-key {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Section headers and rows share one left edge, so the rail is a straight
+   column rather than two columns a few pixels apart. */
+.side-header-row {
+  padding-left: var(--s2);
+}
+
+/* The keyboard cursor, distinct from selection: an outline rather than a fill,
+   because the row underneath may already be the checked-out branch. */
+.side-item-cursor {
+  background: var(--surface-alt);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.sidebar-hint {
+  position: sticky;
+  bottom: 0;
+  margin: var(--s5) 0 0;
+  padding: var(--s3) var(--s4);
+  background: var(--chrome);
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  line-height: 1.8;
+}
+
+.sidebar-hint kbd {
+  margin-right: var(--s1);
+}
+
+/* --- toolbar tips ------------------------------------------------------ */
+
+/* Anchored below the whole toolbar and centred on its button, so a tip never
+   lands on the buttons either side of the one being described. */
+.tip {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s2) var(--s4);
+  background: var(--chrome-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  max-width: min(460px, 90vw);
+  font-size: var(--fs-small);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: tip-in 90ms ease-out;
+}
+
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -3px);
+  }
+}
+
+.tip-label {
+  color: var(--text);
+  /* A repository path can be longer than the window; it wraps rather than
+     running off the edge. */
+  overflow-wrap: anywhere;
+}
+
+.tip-key {
+  background: var(--chrome);
+}
+
+.tip-note {
+  color: var(--text-faint);
+}
+
+/* Revealed only while the modifier is down, so tabs stay clean until the
+   question "which number is this one" is actually being asked. */
+.tab-key {
+  height: 14px;
+  min-width: 14px;
+  padding: 0 3px;
+  animation: tab-key-in 90ms ease-out;
+}
+
+@keyframes tab-key-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+.tab-active .tab-key {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* --- hunk and line staging --------------------------------------------- */
+
+/* Actions sit on the hunk header, where the thing they act on begins. They
+   appear on hover so a diff stays a diff until you reach for them. */
+.hunk-actions {
+  position: sticky;
+  right: var(--s4);
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-left: auto;
+  padding-right: var(--s4);
+  opacity: 0;
+}
+
+.diff-hunk:hover .hunk-actions,
+.hunk-actions:focus-within {
+  opacity: 1;
+}
+
+.hunk-count {
+  color: var(--accent);
+  font-family: var(--sans);
+  font-size: var(--fs-micro);
+}
+
+.hunk-button {
+  padding: 1px var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-family: var(--sans);
+  font-size: var(--fs-micro);
+  line-height: 15px;
+  cursor: pointer;
+}
+
+.hunk-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hunk-button-danger:hover {
+  border-color: var(--removed);
+  color: var(--removed);
+}
+
+/* Only a changed line can be picked; context has nothing to stage. */
+.diff-line-selectable {
+  cursor: pointer;
+}
+
+/* The marker column carries the selection, so the line's own added/removed
+   colour is left alone — one signal per channel. */
+.diff-line-picked .diff-marker {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.diff-line-picked {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* --- conflicts ---------------------------------------------------------- */
+
+/* Above the diff, so the choice sits next to the thing being decided. */
+.conflict-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  padding: var(--s3) var(--s5);
+  background: var(--removed-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.conflict-text {
+  display: grid;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+.conflict-title {
+  color: var(--conflict);
+  font-weight: 600;
+}
+
+.conflict-hint {
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  line-height: 1.45;
+}
+
+.conflict-actions {
+  display: flex;
+  flex: none;
+  gap: var(--s3);
+  margin-left: auto;
+}
+
+.conflict-actions button {
+  padding: 3px var(--s4);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+/* The diff sits under the bar, so the pane becomes a column. */
+.fs-right {
+  display: flex;
+  flex-direction: column;
+}
+
+.fs-right > .diff {
+  flex: 1;
+  min-height: 0;
+}

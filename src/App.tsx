@@ -1,0 +1,1272 @@
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useKeyHold } from "@tanstack/react-hotkeys";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+
+import {
+  api,
+  flowNoun,
+  isReleaseKind,
+  onRepoChanged,
+  type CurrentFlow,
+  type FlowKind,
+  type RepoInfo,
+} from "./lib/api";
+import { Toolbar, type ToolbarAction } from "./components/Toolbar";
+import {
+  Sidebar,
+  isSidebarPanel,
+  PANELS,
+  type MenuTarget,
+  type PanelId,
+  type Point,
+  type WorkspaceView,
+} from "./components/Sidebar";
+import { ContextMenu, type MenuEntry, type MenuState } from "./components/ContextMenu";
+import { FileStatusView } from "./components/FileStatusView";
+import { HistoryView } from "./components/HistoryView";
+import { Dialog, type DialogSpec } from "./components/Dialog";
+import { Toaster } from "./components/Toaster";
+import { ActivityLog } from "./components/ActivityLog";
+import { OperationBanner } from "./components/OperationBanner";
+import { Splitter, usePaneSize } from "./components/Splitter";
+import { SettingsDialog } from "./components/SettingsDialog";
+import { CommandPalette } from "./components/CommandPalette";
+import { useTip } from "./components/Tip";
+import type { CommitBoxHandle } from "./components/CommitBox";
+import { useTheme } from "./lib/useTheme";
+import { useSettings } from "./lib/settings";
+import { useCommands } from "./lib/useCommands";
+import { shortcutLabel } from "./lib/shortcutLabel";
+import { useActivity } from "./lib/useActivity";
+import type { HintAction } from "./lib/gitHints";
+import {
+  IconBranch,
+  IconCommit,
+  IconDiscard,
+  IconFetch,
+  IconFlow,
+  IconFolder,
+  IconMerge,
+  IconPull,
+  IconPush,
+  IconStash,
+  IconTerminal,
+  IconSubmodule,
+  IconWorktree,
+} from "./components/icons";
+import "./styles.css";
+
+/** Cache keys invalidated when a repo reports that its state changed. */
+const REPO_QUERY_KEYS = [
+  "status",
+  "refs",
+  "log",
+  "diff",
+  "worktrees",
+  "submodules",
+  "flow",
+];
+
+export default function App() {
+  const queryClient = useQueryClient();
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [view, setView] = useState<WorkspaceView>("status");
+  // Which region the keyboard is driving. Files and History are the main
+  // panel; the rest are sidebar lists.
+  const [focusedPanel, setFocusedPanel] = useState<PanelId>("files");
+  const [dialog, setDialog] = useState<DialogSpec | null>(null);
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const [logOpen, setLogOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  // Nothing may be written back until the restore has finished, or the first
+  // save would overwrite the stored session with an empty list.
+  const [restored, setRestored] = useState(false);
+  const { settings, keymap, update: updateSettings, loaded: settingsLoaded } = useSettings();
+
+  /** Numbers jump to a panel. Files and History also switch the main view;
+   *  the sidebar panels leave it alone so you can browse branches while still
+   *  looking at history. */
+  const focusPanel = (panel: PanelId) => {
+    if (panel === "files") setView("status");
+    if (panel === "history") setView("history");
+    setFocusedPanel(panel);
+  };
+  const themeResolved = useTheme(settings.theme);
+
+  const cycleTheme = () => {
+    const order = ["system", "light", "dark"] as const;
+    const next = order[(order.indexOf(settings.theme) + 1) % order.length];
+    updateSettings({ theme: next });
+  };
+  const activity = useActivity();
+  const [sidebarWidth, setSidebarWidth] = usePaneSize("sidebar", 232);
+  const commitRef = useRef<CommitBoxHandle>(null);
+  const tip = useTip();
+
+  // Holding the modifier reveals which digit goes with which tab. The numbers
+  // stay hidden the rest of the time: they are an answer to "which one is it",
+  // and that question is only ever asked with the key already down.
+  const ctrlHeld = useKeyHold("Control");
+  const metaHeld = useKeyHold("Meta");
+  const modHeld = ctrlHeld || metaHeld;
+
+  const repos = useQuery({
+    queryKey: ["repos"],
+    queryFn: api.listRepos,
+    initialData: [] as RepoInfo[],
+  });
+
+  // Every repo-scoped read shares these options: no polling and no refetch on
+  // focus. The backend's filesystem watcher is the only thing that invalidates
+  // them, which is what keeps many open tabs from costing anything at idle.
+  const eventDriven = {
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  } as const;
+
+  const status = useQuery({
+    queryKey: ["status", activeId],
+    queryFn: () => api.repoStatus(activeId!),
+    enabled: activeId !== null,
+    ...eventDriven,
+  });
+
+  const refs = useQuery({
+    queryKey: ["refs", activeId],
+    queryFn: () => api.repoRefs(activeId!),
+    enabled: activeId !== null,
+    ...eventDriven,
+  });
+
+  const worktrees = useQuery({
+    queryKey: ["worktrees", activeId],
+    queryFn: () => api.listWorktrees(activeId!),
+    enabled: activeId !== null,
+    ...eventDriven,
+  });
+
+  const submodules = useQuery({
+    queryKey: ["submodules", activeId],
+    queryFn: () => api.listSubmodules(activeId!),
+    enabled: activeId !== null,
+    ...eventDriven,
+  });
+
+  const flow = useQuery({
+    queryKey: ["flow", activeId],
+    queryFn: () => api.flowStatus(activeId!),
+    enabled: activeId !== null,
+    ...eventDriven,
+  });
+
+  // Reopen the tabs that were open last time.
+  //
+  // Repositories that have since been moved or deleted are skipped rather than
+  // failing the whole restore, and reported once at the end instead of as one
+  // error per repository.
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        if (!settings.restoreTabs) return;
+
+        const stored = await api.loadSession();
+        const opened: string[] = [];
+        const missing: string[] = [];
+
+        for (const path of stored.repos) {
+          try {
+            const repo = await api.openRepo(path);
+            opened.push(repo.id);
+          } catch {
+            missing.push(path);
+          }
+        }
+
+        if (cancelled) return;
+
+        await queryClient.invalidateQueries({ queryKey: ["repos"] });
+
+        setActiveId(
+          stored.active && opened.includes(stored.active) ? stored.active : (opened[0] ?? null),
+        );
+
+        if (missing.length > 0) {
+          activity.note(
+            `${missing.length} ${missing.length === 1 ? "repository" : "repositories"} could not be reopened`,
+            ["These paths no longer exist:", ...missing].join("\n"),
+            "error",
+          );
+        }
+      } finally {
+        if (!cancelled) setRestored(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Runs once the stored settings are known, so the preference is honoured.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryClient, settingsLoaded]);
+
+  // A background repo emitting a change only invalidates its own cache entries.
+  // Nothing is recomputed until that tab is actually looked at.
+  useEffect(() => {
+    const unlisten = onRepoChanged((id) => {
+      for (const key of REPO_QUERY_KEYS) {
+        queryClient.invalidateQueries({ queryKey: [key, id] });
+      }
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, [queryClient]);
+
+  // A string rather than the array, so a refetch that returns an identical list
+  // does not rewrite the file.
+  const sessionKey = JSON.stringify([repos.data.map((r) => r.root), activeId]);
+
+  useEffect(() => {
+    if (!restored) return;
+
+    void api.saveSession({
+      repos: repos.data.map((r) => r.root),
+      active: activeId,
+    });
+    // sessionKey is the value that decides whether a write is needed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restored, sessionKey]);
+
+  const activeRepo = repos.data.find((r) => r.id === activeId);
+  const head = status.data;
+  const id = activeId;
+  const busy = activity.running.length > 0;
+
+  /** Run a git action with a name attached.
+   *
+   *  The label is what the user sees in the toast, the status bar and the
+   *  activity log, so it is written as the thing they asked for rather than
+   *  the command that implements it. */
+  const perform = async (label: string, action: () => Promise<unknown>) => {
+    const ok = await activity.run(label, action);
+
+    // Refresh straight away rather than waiting on the filesystem watcher.
+    // Some operations (fetch, in particular) change refs without touching
+    // anything the watcher would notice quickly.
+    if (ok && id) {
+      for (const key of REPO_QUERY_KEYS) {
+        void queryClient.invalidateQueries({ queryKey: [key, id] });
+      }
+    }
+
+    return ok;
+  };
+
+  const act = (label: string, action: () => Promise<unknown>) => {
+    void perform(label, action);
+  };
+
+  const addRepo = (path: string) =>
+    perform(`Open ${path}`, async () => {
+      const repo = await api.openRepo(path);
+      await queryClient.invalidateQueries({ queryKey: ["repos"] });
+      setActiveId(repo.id);
+      return `Opened ${repo.root}`;
+    });
+
+  const openRepo = async () => {
+    const picked = await openDialog({ directory: true, multiple: false });
+    if (typeof picked === "string") await addRepo(picked);
+  };
+
+  const createRepo = () =>
+    setDialog({
+      title: "Create repository",
+      message:
+        "Creates the folder if it does not exist, runs git init in it, and opens it as a tab. An existing folder with files in it is fine — that is how a project starts being tracked.",
+      fields: [
+        { key: "parent", label: "Where to put it", browse: true, placeholder: "E:/Projects" },
+        { key: "name", label: "Folder name", placeholder: "my-project" },
+        {
+          key: "branch",
+          label: "First branch",
+          placeholder: "leave empty to use your git default",
+          optional: true,
+        },
+      ],
+      confirmLabel: "Create repository",
+      onConfirm: (v) => {
+        const path = `${v.parent.replace(/[\/]+$/, "")}/${v.name}`;
+
+        void perform(`Create repository ${v.name}`, async () => {
+          const repo = await api.initRepo(path, v.branch);
+          await queryClient.invalidateQueries({ queryKey: ["repos"] });
+          setActiveId(repo.id);
+          return `Created ${repo.root}`;
+        });
+      },
+    });
+
+  /** Both ways in, from one place, so the tab strip and the welcome screen
+   *  cannot drift apart. */
+  const openAddRepoMenu = (event: React.MouseEvent) =>
+    openMenu(event, [
+      {
+        label: "Open existing repository…",
+        hint: shortcutLabel(keymap["repo.open"]),
+        onClick: () => void openRepo(),
+      },
+      {
+        label: "Create new repository…",
+        hint: shortcutLabel(keymap["repo.create"]),
+        onClick: createRepo,
+      },
+    ]);
+
+  /** Tabs are listed in the order the strip shows them, so an index here is
+   *  the position you can actually see. */
+  const goToTab = (index: number) => {
+    const repo = repos.data[index];
+    if (repo) setActiveId(repo.id);
+  };
+
+  /** The digit that selects a tab, or null for one no digit reaches.
+   *
+   *  Past the eighth tab only the last is addressable, on 9 — so that is the
+   *  only one still worth labelling. */
+  const tabDigit = (index: number): number | null => {
+    if (index < 8) return index + 1;
+    return index === repos.data.length - 1 ? 9 : null;
+  };
+
+  /** Wraps, so Ctrl+Tab keeps cycling rather than stopping at the last one. */
+  const cycleTab = (delta: number) => {
+    const list = repos.data;
+    if (list.length < 2) return;
+
+    const current = list.findIndex((repo) => repo.id === activeId);
+    const next = (current + delta + list.length) % list.length;
+    setActiveId(list[next].id);
+  };
+
+  const closeRepo = async (repoId: string) => {
+    await api.closeRepo(repoId);
+    await queryClient.invalidateQueries({ queryKey: ["repos"] });
+    if (activeId === repoId) {
+      setActiveId(repos.data.find((r) => r.id !== repoId)?.id ?? null);
+    }
+  };
+
+  // --- dialogs ------------------------------------------------------------
+
+  const openAddWorktree = () => {
+    if (!id) return;
+
+    setDialog({
+      title: "Add worktree",
+      message:
+        "A worktree checks out another branch into its own directory, so you can work on two branches without stashing.",
+      fields: [
+        {
+          key: "path",
+          label: "Location",
+          browse: true,
+          placeholder: `${activeRepo?.root ?? ""}-feature`,
+        },
+        { key: "branch", label: "Branch", placeholder: "feature/login" },
+      ],
+      checkboxes: [
+        { key: "create", label: "Create the branch if it does not exist", value: true },
+      ],
+      confirmLabel: "Add worktree",
+      onConfirm: (v) =>
+        act(`Add worktree ${v.branch}`, () =>
+          api.addWorktree(id, v.path, v.branch, v.create === "true"),
+        ),
+    });
+  };
+
+  const openUpdateSubmodules = () => {
+    if (!id) return;
+
+    setDialog({
+      title: "Update submodules",
+      message: "Initializes any missing submodule and checks out the recorded commit.",
+      checkboxes: [
+        { key: "recursive", label: "Recurse into nested submodules", value: true },
+      ],
+      confirmLabel: "Update",
+      onConfirm: (v) =>
+        act("Update submodules", () =>
+          api.updateSubmodules(id, "", v.recursive === "true"),
+        ),
+    });
+  };
+
+  const confirmDeleteBranch = (name: string) => {
+    if (!id) return;
+
+    setDialog({
+      title: `Delete branch ${name}`,
+      message:
+        "Git refuses to delete a branch whose work is not merged anywhere. Forcing overrides that check and the commits become unreachable.",
+      checkboxes: [{ key: "force", label: "Force delete even if unmerged" }],
+      confirmLabel: "Delete",
+      danger: true,
+      onConfirm: (v) =>
+        act(`Delete branch ${name}`, () => api.deleteBranch(id, name, v.force === "true")),
+    });
+  };
+
+  // --- git flow -----------------------------------------------------------
+
+  const openFlowSetup = () => {
+    if (!id) return;
+    const config = flow.data?.config;
+    const existing = flow.data?.initialized ?? false;
+
+    setDialog({
+      title: existing ? "Git flow settings" : "Set up git flow",
+      message:
+        "Branch names and prefixes are stored in this repository's git config, so the git-flow command line tool reads the same setup.",
+      fields: [
+        { key: "master", label: "Production branch", value: config?.master ?? "main" },
+        { key: "develop", label: "Development branch", value: config?.develop ?? "develop" },
+        { key: "feature", label: "Feature prefix", value: config?.feature ?? "feature/" },
+        { key: "bugfix", label: "Bugfix prefix", value: config?.bugfix ?? "bugfix/" },
+        { key: "release", label: "Release prefix", value: config?.release ?? "release/" },
+        { key: "hotfix", label: "Hotfix prefix", value: config?.hotfix ?? "hotfix/" },
+        { key: "support", label: "Support prefix", value: config?.support ?? "support/" },
+        {
+          key: "versiontag",
+          label: "Version tag prefix",
+          value: config?.versiontag ?? "",
+          placeholder: "v",
+          optional: true,
+        },
+      ],
+      confirmLabel: existing ? "Save settings" : "Set up git flow",
+      onConfirm: (v) =>
+        act(existing ? "Save git flow settings" : "Set up git flow", () =>
+          api.flowInit(id, {
+            master: v.master,
+            develop: v.develop,
+            feature: v.feature,
+            bugfix: v.bugfix,
+            release: v.release,
+            hotfix: v.hotfix,
+            support: v.support,
+            versiontag: v.versiontag,
+          }),
+        ),
+    });
+  };
+
+  const openFlowStart = (kind: FlowKind) => {
+    if (!id) return;
+    const config = flow.data?.config;
+    const base = kind === "hotfix" || kind === "support" ? config?.master : config?.develop;
+    const versioned = isReleaseKind(kind);
+
+    setDialog({
+      title: `Start ${flowNoun[kind]}`,
+      message: `Branches from ${base ?? "the base branch"} and checks the new branch out.`,
+      fields: [
+        {
+          key: "name",
+          label: versioned ? "Version" : "Name",
+          placeholder: versioned ? "1.4.0" : "login",
+        },
+      ],
+      confirmLabel: "Start",
+      onConfirm: (v) =>
+        act(`Start ${flowNoun[kind]} ${v.name}`, () => api.flowStart(id, kind, v.name)),
+    });
+  };
+
+  const openFlowFinish = (current: CurrentFlow) => {
+    if (!id) return;
+    const config = flow.data?.config;
+    const versioned = isReleaseKind(current.kind);
+
+    setDialog({
+      title: `Finish ${flowNoun[current.kind]} ${current.name}`,
+      message: versioned
+        ? `Merges ${current.branch} into ${config?.master}, tags the result, then merges it into ${config?.develop}.`
+        : `Merges ${current.branch} into ${config?.develop}.`,
+      fields: versioned
+        ? [
+            {
+              key: "tag",
+              label: "Tag message",
+              placeholder: `${config?.versiontag ?? ""}${current.name}`,
+              optional: true,
+            },
+          ]
+        : undefined,
+      checkboxes: [
+        { key: "delete", label: `Delete ${current.branch} afterwards`, value: true },
+        { key: "push", label: "Push the result to origin" },
+      ],
+      confirmLabel: "Finish",
+      onConfirm: (v) =>
+        act(`Finish ${flowNoun[current.kind]} ${current.name}`, () =>
+          api.flowFinish(id, current.kind, current.name, {
+            deleteBranch: v.delete === "true",
+            push: v.push === "true",
+            tagMessage: v.tag ?? "",
+          }),
+        ),
+    });
+  };
+
+  const openFlowMenu = (x: number, y: number) => {
+    const status = flow.data;
+
+    // Nothing is configured yet, so there is exactly one thing to offer.
+    if (!status?.initialized) {
+      openMenuAt(x, y, [{ label: "Set up git flow…", onClick: openFlowSetup }]);
+      return;
+    }
+
+    const entries: MenuEntry[] = [];
+
+    // Finishing only makes sense on a flow branch, so it leads the menu when
+    // you are on one and is absent when you are not.
+    if (status.current && status.current.kind !== "support") {
+      const { kind, name } = status.current;
+      entries.push(
+        { label: `Finish ${flowNoun[kind]} ${name}…`, onClick: () => openFlowFinish(status.current!) },
+        "separator",
+      );
+    }
+
+    entries.push(
+      { label: "Start feature…", onClick: () => openFlowStart("feature") },
+      { label: "Start bugfix…", onClick: () => openFlowStart("bugfix") },
+      { label: "Start release…", onClick: () => openFlowStart("release") },
+      { label: "Start hotfix…", onClick: () => openFlowStart("hotfix") },
+      "separator",
+      { label: "Git flow settings…", onClick: openFlowSetup },
+    );
+
+    openMenuAt(x, y, entries);
+  };
+
+  const openNewBranch = () =>
+    setDialog({
+      title: "New branch",
+      fields: [{ key: "name", label: "Branch name", placeholder: "feature/thing" }],
+      confirmLabel: "Create branch",
+      onConfirm: (v) =>
+        act(`Create branch ${v.name}`, () => api.createBranch(id!, v.name, true)),
+    });
+
+  const openMerge = () =>
+    setDialog({
+      title: `Merge into ${head?.head ?? "HEAD"}`,
+      fields: [{ key: "name", label: "Branch to merge", placeholder: "main" }],
+      confirmLabel: "Merge",
+      onConfirm: (v) => act(`Merge ${v.name}`, () => api.mergeBranch(id!, v.name)),
+    });
+
+  /** Everything a discard would throw away. */
+  const discardablePaths = () =>
+    head?.entries
+      .filter((e) => e.worktreeStatus !== "." || e.kind === "untracked")
+      .filter((e) => e.kind !== "ignored")
+      .map((e) => e.path) ?? [];
+
+  const openStash = () =>
+    setDialog({
+      title: "Stash changes",
+      fields: [
+        {
+          key: "message",
+          label: "Message",
+          placeholder: "work in progress",
+          optional: true,
+        },
+      ],
+      checkboxes: [{ key: "untracked", label: "Include untracked files", value: true }],
+      confirmLabel: "Stash",
+      onConfirm: (v) =>
+        act("Stash changes", () => api.stashPush(id!, v.message, v.untracked === "true")),
+    });
+
+  /** Take the next step a failed command suggested. */
+  const runHintAction = (kind: HintAction) => {
+    if (!id) return;
+
+    switch (kind) {
+      case "pull":
+        act("Pull", () => api.pull(id));
+        break;
+      case "fetch":
+        act("Fetch", () => api.fetch(id));
+        break;
+      case "stash":
+        openStash();
+        break;
+      case "resolve":
+        // The conflicted files are in the File Status view; put the user there
+        // rather than describing where to go.
+        setView("status");
+        break;
+    }
+  };
+
+  const confirmDiscard = (paths: string[]) => {
+    if (!id || paths.length === 0) return;
+
+    const what = paths.length === 1 ? paths[0] : `${paths.length} files`;
+
+    // Turning the confirmation off is a deliberate setting, so it is honoured
+    // rather than asking anyway.
+    if (!settings.confirmDiscard) {
+      act(`Discard ${what}`, () => api.discard(id, paths));
+      return;
+    }
+
+    setDialog({
+      title: `Discard changes to ${what}`,
+      message:
+        "The working copy goes back to the last commit. Git keeps no record of discarded changes, so this cannot be undone.",
+      confirmLabel: "Discard",
+      danger: true,
+      onConfirm: () =>
+        act(`Discard ${what}`, () => api.discard(id, paths)),
+    });
+  };
+
+  const confirmRemoveWorktree = (path: string) => {
+    if (!id) return;
+
+    setDialog({
+      title: "Remove worktree",
+      message: `${path}\n\nThe directory is deleted. Uncommitted changes in it are lost.`,
+      checkboxes: [{ key: "force", label: "Force removal even with uncommitted changes" }],
+      confirmLabel: "Remove",
+      danger: true,
+      onConfirm: (v) =>
+        act("Remove worktree", () => api.removeWorktree(id, path, v.force === "true")),
+    });
+  };
+
+  // --- menus --------------------------------------------------------------
+
+  const openMenuAt = (x: number, y: number, entries: MenuEntry[]) =>
+    setMenu({ x, y, entries });
+
+  const openMenu = (event: React.MouseEvent, entries: MenuEntry[]) =>
+    openMenuAt(event.clientX, event.clientY, entries);
+
+  /** Where a menu opens when it was triggered by a key rather than a click. */
+  const menuAnchor = (): [number, number] => [window.innerWidth / 2 - 100, 120];
+
+  /** Menus for the sidebar. The sidebar reports what was clicked; the git
+   *  meaning of each target is decided here. */
+  const onSidebarMenu = (target: MenuTarget, at: Point) => {
+    if (!id) return;
+    const current = head?.head ?? "HEAD";
+
+    switch (target.kind) {
+      case "branch": {
+        const { branch } = target;
+        openMenuAt(at.x, at.y, [
+          {
+            label: `Check out ${branch.name}`,
+            disabled: branch.isHead,
+            onClick: () => act(`Check out ${branch.name}`, () => api.checkout(id, branch.name)),
+          },
+          {
+            label: `Merge ${branch.name} into ${current}`,
+            disabled: branch.isHead,
+            onClick: () =>
+              act(`Merge ${branch.name}`, () => api.mergeBranch(id, branch.name)),
+          },
+          "separator",
+          {
+            label: "Delete branch…",
+            danger: true,
+            disabled: branch.isHead,
+            onClick: () => confirmDeleteBranch(branch.name),
+          },
+        ]);
+        break;
+      }
+
+      case "remote": {
+        const { remote, branch } = target;
+        openMenuAt(at.x, at.y, [
+          {
+            label: `Check out ${branch}`,
+            onClick: () => act(`Check out ${branch}`, () => api.checkout(id, branch)),
+          },
+          {
+            label: `Merge ${remote}/${branch} into ${current}`,
+            onClick: () =>
+              act(`Merge ${remote}/${branch}`, () =>
+                api.mergeBranch(id, `${remote}/${branch}`),
+              ),
+          },
+        ]);
+        break;
+      }
+
+      case "tag":
+        openMenuAt(at.x, at.y, [
+          {
+            // Checking out a tag leaves HEAD detached; git does this, and
+            // saying so beats letting the status bar surprise them.
+            label: `Check out ${target.tag} (detached)`,
+            onClick: () => act(`Check out ${target.tag}`, () => api.checkout(id, target.tag)),
+          },
+          {
+            label: `Merge ${target.tag} into ${current}`,
+            onClick: () => act(`Merge ${target.tag}`, () => api.mergeBranch(id, target.tag)),
+          },
+        ]);
+        break;
+
+      case "stash": {
+        const { selector, message } = target.stash;
+        openMenuAt(at.x, at.y, [
+          {
+            label: "Apply and keep",
+            onClick: () => act(`Apply ${selector}`, () => api.stashApply(id, selector, false)),
+          },
+          {
+            label: "Pop (apply and drop)",
+            onClick: () => act(`Pop ${selector}`, () => api.stashApply(id, selector, true)),
+          },
+          "separator",
+          {
+            label: "Drop",
+            danger: true,
+            onClick: () =>
+              act(`Drop ${selector} — ${message}`, () => api.stashDrop(id, selector)),
+          },
+        ]);
+        break;
+      }
+
+      case "worktree": {
+        const { worktree } = target;
+        openMenuAt(at.x, at.y, [
+          { label: "Open as tab", onClick: () => void addRepo(worktree.path) },
+          "separator",
+          worktree.prunable
+            ? {
+                label: "Prune missing worktrees",
+                onClick: () => act("Prune worktrees", () => api.pruneWorktrees(id)),
+              }
+            : {
+                label: "Remove worktree…",
+                danger: true,
+                disabled: worktree.isMain,
+                onClick: () => confirmRemoveWorktree(worktree.path),
+              },
+        ]);
+        break;
+      }
+
+      case "submodule": {
+        const { submodule } = target;
+        openMenuAt(at.x, at.y, [
+          {
+            label: "Open as tab",
+            disabled: submodule.state === "uninitialized",
+            onClick: () => void addRepo(absolute(submodule.path, activeRepo?.root)),
+          },
+          {
+            label: submodule.state === "uninitialized" ? "Initialize" : "Update",
+            onClick: () =>
+              act(`Update ${submodule.path}`, () =>
+                api.updateSubmodules(id, submodule.path, true),
+              ),
+          },
+        ]);
+        break;
+      }
+    }
+  };
+
+  // --- toolbar ------------------------------------------------------------
+
+  const actions: ToolbarAction[][] = id
+    ? [
+        [
+          {
+            key: "commit",
+            commandId: "git.commit",
+            label: "Commit",
+            icon: <IconCommit />,
+            badge: head?.stagedCount || undefined,
+            primary: (head?.stagedCount ?? 0) > 0,
+            onClick: () => {
+              setView("status");
+              // Defer so the textarea exists if we just switched views.
+              setTimeout(() => commitRef.current?.focus(), 0);
+            },
+          },
+          {
+            key: "pull",
+            commandId: "git.pull",
+            label: "Pull",
+            icon: <IconPull />,
+            badge: head?.behind || undefined,
+            onClick: () => act("Pull", () => api.pull(id)),
+          },
+          {
+            key: "push",
+            commandId: "git.push",
+            label: "Push",
+            icon: <IconPush />,
+            badge: head?.ahead || undefined,
+            onClick: () => act("Push", () => api.push(id)),
+          },
+          {
+            key: "fetch",
+            commandId: "git.fetch",
+            label: "Fetch",
+            icon: <IconFetch />,
+            onClick: () => act("Fetch", () => api.fetch(id)),
+          },
+        ],
+        [
+          {
+            key: "branch",
+            commandId: "git.branch",
+            label: "Branch",
+            icon: <IconBranch />,
+            onClick: openNewBranch,
+          },
+          {
+            key: "merge",
+            commandId: "git.merge",
+            label: "Merge",
+            icon: <IconMerge />,
+            onClick: openMerge,
+          },
+          {
+            key: "stash",
+            commandId: "git.stash",
+            label: "Stash",
+            icon: <IconStash />,
+            onClick: openStash,
+          },
+          {
+            key: "discard",
+            commandId: "git.discardAll",
+            label: "Discard",
+            icon: <IconDiscard />,
+            disabled: !head || head.unstagedCount + head.untrackedCount === 0,
+            disabledReason: "Nothing to discard",
+            onClick: () => confirmDiscard(discardablePaths()),
+          },
+        ],
+        [
+          {
+            key: "flow",
+            commandId: "git.flow",
+            label: "Git Flow",
+            icon: <IconFlow />,
+            // A dot marks a repository already using git flow, so the button
+            // says whether there is anything set up before you press it.
+            badge: flow.data?.current ? 1 : undefined,
+            onClick: (e) => openFlowMenu(e.clientX, e.clientY),
+          },
+          {
+            key: "worktree",
+            label: "Worktree",
+            icon: <IconWorktree />,
+            badge: (worktrees.data?.length ?? 0) > 1 ? worktrees.data?.length : undefined,
+            onClick: openAddWorktree,
+          },
+          {
+            key: "submodule",
+            label: "Submodule",
+            icon: <IconSubmodule />,
+            badge: submodules.data?.length || undefined,
+            disabled: (submodules.data?.length ?? 0) === 0,
+            disabledReason: "This repository has no submodules",
+            onClick: openUpdateSubmodules,
+          },
+        ],
+        [
+          {
+            key: "explorer",
+            commandId: "repo.explorer",
+            label: "Explorer",
+            icon: <IconFolder />,
+            onClick: () => act("Open in Explorer", () => api.openInFileManager(id)),
+          },
+          {
+            key: "terminal",
+            commandId: "repo.terminal",
+            label: "Terminal",
+            icon: <IconTerminal />,
+            onClick: () => act("Open in terminal", () => api.openInTerminal(id)),
+          },
+        ],
+      ]
+    : [];
+
+  /** Everything reachable from a key or the palette.
+   *
+   *  A command with no handler is neither bound nor listed, so the palette
+   *  shows only what can actually run right now. */
+  const handlers: Record<string, (() => void) | undefined> = {
+    "app.palette": () => setPaletteOpen(true),
+    "app.settings": () => setSettingsOpen(true),
+    "app.activityLog": () => setLogOpen((v) => !v),
+    "app.theme": cycleTheme,
+
+    "repo.open": () => void openRepo(),
+    "repo.create": createRepo,
+    "repo.close": id ? () => void closeRepo(id) : undefined,
+    "repo.explorer": id ? () => act("Open in Explorer", () => api.openInFileManager(id)) : undefined,
+    "repo.terminal": id ? () => act("Open in terminal", () => api.openInTerminal(id)) : undefined,
+
+    // A tab shortcut only exists while that tab does, so the palette never
+    // lists a repository you do not have open.
+    "tab.next": repos.data.length > 1 ? () => cycleTab(1) : undefined,
+    "tab.previous": repos.data.length > 1 ? () => cycleTab(-1) : undefined,
+    "tab.last": repos.data.length > 1 ? () => goToTab(repos.data.length - 1) : undefined,
+    ...Object.fromEntries(
+      Array.from({ length: 8 }, (_, i) => [
+        `tab.${i + 1}`,
+        repos.data.length > i ? () => goToTab(i) : undefined,
+      ]),
+    ),
+    ...Object.fromEntries(
+      PANELS.map((panel) => [
+        `panel.${panel}`,
+        // Sidebar panels need a repository; the two main ones always exist.
+        id || panel === "files" || panel === "history"
+          ? () => focusPanel(panel)
+          : undefined,
+      ]),
+    ),
+
+    "git.fetch": id ? () => act("Fetch", () => api.fetch(id)) : undefined,
+    "git.pull": id ? () => act("Pull", () => api.pull(id)) : undefined,
+    "git.push": id ? () => act("Push", () => api.push(id)) : undefined,
+    "git.commit": id
+      ? () => {
+          setView("status");
+          setTimeout(() => commitRef.current?.focus(), 0);
+        }
+      : undefined,
+    "git.branch": id ? openNewBranch : undefined,
+    "git.merge": id ? openMerge : undefined,
+    "git.stash": id ? openStash : undefined,
+    "git.discardAll": id ? () => confirmDiscard(discardablePaths()) : undefined,
+    "git.flow": id ? () => openFlowMenu(...menuAnchor()) : undefined,
+  };
+
+  const inputOpen = settingsOpen || paletteOpen || dialog !== null;
+  useCommands(handlers, !inputOpen);
+
+  return (
+    <div className={`app ${id === null ? "app-empty" : ""}`}>
+      <header className="tabs">
+        {repos.data.map((repo, index) => (
+          <div
+            key={repo.id}
+            className={`tab ${repo.id === activeId ? "tab-active" : ""}`}
+            onClick={() => setActiveId(repo.id)}
+            {...tip(
+              repo.root,
+              index < 8
+                ? `tab.${index + 1}`
+                : index === repos.data.length - 1
+                  ? "tab.last"
+                  : undefined,
+            )}
+          >
+            {modHeld && tabDigit(index) !== null && (
+              <kbd className="tab-key">{tabDigit(index)}</kbd>
+            )}
+            <span className="tab-name">{repo.name}</span>
+            <span
+              className="tab-close"
+              title="Close repository"
+              onClick={(e) => {
+                e.stopPropagation();
+                void closeRepo(repo.id);
+              }}
+            >
+              &times;
+            </span>
+          </div>
+        ))}
+
+        <button
+          className="tab tab-add"
+          {...tip("Open or create a repository", "repo.open")}
+          onClick={openAddRepoMenu}
+        >
+          +
+        </button>
+      </header>
+
+      {id === null ? (
+        <div className="welcome">
+          <h1>Braid</h1>
+          <p>
+            Open a repository to see its working copy and history. Open as many as you
+            like — each one gets a tab, and idle tabs cost nothing.
+          </p>
+          <div className="welcome-actions">
+            <button className="btn-primary" onClick={() => void openRepo()}>
+              Open repository
+            </button>
+            <button className="btn" onClick={createRepo}>
+              Create repository
+            </button>
+          </div>
+          <p className="welcome-hint">Ctrl+O to open · Ctrl+N to create</p>
+        </div>
+      ) : (
+        <>
+          <Toolbar groups={actions} />
+
+          <div
+            className={`body ${logOpen ? "body-with-log" : ""}`}
+            style={{
+              gridTemplateColumns: `${sidebarWidth}px 4px minmax(0, 1fr)${logOpen ? " 380px" : ""}`,
+            }}
+          >
+            <Sidebar
+              focusedPanel={focusedPanel}
+              keyboardActive={!inputOpen}
+              onFocusPanel={focusPanel}
+              refs={refs.data}
+              status={status.data}
+              worktrees={worktrees.data}
+              submodules={submodules.data}
+              view={view}
+              onCheckout={(name) => act(`Check out ${name}`, () => api.checkout(id, name))}
+              onStash={(selector, action) =>
+                act(
+                  action === "drop" ? `Drop ${selector}` : `${action} ${selector}`,
+                  () =>
+                    action === "drop"
+                      ? api.stashDrop(id, selector)
+                      : api.stashApply(id, selector, action === "pop"),
+                )
+              }
+              // Worktrees and submodules are separate repositories, so opening
+              // one is the same operation as opening any other repo: a new tab.
+              onOpenPath={(path) => void addRepo(absolute(path, activeRepo?.root))}
+              onAddWorktree={openAddWorktree}
+              onPruneWorktrees={() => act("Prune worktrees", () => api.pruneWorktrees(id))}
+              onRemoveWorktree={confirmRemoveWorktree}
+              onUpdateSubmodule={(path) =>
+                act(`Update ${path}`, () => api.updateSubmodules(id, path, true))
+              }
+              onUpdateAllSubmodules={openUpdateSubmodules}
+              onMenu={onSidebarMenu}
+            />
+
+            <Splitter
+              axis="x"
+              value={sidebarWidth}
+              onChange={setSidebarWidth}
+              min={180}
+              max={480}
+            />
+
+            <main className="content">
+              {head && (
+                <OperationBanner
+                  state={head.state}
+                  conflictedCount={head.conflictedCount}
+                  busy={busy}
+                  onAbort={() => act("Abort operation", () => api.abortOperation(id))}
+                  onContinue={() => act("Continue operation", () => api.continueOperation(id))}
+                  onSkip={() => act("Skip commit", () => api.skipOperation(id))}
+                />
+              )}
+
+              {view === "status" ? (
+                <FileStatusView
+                  keyboardActive={!isSidebarPanel(focusedPanel) && !inputOpen}
+                  repoId={id}
+                  status={status.data}
+                  busy={busy}
+                  commitRef={commitRef}
+                  onStage={(paths) =>
+                    act(stageLabel("Stage", paths), () => api.stage(id, paths))
+                  }
+                  onUnstage={(paths) =>
+                    act(stageLabel("Unstage", paths), () => api.unstage(id, paths))
+                  }
+                  onDiscard={(paths) => confirmDiscard(paths)}
+                  onCommit={(message, amend) =>
+                    perform(amend ? "Amend commit" : "Commit", () =>
+                      api.commit(id, message, amend),
+                    )
+                  }
+                  onResolve={(path, side) =>
+                    act(
+                      `Take ${side === "ours" ? "this branch" : "the other side"} for ${path}`,
+                      () => api.resolveWithSide(id, path, side),
+                    )
+                  }
+                  onMarkResolved={(path) =>
+                    act(`Mark ${path} resolved`, () => api.markResolved(id, path))
+                  }
+                  onHunk={({ path, hunk, lines, action }) =>
+                    act(hunkLabel(action, lines), () =>
+                      api.applyHunk(id, {
+                        path,
+                        hunkIndex: hunk,
+                        lines,
+                        mode: action,
+                        contextLines: settings.diffContextLines,
+                        ignoreWhitespace: settings.ignoreWhitespace,
+                      }),
+                    )
+                  }
+                />
+              ) : (
+                <HistoryView
+                  repoId={id}
+                  headOid={head?.headOid ?? null}
+                  keyboardActive={!isSidebarPanel(focusedPanel) && !inputOpen}
+                />
+              )}
+            </main>
+
+            {logOpen && (
+              <ActivityLog
+                entries={activity.entries}
+                onClear={activity.clear}
+                onClose={() => setLogOpen(false)}
+              />
+            )}
+          </div>
+        </>
+      )}
+
+      <footer className="statusbar">
+        {head && (
+          <>
+            {/* The current branch doubles as a quick switcher, which is the
+                place people look for one. */}
+            <button
+              className="branch"
+              {...tip("Switch branch")}
+              onClick={(e) =>
+                openMenu(
+                  e,
+                  (refs.data?.branches ?? []).map((branch) => ({
+                    label: branch.isHead ? `${branch.name} (current)` : branch.name,
+                    disabled: branch.isHead,
+                    onClick: () =>
+                      act(`Check out ${branch.name}`, () => api.checkout(id!, branch.name)),
+                  })),
+                )
+              }
+            >
+              {head.head ?? "detached HEAD"}
+            </button>
+
+            {head.upstream && (
+              <span>
+                &uarr;{head.ahead} &darr;{head.behind} {head.upstream}
+              </span>
+            )}
+            <span>
+              {head.stagedCount} staged &middot; {head.unstagedCount} changed &middot;{" "}
+              {head.untrackedCount} untracked
+              {head.conflictedCount > 0 && ` · ${head.conflictedCount} conflicted`}
+            </span>
+          </>
+        )}
+
+        {busy && (
+          <span className="activity">
+            <span className="spinner" />
+            {activity.running[0].label}
+            {activity.running.length > 1 && ` +${activity.running.length - 1}`}
+          </span>
+        )}
+
+        <span className="statusbar-spacer" />
+
+        {head && (
+          <span className="timing" title="Time the last git status call took">
+            status {head.durationMs}ms
+          </span>
+        )}
+
+        <button
+          className="statusbar-button"
+          {...tip("Show every git operation and its output", "app.activityLog")}
+          onClick={() => setLogOpen((v) => !v)}
+        >
+          Activity
+          {activity.errorCount > 0 && (
+            <span className="statusbar-error-count">{activity.errorCount}</span>
+          )}
+        </button>
+
+        <button
+          className="statusbar-button"
+          {...tip("Switch between system, light and dark", "app.theme")}
+          onClick={cycleTheme}
+        >
+          Theme: {settings.theme}
+          {settings.theme === "system" && ` (${themeResolved})`}
+        </button>
+
+        <button
+          className="statusbar-button"
+          {...tip("Settings and keyboard shortcuts", "app.settings")}
+          onClick={() => setSettingsOpen(true)}
+        >
+          Settings
+        </button>
+      </footer>
+
+      <Toaster
+        toasts={activity.toasts}
+        onDismiss={activity.dismiss}
+        onAction={runHintAction}
+      />
+
+      {dialog && <Dialog spec={dialog} onClose={() => setDialog(null)} />}
+      {menu && <ContextMenu state={menu} onClose={() => setMenu(null)} />}
+      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {paletteOpen && (
+        <CommandPalette handlers={handlers} onClose={() => setPaletteOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+function hunkLabel(action: "stage" | "unstage" | "discard", lines?: number[]) {
+  const verb = action === "stage" ? "Stage" : action === "unstage" ? "Unstage" : "Discard";
+  if (!lines) return `${verb} hunk`;
+
+  return `${verb} ${lines.length} ${lines.length === 1 ? "line" : "lines"}`;
+}
+
+function stageLabel(verb: string, paths: string[]) {
+  return paths.length === 1 ? `${verb} ${paths[0]}` : `${verb} ${paths.length} files`;
+}
+
+/** Submodule paths are relative to the superproject; worktree paths are not. */
+function absolute(path: string, root: string | undefined) {
+  const isAbsolute = /^([a-zA-Z]:[\\/]|\/|\\\\)/.test(path);
+  return isAbsolute || !root ? path : `${root}/${path}`;
+}

@@ -1,0 +1,133 @@
+import { useEffect, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+
+import { badgeFor, type StatusEntry } from "../lib/api";
+
+const ROW_HEIGHT = 22;
+
+/** Git's status letters, spelled out. The letters stay — they are what git and
+ *  every other client use — but nobody should have to remember them. */
+const BADGE_TITLES: Record<string, string> = {
+  M: "Modified",
+  A: "Added",
+  D: "Deleted",
+  R: "Renamed",
+  C: "Copied",
+  T: "Type changed",
+  "?": "Untracked",
+  "!": "Conflicted",
+};
+
+interface Props {
+  title: string;
+  entries: StatusEntry[];
+  staged: boolean;
+  selectedPath: string | null;
+  onSelect: (entry: StatusEntry) => void;
+  /** Checkbox toggle: stages an unstaged file, unstages a staged one. */
+  onToggle: (entry: StatusEntry) => void;
+  onToggleAll: () => void;
+  actionLabel: string;
+  emptyMessage: string;
+}
+
+/** One of the two panes in the File Status view.
+ *
+ *  Virtualized because a `git reset` on a large tree can leave tens of
+ *  thousands of files in this list. */
+export function FileList({
+  title,
+  entries,
+  staged,
+  selectedPath,
+  onSelect,
+  onToggle,
+  onToggleAll,
+  actionLabel,
+  emptyMessage,
+}: Props) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: entries.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 15,
+  });
+
+  // Keep the keyboard selection on screen without yanking the whole list.
+  const index = entries.findIndex((entry) => entry.path === selectedPath);
+  useEffect(() => {
+    if (index >= 0) virtualizer.scrollToIndex(index, { align: "auto" });
+  }, [index, virtualizer]);
+
+  return (
+    <section className="file-list">
+      <header className="pane-header">
+        <span className="pane-title">{title}</span>
+        <span className="pane-count">{entries.length}</span>
+        <button className="link-button" disabled={entries.length === 0} onClick={onToggleAll}>
+          {actionLabel}
+        </button>
+      </header>
+
+      <div className="pane-body" ref={scrollRef}>
+        <div className="virtual-canvas" style={{ height: virtualizer.getTotalSize() }}>
+          {virtualizer.getVirtualItems().map((item) => {
+            const entry = entries[item.index];
+            if (!entry) return null;
+
+            const badge = badgeFor(entry, staged);
+            const meaning = BADGE_TITLES[badge] ?? "Changed";
+
+            return (
+              <div
+                key={item.key}
+                className={`file-row ${entry.path === selectedPath ? "file-row-selected" : ""}`}
+                style={{ height: item.size, transform: `translateY(${item.start}px)` }}
+                onMouseDown={() => onSelect(entry)}
+                onDoubleClick={() => onToggle(entry)}
+              >
+                <input
+                  type="checkbox"
+                  checked={staged}
+                  aria-label={`${staged ? "Unstage" : "Stage"} ${entry.path}`}
+                  onChange={() => onToggle(entry)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span className={`badge badge-${badgeClass(badge)}`} title={meaning}>
+                  {badge}
+                </span>
+                <span className="file-path" title={`${entry.path} — ${meaning}`}>
+                  <PathLabel path={entry.path} />
+                </span>
+                {entry.origPath && <span className="file-orig">was {entry.origPath}</span>}
+              </div>
+            );
+          })}
+        </div>
+
+        {entries.length === 0 && <div className="pane-empty">{emptyMessage}</div>}
+      </div>
+    </section>
+  );
+}
+
+function badgeClass(badge: string) {
+  if (badge === "?") return "untracked";
+  if (badge === "!") return "conflict";
+  return badge.toLowerCase();
+}
+
+/** Dim the directory so the filename is what the eye lands on. */
+function PathLabel({ path }: { path: string }) {
+  const cut = path.lastIndexOf("/");
+  if (cut === -1) return <span className="path-name">{path}</span>;
+
+  return (
+    <>
+      <span className="path-dir">{path.slice(0, cut + 1)}</span>
+      <span className="path-name">{path.slice(cut + 1)}</span>
+    </>
+  );
+}
