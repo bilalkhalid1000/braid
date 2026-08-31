@@ -173,19 +173,31 @@ kbd.key-live {
   color: #fff;
 }
 
+/* A column, deliberately not a grid with a fixed row template. Half of this
+   shell's children are conditional -- the update banner, the toolbar, dialogs,
+   the palette -- and a row template assigns space by child *index*, so one
+   absent child silently hands the 1fr row to whatever follows it. A flex column
+   sizes by child instead, so the body keeps the slack no matter what is
+   mounted. */
 .app {
-  display: grid;
-  /* tabs, toolbar, update banner, body, status bar. The banner row collapses
-     to nothing when there is no update, so it costs no space normally. */
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   height: 100%;
   outline: none;
 }
 
-/* With no repo open there is no toolbar, so the welcome pane takes the middle
-   row directly instead of leaving the status bar floating mid-window. */
-.app-empty {
-  grid-template-rows: auto minmax(0, 1fr) auto;
+/* Chrome keeps its own height; only the body absorbs what is left over. */
+.app > .tabs,
+.app > .toolbar,
+.app > .update-banner,
+.app > .statusbar {
+  flex: none;
+}
+
+.app > .body,
+.app > .welcome {
+  flex: 1;
+  min-height: 0;
 }
 
 /* --- repo tabs --------------------------------------------------------- */

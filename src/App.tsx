@@ -981,7 +981,7 @@ export default function App() {
   useCommands(handlers, !inputOpen);
 
   return (
-    <div className={`app ${id === null ? "app-empty" : ""}`}>
+    <div className="app">
       <header className="tabs">
         {repos.data.map((repo, index) => (
           <div
