@@ -1851,6 +1851,14 @@ kbd.key-live {
   color: #fff;
 }
 
+/* The keyboard cursor reads the same as hover -- and hovering moves the
+   cursor -- so the mouse and the keyboard never highlight two different
+   entries. */
+.menu-item-cursor:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+}
+
 .menu-item:disabled {
   color: var(--text-faint);
   cursor: default;
@@ -2779,4 +2787,39 @@ kbd.key-live {
   color: var(--modified);
   font-size: var(--fs-small);
   line-height: 1.5;
+}
+
+/* --- git flow plan ----------------------------------------------------- */
+
+/* The diagram in the finish dialog. Chrome is sans and data is mono
+   everywhere else in the app, and a branch name is data. */
+.flow-plan {
+  width: 100%;
+  margin: var(--s4) 0 var(--s5);
+}
+.flow-rail {
+  stroke: var(--border);
+  stroke-width: 1.5;
+  fill: none;
+}
+.flow-arrow-head {
+  fill: var(--border);
+}
+.flow-node {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.flow-node-source {
+  fill: var(--accent);
+}
+.flow-branch {
+  fill: var(--text);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+}
+.flow-note {
+  fill: var(--text-faint);
+  font-family: var(--sans);
+  font-size: var(--fs-micro);
 }

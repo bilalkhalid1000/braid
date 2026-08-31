@@ -310,6 +310,69 @@ async fn finishing_a_release_tags_it_and_lands_on_both_branches() {
 }
 
 #[tokio::test]
+async fn finishing_a_hotfix_without_deleting_keeps_the_branch() {
+    // The delete checkbox is the one option in that dialog that destroys
+    // something, so "off" has to mean off. A hotfix takes the longer path --
+    // production, tag, then develop -- which is where an unconditional delete
+    // would hide.
+    let repo = TestRepo::new();
+    flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
+
+    flow::start(repo.git_api(), FlowKind::Hotfix, "1.0.1").await.unwrap();
+    repo.write("fix.txt", "patched
+");
+    repo.commit_all("Fix the thing");
+
+    flow::finish(
+        repo.git_api(),
+        FlowKind::Hotfix,
+        "1.0.1",
+        &FinishOptions {
+            delete_branch: false,
+            push: false,
+            tag_message: String::new(),
+        },
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        repo.git(&["branch", "--list", "hotfix/1.0.1"]).contains("hotfix/1.0.1"),
+        "the branch must survive when the delete option is off",
+    );
+    assert!(repo.git(&["tag", "--list", "1.0.1"]).contains("1.0.1"));
+}
+
+#[tokio::test]
+async fn finishing_a_feature_without_deleting_keeps_the_branch() {
+    let repo = TestRepo::new();
+    flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
+
+    flow::start(repo.git_api(), FlowKind::Feature, "login").await.unwrap();
+    repo.write("login.txt", "work
+");
+    repo.commit_all("Feature work");
+
+    flow::finish(
+        repo.git_api(),
+        FlowKind::Feature,
+        "login",
+        &FinishOptions {
+            delete_branch: false,
+            push: false,
+            tag_message: String::new(),
+        },
+    )
+    .await
+    .unwrap();
+
+    assert!(
+        repo.git(&["branch", "--list", "feature/login"]).contains("feature/login"),
+        "the branch must survive when the delete option is off",
+    );
+}
+
+#[tokio::test]
 async fn a_support_branch_cannot_be_finished() {
     let repo = TestRepo::new();
     flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();

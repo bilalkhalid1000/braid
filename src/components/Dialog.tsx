@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 export interface DialogField {
@@ -21,6 +21,8 @@ export interface DialogCheckbox {
 export interface DialogSpec {
   title: string;
   message?: string;
+  /** Drawn under the message: what the action is about to do. */
+  graphic?: ReactNode;
   fields?: DialogField[];
   checkboxes?: DialogCheckbox[];
   confirmLabel: string;
@@ -79,6 +81,7 @@ export function Dialog({ spec, onClose }: { spec: DialogSpec; onClose: () => voi
       >
         <h2 className="dialog-title">{spec.title}</h2>
         {spec.message && <p className="dialog-message">{spec.message}</p>}
+        {spec.graphic}
 
         {spec.fields?.map((field, index) => (
           <label className="dialog-field" key={field.key}>

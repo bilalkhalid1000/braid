@@ -14,7 +14,7 @@
  *  on both J and ArrowDown, the way every list does.
  */
 
-export type CommandScope = "global" | "status" | "history" | "sidebar";
+export type CommandScope = "global" | "status" | "history" | "sidebar" | "menu";
 
 /** commandId to every way it can be triggered. An empty list means unbound. */
 export type Keymap = Record<string, string[]>;
@@ -81,6 +81,14 @@ export const COMMANDS: CommandDef[] = [
   { id: "sidebar.activate", label: "Use the selected item", category: "Sidebar", scope: "sidebar", binding: ["Enter"] },
   { id: "sidebar.menu", label: "Open the item's menu", category: "Sidebar", scope: "sidebar", binding: ["Shift+Enter"] },
   { id: "sidebar.leave", label: "Return to the main panel", category: "Sidebar", scope: "sidebar", binding: ["Escape"] },
+
+  // --- Menus, live only while one is open. A menu takes the keyboard from
+  //     whatever raised it, so these reuse the list keys rather than
+  //     inventing a second set. ---
+  { id: "menu.next", label: "Next entry", category: "Menu", scope: "menu", binding: ["J", "ArrowDown"] },
+  { id: "menu.previous", label: "Previous entry", category: "Menu", scope: "menu", binding: ["K", "ArrowUp"] },
+  { id: "menu.activate", label: "Run the selected entry", category: "Menu", scope: "menu", binding: ["Enter"] },
+  { id: "menu.close", label: "Close the menu", category: "Menu", scope: "menu", binding: ["Escape"] },
 
   // --- Git, lazygit-style single letters ---
   { id: "git.fetch", label: "Fetch", category: "Git", scope: "global", binding: ["F"], needsRepo: true },

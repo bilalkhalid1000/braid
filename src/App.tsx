@@ -26,6 +26,7 @@ import { ContextMenu, type MenuEntry, type MenuState } from "./components/Contex
 import { FileStatusView } from "./components/FileStatusView";
 import { HistoryView } from "./components/HistoryView";
 import { Dialog, type DialogSpec } from "./components/Dialog";
+import { FlowPlan, type FlowPlanTarget } from "./components/FlowPlan";
 import { Toaster } from "./components/Toaster";
 import { ActivityLog } from "./components/ActivityLog";
 import { OperationBanner } from "./components/OperationBanner";
@@ -500,11 +501,24 @@ export default function App() {
     const config = flow.data?.config;
     const versioned = isReleaseKind(current.kind);
 
+    // What the merges will do, drawn. Two merges, a tag and a delete is more
+    // than a sentence carries comfortably, and it is the moment to check.
+    const targets: FlowPlanTarget[] = versioned
+      ? [
+          {
+            branch: config?.master ?? "main",
+            note: `tag ${config?.versiontag ?? ""}${current.name}`,
+          },
+          { branch: config?.develop ?? "develop" },
+        ]
+      : [{ branch: config?.develop ?? "develop" }];
+
     setDialog({
       title: `Finish ${flowNoun[current.kind]} ${current.name}`,
       message: versioned
         ? `Merges ${current.branch} into ${config?.master}, tags the result, then merges it into ${config?.develop}.`
         : `Merges ${current.branch} into ${config?.develop}.`,
+      graphic: <FlowPlan from={current.branch} targets={targets} />,
       fields: versioned
         ? [
             {
@@ -977,7 +991,9 @@ export default function App() {
     "git.flow": id ? () => openFlowMenu(...menuAnchor()) : undefined,
   };
 
-  const inputOpen = settingsOpen || paletteOpen || dialog !== null;
+  // A menu counts: it owns the keyboard while it is up, or J would move the
+  // list behind it instead of the menu's own cursor.
+  const inputOpen = settingsOpen || paletteOpen || dialog !== null || menu !== null;
   useCommands(handlers, !inputOpen);
 
   return (
