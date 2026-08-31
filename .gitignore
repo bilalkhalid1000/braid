@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Updater signing keys. The private half must never be committed: every
+# installed copy trusts only that key, so leaking it means anyone can ship an
+# update, and losing it means nobody can.
+*.key
+*.key.pub

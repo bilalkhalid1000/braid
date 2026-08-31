@@ -1,7 +1,15 @@
 # Braid
 
-A fast, keyboard-first Git GUI. Built because SourceTree becomes unusable with
-several repositories open at once.
+![alpha](https://img.shields.io/badge/status-alpha-orange)
+![tests](https://img.shields.io/badge/tests-275%20passing-brightgreen)
+
+A fast, keyboard-first Git GUI.
+
+Built because SourceTree becomes unusable with several repositories open at once.
+
+> **Alpha.** Usable daily, but early. Every write goes through your own `git`, so
+> nothing here invents a storage format of its own — but keep a backup of anything
+> you cannot afford to lose, and expect rough edges.
 
 See [PLAN.md](./PLAN.md) for the architecture, the performance rules the design
 is built around, and the phased roadmap.
@@ -97,6 +105,83 @@ pnpm tauri icon src-tauri/icons/source.png     # source.png -> .ico, .icns, PNGs
 Check the result at 32px before committing. The proportions are tuned for that
 size: the branch's parallel run has to carry about a third of its length, or the
 two curves meet and the shape closes into a balloon.
+
+## Releasing
+
+One command, then CI does the rest:
+
+```sh
+pnpm release patch          # or minor, major, or an exact 1.4.2
+git push && git push origin v0.1.1
+```
+
+The script bumps the version in the three files that have to agree
+(`package.json`, `tauri.conf.json`, `Cargo.toml`), commits, and tags. Pushing the
+tag starts `.github/workflows/release.yml`, which builds installers for Windows,
+macOS and Linux, signs the update artifacts, and opens a **draft** release with a
+`latest.json` manifest attached.
+
+It stops at draft deliberately. Nothing installed offers the update until you open
+that draft and publish it, so a tag pushed by mistake costs nothing.
+
+```
+pnpm release alpha      0.1.0-alpha.1 -> 0.1.0-alpha.2
+pnpm release beta       0.1.0-alpha.4 -> 0.1.0-beta.1
+pnpm release stable     0.1.0-alpha.4 -> 0.1.0
+pnpm release patch|minor|major
+pnpm release 1.4.2      an exact version
+```
+
+`--dry-run` shows what it would change without writing anything.
+
+### Prereleases and the updater
+
+A prerelease is signalled by the **version** (`0.1.0-alpha.2`), which the app reads
+at runtime and shows as a badge beside the status bar, on the welcome screen and in
+*Settings → About*. Because it is derived from the version, the badge disappears by
+itself at 1.0.0 rather than waiting for someone to remember to delete it.
+
+GitHub's own *prerelease* checkbox is deliberately left **off**, and this is the one
+non-obvious thing in the setup: GitHub excludes prereleases from
+`/releases/latest`, which is exactly the URL every installed copy polls. Ticking it
+would quietly switch off auto-updates for everyone. Turn it on in
+`.github/workflows/release.yml` only once updates no longer matter, or after moving
+the endpoint off `/latest`.
+
+### First-time setup
+
+Two things have to be done once, and updates silently do nothing without them.
+
+**1. Point the updater at the repository.** In `src-tauri/tauri.conf.json`, replace
+`OWNER/REPO`:
+
+```json
+"endpoints": ["https://github.com/OWNER/REPO/releases/latest/download/latest.json"]
+```
+
+**2. Add the signing key to GitHub.** Updates are signed, and the app refuses
+anything not signed with the key its build was made against. The keypair already
+exists at `~/.tauri/braid-updater.key`; the public half is in `tauri.conf.json`
+and the private half must never be committed.
+
+In *Settings → Secrets and variables → Actions*, add:
+
+| Secret | Value |
+| --- | --- |
+| `TAURI_SIGNING_PRIVATE_KEY` | the contents of `~/.tauri/braid-updater.key` |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | empty, unless you set one |
+
+**Back that private key up somewhere you will still have it in a year.** Losing it
+means every installed copy stops accepting updates, because they only trust that
+key — the only way out is for everyone to reinstall by hand.
+
+### How an installed app updates
+
+A few seconds after launch it asks GitHub whether a newer release exists, and shows
+a banner under the toolbar if so. Nothing downloads until asked, and nothing
+restarts without asking — an update that interrupts you mid-commit is worse than a
+late one. It can also be checked on demand in *Settings → Updates*, and the
+launch check turned off there.
 
 ## Notes on behaviour
 

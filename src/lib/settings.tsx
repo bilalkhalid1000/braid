@@ -27,6 +27,8 @@ export interface Settings {
   historyPageSize: number;
   /** How long a multi-key sequence waits for its next chord, in ms. */
   sequenceTimeout: number;
+  /** Look for a new version shortly after launch. */
+  checkForUpdates: boolean;
   /** Only the commands the user has actually rebound. Values are lists, so a
    *  command can answer to several keys. */
   keymap: Keymap;
@@ -40,6 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ignoreWhitespace: false,
   historyPageSize: 300,
   sequenceTimeout: 700,
+  checkForUpdates: true,
   keymap: {},
 };
 

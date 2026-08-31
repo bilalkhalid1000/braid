@@ -175,7 +175,9 @@ kbd.key-live {
 
 .app {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  /* tabs, toolbar, update banner, body, status bar. The banner row collapses
+     to nothing when there is no update, so it costs no space normally. */
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   height: 100%;
   outline: none;
 }
@@ -1108,8 +1110,9 @@ kbd.key-live {
 .history-detail {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   min-height: 0;
+  overflow: hidden;
   background: var(--surface);
 }
 
@@ -1124,8 +1127,8 @@ kbd.key-live {
 }
 
 .commit-left {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   border-right: 1px solid var(--border);
 }
@@ -1135,11 +1138,24 @@ kbd.key-live {
   min-height: 0;
 }
 
+/* Capped at half the pane so a long message can never squeeze the file list
+   out of existence, and scrolls inside that cap rather than being clipped. */
 .commit-head {
-  display: grid;
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
   gap: var(--s2);
+  min-height: 0;
+  max-height: 50%;
   padding: var(--s4) var(--s5);
   border-bottom: 1px solid var(--border-soft);
+}
+
+/* The subject and the hash stay put; only the message body moves, so you never
+   lose track of which commit you are reading. */
+.commit-subject,
+.commit-meta {
+  flex: none;
 }
 
 .commit-subject {
@@ -1184,7 +1200,10 @@ kbd.key-live {
 }
 
 .commit-body {
+  flex: 1 1 auto;
+  min-height: 0;
   margin: var(--s2) 0 0;
+  overflow-y: auto;
   color: var(--text-dim);
   font-family: var(--mono);
   font-size: var(--fs-body);
@@ -1195,6 +1214,7 @@ kbd.key-live {
 
 .commit-summary {
   display: flex;
+  flex: none;
   align-items: center;
   gap: var(--s5);
   height: 24px;
@@ -1213,6 +1233,8 @@ kbd.key-live {
 
 .commit-files {
   position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   background: var(--surface);
 }
@@ -2607,4 +2629,120 @@ kbd.key-live {
 .fs-right > .diff {
   flex: 1;
   min-height: 0;
+}
+
+/* --- updates ------------------------------------------------------------ */
+
+/* Under the toolbar rather than over the window: a new version is never urgent
+   enough to take the app away from someone mid-commit. */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  padding: var(--s3) var(--s5);
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border);
+  animation: tip-in 140ms ease-out;
+}
+
+.update-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.update-text {
+  display: grid;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+.update-title {
+  font-weight: 600;
+}
+
+.update-notes {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-actions {
+  display: flex;
+  flex: none;
+  gap: var(--s3);
+  margin-left: auto;
+}
+
+.update-actions button {
+  padding: 3px var(--s4);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+.update-meter {
+  flex: none;
+  width: 160px;
+  height: 6px;
+  margin-left: auto;
+  background: var(--surface);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.update-meter-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 120ms linear;
+}
+
+/* --- release channel ---------------------------------------------------- */
+
+/* Derived from the version, so it disappears on its own at 1.0.0 rather than
+   waiting for someone to remember to delete it. */
+.channel {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--s3);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-family: var(--sans);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 15px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.channel-alpha {
+  color: var(--modified);
+}
+
+.channel-beta,
+.channel-dev {
+  color: var(--accent);
+}
+
+.channel-rc {
+  color: var(--added);
+}
+
+.welcome h1 .channel {
+  margin-left: var(--s4);
+  vertical-align: 4px;
+}
+
+.welcome-caution {
+  max-width: 40ch;
+  margin: 0 0 var(--s2);
+  color: var(--modified);
+  font-size: var(--fs-small);
+  line-height: 1.5;
 }

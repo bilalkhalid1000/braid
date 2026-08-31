@@ -1,6 +1,6 @@
 [package]
 name = "braid"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 description = "A fast, keyboard-first Git GUI"
 authors = ["you"]
 edition = "2021"
@@ -19,6 +19,12 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
+
+# Desktop only: there is no self-update on mobile, and the plugin does not
+# build for those targets.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["process", "sync", "time", "rt-multi-thread", "macros", "io-util", "fs"] }

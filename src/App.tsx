@@ -29,6 +29,7 @@ import { Dialog, type DialogSpec } from "./components/Dialog";
 import { Toaster } from "./components/Toaster";
 import { ActivityLog } from "./components/ActivityLog";
 import { OperationBanner } from "./components/OperationBanner";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { Splitter, usePaneSize } from "./components/Splitter";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { CommandPalette } from "./components/CommandPalette";
@@ -39,6 +40,9 @@ import { useSettings } from "./lib/settings";
 import { useCommands } from "./lib/useCommands";
 import { shortcutLabel } from "./lib/shortcutLabel";
 import { useActivity } from "./lib/useActivity";
+import { useUpdater } from "./lib/useUpdater";
+import { useAppVersion } from "./lib/useAppVersion";
+import { channelCaution, channelLabel } from "./lib/version";
 import type { HintAction } from "./lib/gitHints";
 import {
   IconBranch,
@@ -102,6 +106,8 @@ export default function App() {
   };
   const activity = useActivity();
   const [sidebarWidth, setSidebarWidth] = usePaneSize("sidebar", 232);
+  const updater = useUpdater(settingsLoaded && settings.checkForUpdates);
+  const app = useAppVersion();
   const commitRef = useRef<CommitBoxHandle>(null);
   const tip = useTip();
 
@@ -1019,10 +1025,20 @@ export default function App() {
 
       {id === null ? (
         <div className="welcome">
-          <h1>Braid</h1>
+          <h1>
+            Braid
+            {app.channel && (
+              <span className={`channel channel-${app.channel}`}>
+                {channelLabel(app.channel)}
+              </span>
+            )}
+          </h1>
           <p>
             Open a repository to see its working copy and history. Open as many as you
             like — each one gets a tab, and idle tabs cost nothing.
+          </p>
+          <p className="welcome-caution">
+            {channelCaution(app.channel)}
           </p>
           <div className="welcome-actions">
             <button className="btn-primary" onClick={() => void openRepo()}>
@@ -1037,6 +1053,13 @@ export default function App() {
       ) : (
         <>
           <Toolbar groups={actions} />
+
+          <UpdateBanner
+            stage={updater.stage}
+            onInstall={() => void updater.install()}
+            onRestart={() => void updater.restart()}
+            onDismiss={updater.dismiss}
+          />
 
           <div
             className={`body ${logOpen ? "body-with-log" : ""}`}
@@ -1198,6 +1221,15 @@ export default function App() {
             <span className="spinner" />
             {activity.running[0].label}
             {activity.running.length > 1 && ` +${activity.running.length - 1}`}
+          </span>
+        )}
+
+        {app.channel && (
+          <span
+            className={`channel channel-${app.channel}`}
+            {...tip(`${app.version} — ${channelCaution(app.channel)}`)}
+          >
+            {channelLabel(app.channel)}
           </span>
         )}
 

@@ -1,0 +1,98 @@
+# Build installers and publish them as a draft release.
+#
+# Pushing a `v*` tag is the whole trigger — `pnpm release` creates that tag. The
+# job builds on each platform, signs the update artifacts, and collects
+# everything into one draft release with a `latest.json` the installed app polls.
+#
+# It stops at *draft* on purpose. The release is not visible and no installed app
+# will offer the update until a person opens it, reads the notes, and presses
+# publish. A tag pushed by accident costs nothing.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  # For rehearsing the build without tagging anything.
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ""
+          - platform: macos-latest
+            # One build covering both Apple Silicon and Intel.
+            args: "--target universal-apple-darwin"
+          - platform: ubuntu-22.04
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      # Rust builds are slow from cold; this is the difference between a
+      # two-minute release and a twenty-minute one.
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - run: pnpm install --frozen-lockfile
+
+      # The tests gate the release. A tag should not be able to ship something
+      # that does not pass what is already known to matter.
+      - run: pnpm test
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Without these the build produces installers but no signed update
+          # manifest, and the in-app updater silently never finds anything.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Braid ${{ github.ref_name }}"
+          releaseBody: |
+            ${{ contains(github.ref_name, '-') && '**This is a prerelease.** Expect rough edges, and keep a backup of anything you cannot lose.' || '' }}
+
+            Download the installer for your platform below.
+          releaseDraft: true
+          # Deliberately not set from the tag. GitHub excludes prereleases from
+          # `/releases/latest`, which is the URL every installed copy polls — so
+          # flagging a prerelease here would quietly switch off auto-updates for
+          # everyone. The version string and the in-app badge say "alpha"
+          # instead. Set this to true only once updates no longer matter, or
+          # after moving the endpoint off `/latest`.
+          prerelease: false
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}

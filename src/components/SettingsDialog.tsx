@@ -4,9 +4,12 @@ import { useHotkeyRecorder } from "@tanstack/react-hotkeys";
 import { COMMANDS, COMMANDS_BY_ID, findConflicts, type CommandDef } from "../lib/commands";
 import { formatBinding } from "../lib/shortcutLabel";
 import { useSettings, type Settings } from "../lib/settings";
+import { useUpdater } from "../lib/useUpdater";
+import { useAppVersion } from "../lib/useAppVersion";
+import { channelCaution, channelLabel } from "../lib/version";
 import { FilterInput, matchesFilter } from "./FilterInput";
 
-type Section = "general" | "diff" | "shortcuts" | "about";
+type Section = "general" | "diff" | "shortcuts" | "updates" | "about";
 
 /** Numbered because the number is the key that gets you here, the same way the
  *  sidebar panels are numbered. Nothing here is a sequence, so the digits are
@@ -15,6 +18,7 @@ const SECTIONS: { id: Section; label: string; blurb: string }[] = [
   { id: "general", label: "General", blurb: "Appearance and what happens at launch" },
   { id: "diff", label: "Diff", blurb: "How changes are shown" },
   { id: "shortcuts", label: "Shortcuts", blurb: "Every key, and how to change it" },
+  { id: "updates", label: "Updates", blurb: "New versions, and when to look for them" },
   { id: "about", label: "About", blurb: "Where things are kept" },
 ];
 
@@ -94,6 +98,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           {section === "general" && <GeneralSection />}
           {section === "diff" && <DiffSection />}
           {section === "shortcuts" && <ShortcutsSection />}
+          {section === "updates" && <UpdatesSection />}
           {section === "about" && <AboutSection />}
         </div>
 
@@ -438,12 +443,83 @@ function KeySlot({
   );
 }
 
+function UpdatesSection() {
+  const { settings, update } = useSettings();
+  const updater = useUpdater(false);
+
+  return (
+    <>
+      <Toggle
+        label="Check for updates on launch"
+        hint="A quiet check a few seconds after opening. Nothing downloads without you asking."
+        value={settings.checkForUpdates}
+        onChange={(checkForUpdates) => update({ checkForUpdates })}
+      />
+
+      <Field label="Check now" hint={describe(updater.stage)}>
+        <button
+          className="btn"
+          disabled={updater.stage.state === "checking"}
+          onClick={() => void updater.checkNow()}
+        >
+          {updater.stage.state === "checking" ? "Checking…" : "Check for updates"}
+        </button>
+      </Field>
+
+      {updater.stage.state === "available" && (
+        <Field label={`Version ${updater.stage.version}`} hint="Downloads, then asks before restarting.">
+          <button className="btn-primary" onClick={() => void updater.install()}>
+            Install
+          </button>
+        </Field>
+      )}
+
+      <p className="settings-note">
+        Updates are signed. Braid refuses anything that is not signed with the key this
+        build was made against, so a release has to come from whoever holds that key.
+      </p>
+    </>
+  );
+}
+
+function describe(stage: ReturnType<typeof useUpdater>["stage"]): string {
+  switch (stage.state) {
+    case "checking":
+      return "Asking the release server…";
+    case "upToDate":
+      return "This is the newest version.";
+    case "available":
+      return `Version ${stage.version} is available.`;
+    case "downloading":
+      return stage.percent === null ? "Downloading…" : `Downloading, ${stage.percent}%.`;
+    case "ready":
+      return "Installed. It takes effect on restart.";
+    case "failed":
+      return stage.message;
+    default:
+      return "Braid asks GitHub whether a newer release has been published.";
+  }
+}
+
 function AboutSection() {
+  const app = useAppVersion();
+
   return (
     <>
       <Field label="Braid" hint="A fast, keyboard-first Git client.">
-        <span className="settings-static">0.1.0</span>
+        <span className="settings-static">{app.version || "unknown"}</span>
       </Field>
+
+      {app.channel && (
+        <Field
+          label={`This is ${app.channel === "rc" ? "a" : "an"} ${channelLabel(app.channel)}`}
+          hint={channelCaution(app.channel)}
+        >
+          <span className={`channel channel-${app.channel}`}>
+            {channelLabel(app.channel)}
+          </span>
+        </Field>
+      )}
 
       <p className="settings-note">
         Settings, shortcuts and the list of open repositories are stored as JSON beside the

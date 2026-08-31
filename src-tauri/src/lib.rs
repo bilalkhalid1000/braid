@@ -15,7 +15,16 @@ use registry::RepoRegistry;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+
+    // Updating replaces the running executable, which only means anything on a
+    // desktop; the plugin does not build for mobile targets at all.
+    #[cfg(desktop)]
+    let builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
+
+    builder
         // The window is created hidden and revealed by the frontend once it has
         // painted, which is what removes the blank white frame at startup.
         // If the frontend never gets there, this shows it anyway: a bug in the
