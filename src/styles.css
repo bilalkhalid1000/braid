@@ -2847,3 +2847,79 @@ kbd.key-live {
   font-family: var(--sans);
   font-size: var(--fs-micro);
 }
+
+/* --- searchable field -------------------------------------------------- */
+
+/* The wrapper is the positioning context for the list, and has to stretch like
+   the bare input it replaces or the Browse button beside it would take the
+   slack instead. */
+.combo {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.combo input {
+  width: 100%;
+}
+
+.combo-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  max-height: 232px;
+  margin: 0;
+  padding: var(--s2);
+  overflow-y: auto;
+  list-style: none;
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.combo-option {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  padding: 4px var(--s3);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  text-align: left;
+  cursor: pointer;
+}
+.combo-option-cursor {
+  background: var(--accent);
+  color: #fff;
+}
+.combo-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.combo-note {
+  flex: none;
+  font-family: var(--sans);
+  font-size: var(--fs-micro);
+  opacity: 0.75;
+}
+
+.combo-more {
+  padding: 4px var(--s3);
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+}
+
+/* What the value in the field will actually do, said before the button is
+   pressed rather than reported afterwards as an error. */
+.dialog-describe {
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+}

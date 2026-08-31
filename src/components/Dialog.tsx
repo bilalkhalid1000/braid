@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
+import { Combo, type ComboOption } from "./Combo";
+
 export interface DialogField {
   key: string;
   label: string;
@@ -10,6 +12,11 @@ export interface DialogField {
   browse?: boolean;
   /** Allowed to be submitted empty. */
   optional?: boolean;
+  /** Turns the field into a searchable list. A value that matches nothing in
+   *  it is still valid — that is how something new gets named. */
+  options?: ComboOption[];
+  /** A line under the field describing what the current value will do. */
+  describe?: (value: string) => string | undefined;
 }
 
 export interface DialogCheckbox {
@@ -87,22 +94,38 @@ export function Dialog({ spec, onClose }: { spec: DialogSpec; onClose: () => voi
           <label className="dialog-field" key={field.key}>
             <span>{field.label}</span>
             <div className="dialog-input-row">
-              <input
-                ref={index === 0 ? firstInput : undefined}
-                autoFocus={index === 0}
-                value={values[field.key] ?? ""}
-                placeholder={field.placeholder}
-                spellCheck={false}
-                onChange={(e) =>
-                  setValues((v) => ({ ...v, [field.key]: e.target.value }))
-                }
-              />
+              {field.options ? (
+                <Combo
+                  inputRef={index === 0 ? firstInput : undefined}
+                  autoFocus={index === 0}
+                  value={values[field.key] ?? ""}
+                  options={field.options}
+                  placeholder={field.placeholder}
+                  onChange={(next) => setValues((v) => ({ ...v, [field.key]: next }))}
+                />
+              ) : (
+                <input
+                  ref={index === 0 ? firstInput : undefined}
+                  autoFocus={index === 0}
+                  value={values[field.key] ?? ""}
+                  placeholder={field.placeholder}
+                  spellCheck={false}
+                  onChange={(e) =>
+                    setValues((v) => ({ ...v, [field.key]: e.target.value }))
+                  }
+                />
+              )}
               {field.browse && (
                 <button className="btn" onClick={() => void browse(field.key)}>
                   Browse
                 </button>
               )}
             </div>
+            {field.describe?.(values[field.key] ?? "") && (
+              <span className="dialog-describe">
+                {field.describe(values[field.key] ?? "")}
+              </span>
+            )}
           </label>
         ))}
 

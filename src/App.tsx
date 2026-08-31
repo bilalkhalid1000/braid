@@ -374,6 +374,18 @@ export default function App() {
   const openAddWorktree = () => {
     if (!id) return;
 
+    const branches = refs.data?.branches ?? [];
+    const existing = new Set(branches.map((branch) => branch.name));
+
+    // A branch can only be checked out in one worktree at a time, so saying
+    // where each one already is turns a guaranteed git error into something
+    // visible before the button is pressed.
+    const occupied = new Map(
+      (worktrees.data ?? [])
+        .filter((tree) => tree.branch)
+        .map((tree) => [tree.branch as string, tree.path]),
+    );
+
     setDialog({
       title: "Add worktree",
       message:
@@ -385,15 +397,37 @@ export default function App() {
           browse: true,
           placeholder: `${activeRepo?.root ?? ""}-feature`,
         },
-        { key: "branch", label: "Branch", placeholder: "feature/login" },
-      ],
-      checkboxes: [
-        { key: "create", label: "Create the branch if it does not exist", value: true },
+        {
+          key: "branch",
+          label: "Branch",
+          placeholder: "feature/login",
+          options: branches.map((branch) => ({
+            value: branch.name,
+            note: occupied.has(branch.name)
+              ? "in use"
+              : branch.isHead
+                ? "current"
+                : undefined,
+          })),
+          // Whether this creates a branch is a fact about what was typed, not
+          // a separate thing to get wrong: the checkbox that used to ask left
+          // "create" ticked against an existing name, which git rejects.
+          describe: (value) => {
+            const name = value.trim();
+            if (name === "") return undefined;
+            if (!existing.has(name)) return `Creates ${name} from the current HEAD.`;
+
+            const where = occupied.get(name);
+            return where
+              ? `${name} is already checked out in ${where}, so this will fail.`
+              : `Checks out the existing branch ${name}.`;
+          },
+        },
       ],
       confirmLabel: "Add worktree",
       onConfirm: (v) =>
         act(`Add worktree ${v.branch}`, () =>
-          api.addWorktree(id, v.path, v.branch, v.create === "true"),
+          api.addWorktree(id, v.path, v.branch, !existing.has(v.branch)),
         ),
     });
   };
