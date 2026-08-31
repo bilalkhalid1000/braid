@@ -102,6 +102,13 @@ export function FileList({
                   type="checkbox"
                   checked={staged}
                   aria-label={`${staged ? "Unstage" : "Stage"} ${entry.path}`}
+                  // Out of the tab order deliberately. A checkbox counts as an
+                  // input, and single-key shortcuts are suppressed while one
+                  // has focus -- so in a list that can hold tens of thousands
+                  // of rows, tabbing through them is both endless and a dead
+                  // zone where none of the panel's keys answer. The keyboard
+                  // route to the same thing is the selection plus Space.
+                  tabIndex={-1}
                   onChange={() => onToggle(entry)}
                   onClick={(e) => e.stopPropagation()}
                 />

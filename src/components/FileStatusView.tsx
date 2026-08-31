@@ -15,7 +15,7 @@ import { ConflictBar } from "./ConflictBar";
 import { CommitBox, type CommitBoxHandle } from "./CommitBox";
 import { useCommands } from "../lib/useCommands";
 import { useSettings } from "../lib/settings";
-import { shortcutLabel } from "../lib/shortcutLabel";
+import { formatBinding, shortcutLabel } from "../lib/shortcutLabel";
 import { FilterInput, matchesFilter } from "./FilterInput";
 import { Splitter, usePaneSize } from "./Splitter";
 
@@ -56,6 +56,7 @@ export function FileStatusView({
 }: Props) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [filter, setFilter] = useState("");
+  const [editingMessage, setEditingMessage] = useState(false);
   const [columnWidth, setColumnWidth] = usePaneSize("status-column", 380);
   const { settings, keymap } = useSettings();
 
@@ -191,16 +192,27 @@ export function FileStatusView({
           stagedCount={status?.stagedCount ?? 0}
           busy={busy}
           onCommit={onCommit}
+          onEditing={setEditingMessage}
         />
 
-        {/* Shown exactly while these keys are live, so its presence is itself
-            the answer to whether the panel has the keyboard. */}
+        {/* Lists the keys that are live right now, which is why it changes
+            while the message box has focus: there, a single key is a
+            character, and only Escape and the Mod combos still act. */}
         {keyboardActive && (
           <p className="pane-hint">
-            <kbd>{shortcutLabel(keymap["status.next"])}</kbd>
-            <kbd>{shortcutLabel(keymap["status.previous"])}</kbd> move ·{" "}
-            <kbd>{shortcutLabel(keymap["status.toggle"])}</kbd> stage ·{" "}
-            <kbd>{shortcutLabel(keymap["status.discard"])}</kbd> discard
+            {editingMessage ? (
+              <>
+                <kbd>{shortcutLabel(keymap["status.commit"])}</kbd> commit ·{" "}
+                <kbd>{formatBinding("Escape")}</kbd> leave the message
+              </>
+            ) : (
+              <>
+                <kbd>{shortcutLabel(keymap["status.next"])}</kbd>
+                <kbd>{shortcutLabel(keymap["status.previous"])}</kbd> move ·{" "}
+                <kbd>{shortcutLabel(keymap["status.toggle"])}</kbd> stage ·{" "}
+                <kbd>{shortcutLabel(keymap["status.discard"])}</kbd> discard
+              </>
+            )}
           </p>
         )}
       </div>

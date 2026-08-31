@@ -10,6 +10,9 @@ export interface CommitBoxHandle {
 interface Props {
   stagedCount: number;
   busy: boolean;
+  /** Whether the message box holds the keyboard, so the panel can say which
+   *  keys are live: while you are typing, only Escape and the Mod combos are. */
+  onEditing?: (editing: boolean) => void;
   /** Resolves false when the commit failed, so the message is not lost. */
   onCommit: (message: string, amend: boolean) => Promise<boolean>;
 }
@@ -20,7 +23,7 @@ interface Props {
  *  keystroke that commits stays a setting like every other one instead of being
  *  hard-coded inside a textarea. */
 export const CommitBox = forwardRef<CommitBoxHandle, Props>(
-  ({ stagedCount, busy, onCommit }, ref) => {
+  ({ stagedCount, busy, onCommit, onEditing }, ref) => {
     const [message, setMessage] = useState("");
     const [amend, setAmend] = useState(false);
     const textarea = useRef<HTMLTextAreaElement>(null);
@@ -54,7 +57,12 @@ export const CommitBox = forwardRef<CommitBoxHandle, Props>(
           value={message}
           spellCheck={false}
           onChange={(e) => setMessage(e.target.value)}
+          onFocus={() => onEditing?.(true)}
+          onBlur={() => onEditing?.(false)}
           onKeyDown={(e) => {
+            // The way back out. Single-key shortcuts are suppressed while a
+            // text field has focus -- correctly, or typing "a" would stage
+            // everything -- so without this the keyboard has no exit.
             if (e.key === "Escape") e.currentTarget.blur();
           }}
         />
