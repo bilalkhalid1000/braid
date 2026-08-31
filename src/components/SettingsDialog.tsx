@@ -8,6 +8,7 @@ import { useUpdater } from "../lib/useUpdater";
 import { useAppVersion } from "../lib/useAppVersion";
 import { channelCaution, channelLabel } from "../lib/version";
 import { FilterInput, matchesFilter } from "./FilterInput";
+import { Keys } from "./Keys";
 
 type Section = "general" | "diff" | "shortcuts" | "updates" | "about";
 
@@ -84,8 +85,18 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           ))}
 
           <p className="settings-nav-hint">
-            <kbd>1</kbd>–<kbd>{SECTIONS.length}</kbd> jump · <kbd>↑</kbd>
-            <kbd>↓</kbd> move · <kbd>Esc</kbd> close
+            <Keys>
+              <kbd>1</kbd>–<kbd>{SECTIONS.length}</kbd> jump
+            </Keys>{" "}
+            ·{" "}
+            <Keys>
+              <kbd>↑</kbd>
+              <kbd>↓</kbd> move
+            </Keys>{" "}
+            ·{" "}
+            <Keys>
+              <kbd>Esc</kbd> close
+            </Keys>
           </p>
         </nav>
 

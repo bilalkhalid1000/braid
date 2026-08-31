@@ -17,6 +17,7 @@ import { useCommands } from "../lib/useCommands";
 import { useSettings } from "../lib/settings";
 import { formatBinding, shortcutLabel } from "../lib/shortcutLabel";
 import { FilterInput, matchesFilter } from "./FilterInput";
+import { Keys } from "./Keys";
 import { Splitter, usePaneSize } from "./Splitter";
 
 interface Selection {
@@ -202,15 +203,28 @@ export function FileStatusView({
           <p className="pane-hint">
             {editingMessage ? (
               <>
-                <kbd>{shortcutLabel(keymap["status.commit"])}</kbd> commit ·{" "}
-                <kbd>{formatBinding("Escape")}</kbd> leave the message
+                <Keys>
+                  <kbd>{shortcutLabel(keymap["status.commit"])}</kbd> commit
+                </Keys>{" "}
+                ·{" "}
+                <Keys>
+                  <kbd>{formatBinding("Escape")}</kbd> leave the message
+                </Keys>
               </>
             ) : (
               <>
-                <kbd>{shortcutLabel(keymap["status.next"])}</kbd>
-                <kbd>{shortcutLabel(keymap["status.previous"])}</kbd> move ·{" "}
-                <kbd>{shortcutLabel(keymap["status.toggle"])}</kbd> stage ·{" "}
-                <kbd>{shortcutLabel(keymap["status.discard"])}</kbd> discard
+                <Keys>
+                  <kbd>{shortcutLabel(keymap["status.next"])}</kbd>
+                  <kbd>{shortcutLabel(keymap["status.previous"])}</kbd> move
+                </Keys>{" "}
+                ·{" "}
+                <Keys>
+                  <kbd>{shortcutLabel(keymap["status.toggle"])}</kbd> stage
+                </Keys>{" "}
+                ·{" "}
+                <Keys>
+                  <kbd>{shortcutLabel(keymap["status.discard"])}</kbd> discard
+                </Keys>
               </>
             )}
           </p>

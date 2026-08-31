@@ -5,6 +5,7 @@ import { FilterInput, matchesFilter } from "./FilterInput";
 import { useCommands } from "../lib/useCommands";
 import { useSettings } from "../lib/settings";
 import { shortcutLabel } from "../lib/shortcutLabel";
+import { Keys } from "./Keys";
 import {
   submoduleLabel,
   type BranchRef,
@@ -495,10 +496,18 @@ export function Sidebar({
 
       {focused && (
         <p className="sidebar-hint">
-          <kbd>{shortcutLabel(keymap["sidebar.next"])}</kbd>
-          <kbd>{shortcutLabel(keymap["sidebar.previous"])}</kbd> move ·{" "}
-          <kbd>{shortcutLabel(keymap["sidebar.activate"])}</kbd> use ·{" "}
-          <kbd>{shortcutLabel(keymap["sidebar.leave"])}</kbd> back
+          <Keys>
+            <kbd>{shortcutLabel(keymap["sidebar.next"])}</kbd>
+            <kbd>{shortcutLabel(keymap["sidebar.previous"])}</kbd> move
+          </Keys>{" "}
+          ·{" "}
+          <Keys>
+            <kbd>{shortcutLabel(keymap["sidebar.activate"])}</kbd> use
+          </Keys>{" "}
+          ·{" "}
+          <Keys>
+            <kbd>{shortcutLabel(keymap["sidebar.leave"])}</kbd> back
+          </Keys>
         </p>
       )}
     </nav>

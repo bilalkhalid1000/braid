@@ -2482,6 +2482,14 @@ kbd.key-live {
   margin-right: var(--s1);
 }
 
+/* A key and its label are one thing and wrap as one. Without this a hint
+   breaks at whichever space happens to fall at the edge, which is as likely to
+   be the one inside a pair as the one between two -- leaving a lone "close" on
+   the next line describing nothing. */
+.hint-pair {
+  white-space: nowrap;
+}
+
 /* The sidebar scrolls behind its hint; the file column does not. */
 .sidebar-hint {
   position: sticky;
@@ -2504,6 +2512,17 @@ kbd.key-live {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  /* Without this the tip is only as wide as the gap between `left` and the
+     right edge of the window. A fixed box with `left` set and `width: auto`
+     has its shrink-to-fit width capped by the space remaining to its right,
+     and the translateX that centres it only moves the box afterwards -- it
+     hands back no room. So a control near the right edge got a tip a few
+     characters wide, which broke its own words to fit and had its key cap
+     land on top of the text. max-content sizes to the text and leaves the
+     limiting to max-width, which also makes the width measured in Tip.tsx the
+     real one, so the clamp that keeps the tip on screen has something true to
+     work from. */
+  width: max-content;
   max-width: min(460px, 90vw);
   font-size: var(--fs-small);
   pointer-events: none;
@@ -2519,17 +2538,22 @@ kbd.key-live {
 }
 
 .tip-label {
+  min-width: 0;
   color: var(--text);
-  /* A repository path can be longer than the window; it wraps rather than
-     running off the edge. */
+  /* Only reachable now that the tip is max-content wide: nothing wraps until
+     it reaches max-width, and what does is a repository path with no spaces
+     to break at. */
   overflow-wrap: anywhere;
 }
 
+/* The key cap describes the label; it never gives up room to it. */
 .tip-key {
+  flex: none;
   background: var(--chrome);
 }
 
 .tip-note {
+  flex: none;
   color: var(--text-faint);
 }
 
