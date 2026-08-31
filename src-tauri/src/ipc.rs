@@ -5,7 +5,7 @@ use tauri::{AppHandle, State};
 use crate::error::{AppError, Result};
 use crate::git::status::EntryKind;
 use crate::git::{
-    self, CommitDetail, DiffOptions, DiffTarget, FileDiff, FinishOptions, FlowConfig, FlowKind, FlowStatus, Git,
+    self, Blame, CommitDetail, DiffOptions, DiffTarget, FileDiff, FinishOptions, FlowConfig, FlowKind, FlowStatus, Git,
     LogPage, RefsSnapshot, RepoStatus, Submodule, Worktree,
 };
 use crate::registry::{RepoInfo, RepoRegistry};
@@ -146,6 +146,18 @@ pub async fn file_diff(
         },
     )
     .await
+}
+
+/// Line-by-line authorship for one file, optionally as of some revision.
+#[tauri::command]
+pub async fn blame_file(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    path: String,
+    rev: Option<String>,
+) -> Result<Blame> {
+    let session = registry.get(&id)?;
+    git::blame(&session.git, &path, rev.as_deref()).await
 }
 
 #[tauri::command]

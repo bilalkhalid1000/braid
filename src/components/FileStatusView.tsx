@@ -35,6 +35,12 @@ interface Props {
   onStage: (paths: string[]) => void;
   onUnstage: (paths: string[]) => void;
   onDiscard: (paths: string[]) => void;
+  onBlame: (path: string) => void;
+  onMenu: (
+    entry: StatusEntry,
+    staged: boolean,
+    point: { x: number; y: number },
+  ) => void;
   onCommit: (message: string, amend: boolean) => Promise<boolean>;
   onHunk: (request: HunkRequest & { path: string }) => void;
   onResolve: (path: string, side: "ours" | "theirs") => void;
@@ -50,6 +56,8 @@ export function FileStatusView({
   onStage,
   onUnstage,
   onDiscard,
+  onBlame,
+  onMenu,
   onCommit,
   onHunk,
   onResolve,
@@ -141,6 +149,7 @@ export function FileStatusView({
     "status.discard": () =>
       selected && !selected.staged && onDiscard([selected.entry.path]),
     "status.commit": () => commitRef.current?.submit(),
+    "status.blame": () => selected && onBlame(selected.entry.path),
   }, keyboardActive);
 
   const total = (status?.entries ?? []).filter((e) => e.kind !== "ignored").length;
@@ -168,6 +177,7 @@ export function FileStatusView({
           onSelect={(e) => select(e, true)}
           onToggle={(e) => onUnstage([e.path])}
           onToggleAll={() => onUnstage(staged.map((e) => e.path))}
+          onMenu={(entry, point) => onMenu(entry, true, point)}
           actionLabel="Unstage all"
           actionCommand="status.unstageAll"
           emptyMessage={filter ? "No matches" : "Nothing staged yet"}
@@ -181,6 +191,7 @@ export function FileStatusView({
           onSelect={(e) => select(e, false)}
           onToggle={(e) => onStage([e.path])}
           onToggleAll={() => onStage(unstaged.map((e) => e.path))}
+          onMenu={(entry, point) => onMenu(entry, false, point)}
           actionLabel="Stage all"
           actionCommand="status.stageAll"
           emptyMessage={

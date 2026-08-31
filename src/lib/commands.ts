@@ -14,7 +14,7 @@
  *  on both J and ArrowDown, the way every list does.
  */
 
-export type CommandScope = "global" | "status" | "history" | "sidebar" | "menu";
+export type CommandScope = "global" | "status" | "history" | "sidebar" | "menu" | "blame";
 
 /** commandId to every way it can be triggered. An empty list means unbound. */
 export type Keymap = Record<string, string[]>;
@@ -90,6 +90,11 @@ export const COMMANDS: CommandDef[] = [
   { id: "menu.activate", label: "Run the selected entry", category: "Menu", scope: "menu", binding: ["Enter"] },
   { id: "menu.close", label: "Close the menu", category: "Menu", scope: "menu", binding: ["Escape"] },
 
+  // --- Blame, live only while a file is being blamed ---
+  { id: "blame.next", label: "Next line", category: "Blame", scope: "blame", binding: ["J", "ArrowDown"] },
+  { id: "blame.previous", label: "Previous line", category: "Blame", scope: "blame", binding: ["K", "ArrowUp"] },
+  { id: "blame.close", label: "Close the blame", category: "Blame", scope: "blame", binding: ["Escape"] },
+
   // --- Git, lazygit-style single letters ---
   { id: "git.fetch", label: "Fetch", category: "Git", scope: "global", binding: ["F"], needsRepo: true },
   { id: "git.pull", label: "Pull", category: "Git", scope: "global", binding: ["P"], needsRepo: true },
@@ -109,6 +114,7 @@ export const COMMANDS: CommandDef[] = [
   { id: "status.unstageAll", label: "Unstage everything", category: "File Status", scope: "status", binding: ["Shift+A"] },
   { id: "status.discard", label: "Discard the selected file", category: "File Status", scope: "status", binding: ["Delete"] },
   { id: "status.commit", label: "Commit", category: "File Status", scope: "status", binding: ["Mod+Enter"] },
+  { id: "status.blame", label: "Blame the selected file", category: "File Status", scope: "status", binding: ["Shift+B"] },
 
   // --- History ---
   { id: "history.next", label: "Next commit", category: "History", scope: "history", binding: ["J", "ArrowDown"] },

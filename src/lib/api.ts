@@ -202,6 +202,42 @@ export interface CurrentFlow {
   branch: string;
 }
 
+/** Line-by-line authorship. Commits are keyed separately from lines because a
+ *  long file is the work of a few dozen commits, and repeating the author and
+ *  summary on every line would cost more to send than the blame does to
+ *  compute. */
+export interface BlameCommit {
+  oid: string;
+  author: string;
+  authorMail: string;
+  /** Seconds since the epoch. */
+  authorTime: number;
+  summary: string;
+  /** The line is edited but not committed, so there is no author yet. */
+  uncommitted: boolean;
+}
+
+export interface BlameLine {
+  oid: string;
+  line: number;
+  originalLine: number;
+  content: string;
+}
+
+export interface Blame {
+  path: string;
+  lines: BlameLine[];
+  commits: Record<string, BlameCommit>;
+  tookMs: number;
+}
+
+/** A file to blame, and the revision to blame it at — null for the working
+ *  tree, which is the usual case: you read the file you are editing. */
+export interface BlameTarget {
+  path: string;
+  rev: string | null;
+}
+
 export interface FlowStatus {
   initialized: boolean;
   config: FlowConfig;
@@ -276,6 +312,8 @@ export const api = {
     contextLines: number,
     ignoreWhitespace: boolean,
   ) => invoke<FileDiff>("file_diff", { id, path, target, contextLines, ignoreWhitespace }),
+  blame: (id: string, path: string, rev: string | null) =>
+    invoke<Blame>("blame_file", { id, path, rev }),
   commitDetail: (id: string, oid: string) =>
     invoke<CommitDetail>("commit_detail", { id, oid }),
   commitFileDiff: (

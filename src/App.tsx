@@ -9,7 +9,9 @@ import {
   isReleaseKind,
   onRepoChanged,
   type CurrentFlow,
+  type BlameTarget,
   type FlowKind,
+  type StatusEntry,
   type RepoInfo,
 } from "./lib/api";
 import { Toolbar, type ToolbarAction } from "./components/Toolbar";
@@ -27,6 +29,7 @@ import { FileStatusView } from "./components/FileStatusView";
 import { HistoryView } from "./components/HistoryView";
 import { Dialog, type DialogSpec } from "./components/Dialog";
 import { FlowPlan, type FlowPlanTarget } from "./components/FlowPlan";
+import { BlameView } from "./components/BlameView";
 import { Toaster } from "./components/Toaster";
 import { ActivityLog } from "./components/ActivityLog";
 import { OperationBanner } from "./components/OperationBanner";
@@ -83,6 +86,10 @@ export default function App() {
   const [dialog, setDialog] = useState<DialogSpec | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [logOpen, setLogOpen] = useState(false);
+  // The file being blamed, if any. Blame takes over the main panel
+  // rather than becoming a third workspace view, so the number keys and
+  // the sidebar keep meaning exactly what they meant before.
+  const [blameTarget, setBlameTarget] = useState<BlameTarget | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Nothing may be written back until the restore has finished, or the first
@@ -96,6 +103,9 @@ export default function App() {
   const focusPanel = (panel: PanelId) => {
     if (panel === "files") setView("status");
     if (panel === "history") setView("history");
+    // A blame covers the main panel, so asking for a panel has to close it --
+    // otherwise pressing 2 would look like it did nothing.
+    if (panel === "files" || panel === "history") setBlameTarget(null);
     setFocusedPanel(panel);
   };
   const themeResolved = useTheme(settings.theme);
@@ -723,6 +733,44 @@ export default function App() {
   /** Where a menu opens when it was triggered by a key rather than a click. */
   const menuAnchor = (): [number, number] => [window.innerWidth / 2 - 100, 120];
 
+  const blameFile = (path: string, rev: string | null = null) =>
+    setBlameTarget({ path, rev });
+
+  /** Menu for a row in the File Status lists. */
+  const onFileMenu = (
+    entry: StatusEntry,
+    staged: boolean,
+    at: Point,
+  ) => {
+    if (!id) return;
+
+    openMenuAt(at.x, at.y, [
+      staged
+        ? {
+            label: "Unstage",
+            onClick: () => act(stageLabel("Unstage", [entry.path]), () => api.unstage(id, [entry.path])),
+          }
+        : {
+            label: "Stage",
+            onClick: () => act(stageLabel("Stage", [entry.path]), () => api.stage(id, [entry.path])),
+          },
+      {
+        label: "Blame…",
+        // An untracked file has no history to attribute, so blaming one would
+        // only ever report the same "not committed yet" for every line.
+        disabled: entry.kind === "untracked",
+        onClick: () => blameFile(entry.path),
+      },
+      "separator",
+      {
+        label: "Discard changes…",
+        danger: true,
+        disabled: staged,
+        onClick: () => confirmDiscard([entry.path]),
+      },
+    ]);
+  };
+
   /** Menus for the sidebar. The sidebar reports what was clicked; the git
    *  meaning of each target is decided here. */
   const onSidebarMenu = (target: MenuTarget, at: Point) => {
@@ -1169,7 +1217,14 @@ export default function App() {
                 />
               )}
 
-              {view === "status" ? (
+              {blameTarget ? (
+                <BlameView
+                  repoId={id}
+                  target={blameTarget}
+                  keyboardActive={!isSidebarPanel(focusedPanel) && !inputOpen}
+                  onClose={() => setBlameTarget(null)}
+                />
+              ) : view === "status" ? (
                 <FileStatusView
                   keyboardActive={!isSidebarPanel(focusedPanel) && !inputOpen}
                   repoId={id}
@@ -1183,6 +1238,8 @@ export default function App() {
                     act(stageLabel("Unstage", paths), () => api.unstage(id, paths))
                   }
                   onDiscard={(paths) => confirmDiscard(paths)}
+                  onBlame={(path) => blameFile(path)}
+                  onMenu={onFileMenu}
                   onCommit={(message, amend) =>
                     perform(amend ? "Amend commit" : "Commit", () =>
                       api.commit(id, message, amend),

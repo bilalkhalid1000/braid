@@ -1,3 +1,4 @@
+pub mod blame;
 pub mod cli;
 pub mod commit;
 pub mod diff;
@@ -10,6 +11,7 @@ pub mod status;
 pub mod submodule;
 pub mod worktree;
 
+pub use blame::{blame, Blame};
 pub use cli::Git;
 pub use commit::CommitDetail;
 pub use diff::{file_diff, DiffOptions, DiffTarget, FileDiff};

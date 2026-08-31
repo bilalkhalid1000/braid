@@ -2848,6 +2848,197 @@ kbd.key-live {
   font-size: var(--fs-micro);
 }
 
+/* --- blame ------------------------------------------------------------- */
+
+.blame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.blame-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex: none;
+  padding: var(--s3) var(--s4);
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+.blame-path {
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+}
+.blame-rev,
+.blame-count {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+.blame-spacer {
+  flex: 1;
+}
+
+/* The commit under the cursor. A fixed strip rather than something that
+   appears on hover: it is the answer to the question the view exists for, and
+   it should not move or vanish while being read. */
+.blame-focus {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s5);
+  flex: none;
+  padding: var(--s3) var(--s4);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: var(--fs-small);
+}
+.blame-focus-oid {
+  flex: none;
+  color: var(--accent);
+  font-family: var(--mono);
+}
+.blame-focus-author {
+  flex: none;
+  color: var(--text);
+}
+.blame-focus-date {
+  flex: none;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+.blame-focus-summary {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.blame-focus-uncommitted .blame-focus-summary {
+  color: var(--accent);
+}
+
+.blame-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.blame-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  min-width: 100%;
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+  line-height: 19px;
+  white-space: pre;
+  cursor: default;
+}
+/* Where one commit's run gives way to the next. Most of the gutter is blank by
+   design, so without this a block of forty lines has no visible bottom. */
+.blame-row-start {
+  box-shadow: inset 0 1px 0 var(--border-soft);
+}
+/* Every line of the commit under the cursor, not just the one the cursor is
+   on. Kept far weaker than the cursor itself so the two never compete. */
+.blame-row-kin {
+  background: var(--surface-alt);
+}
+.blame-row-selected {
+  background: var(--accent-soft);
+}
+
+/* The age spine: one hue, stepped by opacity so it holds up in both themes
+   without a second set of tokens. Never the only signal — the date is right
+   beside it — so it can afford to stay this quiet. */
+.blame-age {
+  flex: none;
+  width: 3px;
+  align-self: stretch;
+  background: var(--accent);
+}
+.blame-age-0 {
+  opacity: 0.14;
+}
+.blame-age-1 {
+  opacity: 0.3;
+}
+.blame-age-2 {
+  opacity: 0.48;
+}
+.blame-age-3 {
+  opacity: 0.7;
+}
+.blame-age-4 {
+  opacity: 1;
+}
+/* Not yet committed, so it has no place on a ramp of commit dates. */
+.blame-row-uncommitted .blame-age {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--accent) 0 2px,
+    transparent 2px 4px
+  );
+  opacity: 0.9;
+}
+
+/* Fixed width so code starts at the same column on every row, whether or not
+   that row begins a run. */
+.blame-gutter {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex: none;
+  width: 196px;
+  padding: 0 var(--s4);
+  overflow: hidden;
+  font-size: var(--fs-micro);
+  white-space: nowrap;
+}
+.blame-oid {
+  flex: none;
+  width: 50px;
+  color: var(--text-faint);
+}
+/* The name is what the eye scans for, so it is the one thing here at full
+   strength; the hash beside it is an identifier you almost never read. */
+.blame-author {
+  flex: 1;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-family: var(--sans);
+  text-overflow: ellipsis;
+}
+.blame-date {
+  flex: none;
+  color: var(--text-faint);
+}
+.blame-row-uncommitted .blame-author {
+  color: var(--accent);
+}
+
+.blame-line-no {
+  flex: none;
+  width: 48px;
+  padding-right: var(--s4);
+  border-right: 1px solid var(--border-soft);
+  color: var(--text-faint);
+  text-align: right;
+  user-select: none;
+}
+.blame-content {
+  padding-left: var(--s4);
+}
+
+.blame > .pane-hint {
+  flex: none;
+}
+
 /* --- searchable field -------------------------------------------------- */
 
 /* The wrapper is the positioning context for the list, and has to stretch like

@@ -28,6 +28,8 @@ interface Props {
   /** Checkbox toggle: stages an unstaged file, unstages a staged one. */
   onToggle: (entry: StatusEntry) => void;
   onToggleAll: () => void;
+  /** Right-click on a row. Omitted where a list has no per-file actions. */
+  onMenu?: (entry: StatusEntry, point: { x: number; y: number }) => void;
   actionLabel: string;
   /** The command the action button runs, so its tip can show the key. */
   actionCommand?: string;
@@ -46,6 +48,7 @@ export function FileList({
   onSelect,
   onToggle,
   onToggleAll,
+  onMenu,
   actionLabel,
   actionCommand,
   emptyMessage,
@@ -97,6 +100,14 @@ export function FileList({
                 style={{ height: item.size, transform: `translateY(${item.start}px)` }}
                 onMouseDown={() => onSelect(entry)}
                 onDoubleClick={() => onToggle(entry)}
+                onContextMenu={(e) => {
+                  if (!onMenu) return;
+                  e.preventDefault();
+                  // Right-clicking selects too, so the menu and the diff on
+                  // screen are always talking about the same file.
+                  onSelect(entry);
+                  onMenu(entry, { x: e.clientX, y: e.clientY });
+                }}
               >
                 <input
                   type="checkbox"
