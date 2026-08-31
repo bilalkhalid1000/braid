@@ -25,6 +25,11 @@ dist-ssr
 
 # Updater signing keys. The private half must never be committed: every
 # installed copy trusts only that key, so leaking it means anyone can ship an
-# update, and losing it means nobody can.
+# update to them, and losing it means nobody can. This repository is public,
+# which makes that the difference between a mistake and an incident.
+#
+# The directory is ignored as a whole as well as by extension, so a key saved
+# there under any name is still covered.
+/.tauri/
 *.key
 *.key.pub

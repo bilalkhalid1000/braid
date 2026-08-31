@@ -44,7 +44,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdDQkYwREEwNTNGRkNDRDMKUldUVHpQOVRvQTIvZklXdlEwdjErQ0Rpem4yM1ZDVE5ZVzhBcCtTTG80VTNtQ3M1TGRxNUNwb2wK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFFQ0NERkE2M0Q5MUY3QgpSV1I3SDlsaitzM3NDdVorbTNWUVhYdEZZSGx1dzg4MzN2N1RkbzhaS0NGRGZmd3J1S3FVazVUNAo=",
       "endpoints": [
         "https://github.com/bilalkhalid1000/braid/releases/latest/download/latest.json"
       ],
