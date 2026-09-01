@@ -1,8 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useHotkeyRecorder } from "@tanstack/react-hotkeys";
 import { useQuery } from "@tanstack/react-query";
 
 import { api, type TerminalOption } from "../lib/api";
+import { nextStop, settingsAction } from "../lib/settingsKeys";
+import {
+  SettingsCursor,
+  SettingsRows,
+  actionRow,
+  numberRow,
+  selectRow,
+  staticRow,
+  textRow,
+  toggleRow,
+  type Row,
+} from "./settingsRows";
 
 import { COMMANDS, COMMANDS_BY_ID, findConflicts, type CommandDef } from "../lib/commands";
 import { formatBinding } from "../lib/shortcutLabel";
@@ -26,6 +38,26 @@ const SECTIONS: { id: Section; label: string; blurb: string }[] = [
   { id: "about", label: "About", blurb: "Where things are kept" },
 ];
 
+/* Everything the browser will move focus to with Tab. Disabled controls are
+   excluded because Tab skips them, and a trap that counts them would stop on
+   nothing. */
+/** A box with a caret in it, which owns every key while it has the keyboard.
+ *
+ *  A select is deliberately not one. It can hold the focus after a click, and
+ *  if it answered the arrows as well then the same key would do two different
+ *  things depending on whether you last used the mouse -- which is exactly how
+ *  the arrows stopped working on the selects. */
+function isEditing(target: EventTarget | null): boolean {
+  if (target instanceof HTMLTextAreaElement) return true;
+  if (!(target instanceof HTMLInputElement)) return false;
+
+  return ["text", "number", "search", "password", "email", "url"].includes(target.type);
+}
+
+const FOCUSABLE =
+  'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), ' +
+  'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
 export function SettingsDialog({
   onClose,
   initialSection = "general",
@@ -35,37 +67,125 @@ export function SettingsDialog({
   initialSection?: Section;
 }) {
   const [section, setSection] = useState<Section>(initialSection);
+  const [cursor, setCursor] = useState(0);
   const frame = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+
+  // What the section currently on screen put up, and how to put the caret in
+  // one of them. Kept in a ref rather than state because it is rewritten on
+  // every render and reading it is the only thing anybody does.
+  const rows = useRef<Row[]>([]);
+  const focusRow = useRef<(key: string) => void>(() => {});
+
+  const register = useCallback((next: Row[], focus: (key: string) => void) => {
+    rows.current = next;
+    focusRow.current = focus;
+  }, []);
 
   // The dialog owns the keyboard while it is open: the app's own commands are
   // suspended, so digits here are unambiguous.
   useEffect(() => frame.current?.focus(), []);
 
+  /** Rows worth stopping on. A row with nothing to do to it is skipped rather
+   *  than selected, because a cursor sitting somewhere that answers no key is
+   *  how a keyboard interface starts feeling broken. */
+  const stops = () =>
+    rows.current
+      .map((row, index) => ({ row, index }))
+      .filter(({ row }) => row.adjust || row.activate || row.editable);
+
+  // Start on something. About opens with two lines that only state a version,
+  // so the first row is not always one the cursor belongs on. Children's
+  // effects run before this one, so the rows are already registered by now.
+  useEffect(() => {
+    const first = stops()[0];
+    setCursor(first ? first.index : 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section]);
+
+  const here = () => rows.current[cursor];
+
+  const goToSection = (next: Section) => {
+    setSection(next);
+    setCursor(0);
+  };
+
+  /** Put the keyboard back where the cursor is. A control left holding focus
+   *  after a click would keep answering keys the dialog has already handled. */
+  const takeBack = () => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== frame.current) active.blur();
+    frame.current?.focus();
+  };
+
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      onClose();
+    // Tab is not part of the model -- everything here is reachable without it
+    // -- but it is kept inside the dialog, because the dialog renders last in
+    // the app's tree and the tab order would otherwise walk off the end of it
+    // and into the window behind the scrim.
+    if (e.key === "Tab" && frame.current) {
+      const focusable = [...frame.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || active === frame.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
       return;
     }
 
-    // Never steal a keystroke meant for a field.
-    const typing =
-      e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement;
-    if (typing && e.key !== "Escape") return;
+    const action = settingsAction(e.key, isEditing(e.target), SECTIONS.length);
+    if (action.kind === "none") return;
 
-    const digit = Number(e.key);
-    if (digit >= 1 && digit <= SECTIONS.length) {
-      e.preventDefault();
-      setSection(SECTIONS[digit - 1].id);
-      return;
-    }
+    // Handled here and nowhere else. Without this a focused select would take
+    // the arrow as well and move twice, and Space on a focused checkbox would
+    // toggle it back.
+    e.preventDefault();
+    e.stopPropagation();
 
-    const step = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
-    if (step !== 0) {
-      e.preventDefault();
-      const index = SECTIONS.findIndex((s) => s.id === section);
-      const next = Math.min(Math.max(index + step, 0), SECTIONS.length - 1);
-      setSection(SECTIONS[next].id);
+    switch (action.kind) {
+      case "close":
+        onClose();
+        return;
+
+      case "leave":
+        takeBack();
+        return;
+
+      case "section":
+        goToSection(SECTIONS[action.index]!.id);
+        takeBack();
+        return;
+
+      case "move": {
+        const at = nextStop(
+          stops().map(({ index }) => index),
+          cursor,
+          action.delta,
+        );
+        if (at !== null) setCursor(at);
+        takeBack();
+        return;
+      }
+
+      case "adjust":
+        here()?.adjust?.(action.delta);
+        return;
+
+      case "activate": {
+        const row = here();
+        if (!row) return;
+        // A box you type in takes the caret; everything else just happens.
+        if (row.editable) focusRow.current(row.key);
+        else row.activate?.();
+        return;
+      }
     }
   };
 
@@ -76,18 +196,29 @@ export function SettingsDialog({
       <div
         className="settings"
         ref={frame}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         tabIndex={-1}
         onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={onKeyDown}
+        onKeyDownCapture={onKeyDown}
       >
-        <nav className="settings-nav">
-          <h2 className="settings-title">Settings</h2>
+        <nav className="settings-nav" aria-label="Settings sections">
+          <h2 className="settings-title" id={titleId}>
+            Settings
+          </h2>
 
           {SECTIONS.map((item, index) => (
             <button
               key={item.id}
               className={`settings-tab ${section === item.id ? "settings-tab-active" : ""}`}
-              onClick={() => setSection(item.id)}
+              // One tab stop for the whole list. The digits are the keyboard
+              // route between sections, so tabbing through five headings to
+              // reach the settings would be five stops that do nothing the
+              // number keys do not already do.
+              tabIndex={section === item.id ? 0 : -1}
+              aria-current={section === item.id}
+              onClick={() => goToSection(item.id)}
             >
               <kbd className="settings-tab-key">{index + 1}</kbd>
               <span>{item.label}</span>
@@ -105,6 +236,15 @@ export function SettingsDialog({
             </Keys>{" "}
             ·{" "}
             <Keys>
+              <kbd>←</kbd>
+              <kbd>→</kbd> change
+            </Keys>{" "}
+            ·{" "}
+            <Keys>
+              <kbd>Enter</kbd> toggle
+            </Keys>{" "}
+            ·{" "}
+            <Keys>
               <kbd>Esc</kbd> close
             </Keys>
           </p>
@@ -116,11 +256,13 @@ export function SettingsDialog({
             <p className="settings-blurb">{current.blurb}</p>
           </header>
 
-          {section === "general" && <GeneralSection />}
-          {section === "diff" && <DiffSection />}
-          {section === "shortcuts" && <ShortcutsSection />}
-          {section === "updates" && <UpdatesSection />}
-          {section === "about" && <AboutSection />}
+          <SettingsCursor value={{ index: cursor, setIndex: setCursor, register }}>
+            {section === "general" && <GeneralSection />}
+            {section === "diff" && <DiffSection />}
+            {section === "shortcuts" && <ShortcutsSection />}
+            {section === "updates" && <UpdatesSection />}
+            {section === "about" && <AboutSection />}
+          </SettingsCursor>
         </div>
 
         <button className="settings-close" title="Close settings" onClick={onClose}>
@@ -134,167 +276,135 @@ export function SettingsDialog({
 function GeneralSection() {
   const { settings, update } = useSettings();
 
-  return (
-    <>
-      <Field label="Theme" hint="System follows Windows and changes with it while the app is open.">
-        <select
-          value={settings.theme}
-          onChange={(e) => update({ theme: e.target.value as Settings["theme"] })}
-        >
-          <option value="system">Follow the system</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-        </select>
-      </Field>
-
-      <Toggle
-        label="Reopen repositories on launch"
-        hint="Restores the tabs that were open when you last closed the app."
-        value={settings.restoreTabs}
-        onChange={(restoreTabs) => update({ restoreTabs })}
-      />
-
-      <Toggle
-        label="Ask before discarding changes"
-        hint="Discarding cannot be undone; git keeps no record of it."
-        value={settings.confirmDiscard}
-        onChange={(confirmDiscard) => update({ confirmDiscard })}
-      />
-
-      <TerminalField />
-
-      <Field label="History page size" hint="Commits loaded at a time as you scroll.">
-        <input
-          type="number"
-          min={50}
-          max={2000}
-          step={50}
-          value={settings.historyPageSize}
-          onChange={(e) => update({ historyPageSize: clamp(Number(e.target.value), 50, 2000) })}
-        />
-      </Field>
-
-      <Field
-        label="Sequence timeout"
-        hint="How long a two-key shortcut like G F waits for its second key, in milliseconds."
-      >
-        <input
-          type="number"
-          min={200}
-          max={3000}
-          step={100}
-          value={settings.sequenceTimeout}
-          onChange={(e) => update({ sequenceTimeout: clamp(Number(e.target.value), 200, 3000) })}
-        />
-      </Field>
-    </>
-  );
-}
-
-/** Which terminal the toolbar button and Mod+T open.
- *
- *  The choices come from the backend rather than being listed here, because the
- *  backend is what knows how to start each one -- an option the UI offers and
- *  nothing can launch is a button that silently does nothing. */
-function TerminalField() {
-  const { settings, update } = useSettings();
-
-  const options = useQuery({
+  // The terminals come from the backend rather than being listed here, because
+  // the backend is what knows how to start them.
+  const terminals = useQuery({
     queryKey: ["terminalOptions"],
     queryFn: api.terminalOptions,
     staleTime: Infinity,
   });
 
-  // The two that need nothing from the backend to mean something: one is a
-  // decision not to choose, the other is a command the user types here. If the
-  // list cannot be fetched these still work, and a picker with nothing in it
-  // would leave no way to change the setting at all -- which looks exactly like
-  // the setting being ignored.
-  const available: TerminalOption[] = options.data?.length
-    ? options.data
+  // The two that mean something without the backend: one is a decision not to
+  // choose, the other is a command typed here. A picker with nothing in it
+  // would leave no way to change the setting, which looks exactly like the
+  // setting being ignored.
+  const available: TerminalOption[] = terminals.data?.length
+    ? terminals.data
     : [
         { id: "auto", label: "Choose automatically" },
         { id: "custom", label: "Custom command" },
       ];
 
   // A settings file carried from another machine can name a terminal this one
-  // has never heard of. Showing it keeps the select honest about what is
+  // has never heard of. Showing it keeps the picker honest about what is
   // stored, rather than silently displaying the first entry instead.
-  const unknown =
-    settings.terminal !== "" && !available.some((option) => option.id === settings.terminal);
+  const known = available.some((option) => option.id === settings.terminal);
+  const choices = known
+    ? available
+    : [...available, { id: settings.terminal, label: `${settings.terminal} (not on this system)` }];
 
-  return (
-    <>
-      <Field
-        label="Terminal"
-        hint="What “Open in terminal” starts. Choosing automatically tries the ones this system usually has."
-      >
-        <select
-          value={settings.terminal}
-          onChange={(e) => update({ terminal: e.target.value })}
-        >
-          {available.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-          {unknown && (
-            <option value={settings.terminal}>{settings.terminal} (not on this system)</option>
-          )}
-        </select>
-      </Field>
+  const rows: Row[] = [
+    selectRow(
+      "theme",
+      "Theme",
+      "System follows Windows and changes with it while the app is open.",
+      settings.theme,
+      [
+        { value: "system", label: "Follow the system" },
+        { value: "light", label: "Light" },
+        { value: "dark", label: "Dark" },
+      ],
+      (theme) => update({ theme: theme as Settings["theme"] }),
+    ),
 
-      {options.isError && (
-        <p className="text-small text-modified">
-          This copy of Braid cannot list the terminals it can start, which means the
-          app is running an older build than the settings it is showing. Restart it to
-          pick from the full list; “Custom command” works either way.
-        </p>
-      )}
+    toggleRow(
+      "restoreTabs",
+      "Reopen repositories on launch",
+      "Restores the tabs that were open when you last closed the app.",
+      settings.restoreTabs,
+      (restoreTabs) => update({ restoreTabs }),
+    ),
 
-      {settings.terminal === "custom" && (
-        <Field
-          label="Terminal command"
-          hint="{path} becomes the repository's folder. Quote anything containing spaces. This is not a shell — pipes, redirects and chained commands are treated as ordinary arguments."
-        >
-          <input
-            type="text"
-            spellCheck={false}
-            placeholder="alacritty --working-directory {path}"
-            value={settings.terminalCommand}
-            onChange={(e) => update({ terminalCommand: e.target.value })}
-          />
-        </Field>
-      )}
-    </>
+    toggleRow(
+      "confirmDiscard",
+      "Ask before discarding changes",
+      "Discarding cannot be undone; git keeps no record of it.",
+      settings.confirmDiscard,
+      (confirmDiscard) => update({ confirmDiscard }),
+    ),
+
+    selectRow(
+      "terminal",
+      "Terminal",
+      terminals.isError
+        ? "This build cannot list the terminals it can start, which means it is older than the settings it is showing. Restart it for the full list; a custom command works either way."
+        : "What “Open in terminal” starts. Choosing automatically tries the ones this system usually has.",
+      settings.terminal,
+      choices.map((option) => ({ value: option.id, label: option.label })),
+      (terminal) => update({ terminal }),
+    ),
+  ];
+
+  if (settings.terminal === "custom") {
+    rows.push(
+      textRow(
+        "terminalCommand",
+        "Terminal command",
+        "{path} becomes the repository's folder. Quote anything containing spaces. This is not a shell — pipes, redirects and chained commands are treated as ordinary arguments.",
+        settings.terminalCommand,
+        "alacritty --working-directory {path}",
+        (terminalCommand) => update({ terminalCommand }),
+      ),
+    );
+  }
+
+  rows.push(
+    numberRow(
+      "historyPageSize",
+      "History page size",
+      "Commits loaded at a time as you scroll.",
+      settings.historyPageSize,
+      { min: 50, max: 2000, step: 50 },
+      (historyPageSize) => update({ historyPageSize }),
+    ),
+
+    numberRow(
+      "sequenceTimeout",
+      "Sequence timeout",
+      "How long a two-key shortcut like G F waits for its second key, in milliseconds.",
+      settings.sequenceTimeout,
+      { min: 200, max: 3000, step: 100 },
+      (sequenceTimeout) => update({ sequenceTimeout }),
+    ),
   );
+
+  return <SettingsRows rows={rows} />;
 }
 
 function DiffSection() {
   const { settings, update } = useSettings();
 
   return (
-    <>
-      <Field
-        label="Context lines"
-        hint="Unchanged lines shown around each change. Git's own default is 3."
-      >
-        <input
-          type="number"
-          min={0}
-          max={50}
-          value={settings.diffContextLines}
-          onChange={(e) => update({ diffContextLines: clamp(Number(e.target.value), 0, 50) })}
-        />
-      </Field>
+    <SettingsRows
+      rows={[
+        numberRow(
+          "diffContextLines",
+          "Context lines",
+          "Unchanged lines shown around each change. Git's own default is 3.",
+          settings.diffContextLines,
+          { min: 0, max: 50, step: 1 },
+          (diffContextLines) => update({ diffContextLines }),
+        ),
 
-      <Toggle
-        label="Ignore whitespace"
-        hint="Hides lines that differ only in spacing. Useful after a reformat, misleading in a language where indentation is syntax."
-        value={settings.ignoreWhitespace}
-        onChange={(ignoreWhitespace) => update({ ignoreWhitespace })}
-      />
-    </>
+        toggleRow(
+          "ignoreWhitespace",
+          "Ignore whitespace",
+          "Hides lines that differ only in spacing. Useful after a reformat, misleading in a language where indentation is syntax.",
+          settings.ignoreWhitespace,
+          (ignoreWhitespace) => update({ ignoreWhitespace }),
+        ),
+      ]}
+    />
   );
 }
 
@@ -550,36 +660,81 @@ function UpdatesSection() {
   const { settings, update } = useSettings();
   const updater = useUpdater(false);
 
+  const rows: Row[] = [
+    toggleRow(
+      "checkForUpdates",
+      "Check for updates on launch",
+      "A quiet check a few seconds after opening. Nothing downloads without you asking.",
+      settings.checkForUpdates,
+      (checkForUpdates) => update({ checkForUpdates }),
+    ),
+
+    actionRow("checkNow", "Check now", describe(updater.stage), {
+      label: updater.stage.state === "checking" ? "Checking…" : "Check for updates",
+      disabled: updater.stage.state === "checking",
+      onPress: () => void updater.checkNow(),
+    }),
+  ];
+
+  if (updater.stage.state === "available") {
+    rows.push(
+      actionRow(
+        "install",
+        `Version ${updater.stage.version}`,
+        "Downloads, then asks before restarting.",
+        { label: "Install", primary: true, onPress: () => void updater.install() },
+      ),
+    );
+  }
+
   return (
     <>
-      <Toggle
-        label="Check for updates on launch"
-        hint="A quiet check a few seconds after opening. Nothing downloads without you asking."
-        value={settings.checkForUpdates}
-        onChange={(checkForUpdates) => update({ checkForUpdates })}
-      />
-
-      <Field label="Check now" hint={describe(updater.stage)}>
-        <button
-          className="btn"
-          disabled={updater.stage.state === "checking"}
-          onClick={() => void updater.checkNow()}
-        >
-          {updater.stage.state === "checking" ? "Checking…" : "Check for updates"}
-        </button>
-      </Field>
-
-      {updater.stage.state === "available" && (
-        <Field label={`Version ${updater.stage.version}`} hint="Downloads, then asks before restarting.">
-          <button className="btn-primary" onClick={() => void updater.install()}>
-            Install
-          </button>
-        </Field>
-      )}
+      <SettingsRows rows={rows} />
 
       <p className="settings-note">
         Updates are signed. Braid refuses anything that is not signed with the key this
         build was made against, so a release has to come from whoever holds that key.
+      </p>
+    </>
+  );
+}
+
+function AboutSection() {
+  const app = useAppVersion();
+
+  const rows: Row[] = [
+    staticRow(
+      "version",
+      "Braid",
+      "A fast, keyboard-first Git client.",
+      <span className="font-mono text-small text-text-dim">{app.version || "unknown"}</span>,
+    ),
+  ];
+
+  if (app.channel) {
+    rows.push(
+      staticRow(
+        "channel",
+        `This is ${app.channel === "rc" ? "a" : "an"} ${channelLabel(app.channel)}`,
+        channelCaution(app.channel),
+        <span className={`channel channel-${app.channel}`}>{channelLabel(app.channel)}</span>,
+      ),
+    );
+  }
+
+  return (
+    <>
+      <SettingsRows rows={rows} />
+
+      <p className="settings-note">
+        Settings, shortcuts and the list of open repositories are stored as JSON beside the
+        app's own config, so they can be read, edited or deleted by hand.
+      </p>
+
+      <p className="settings-note">
+        Writes go through your own <span className="mono">git</span>, so hooks, credential
+        helpers, signing and LFS behave exactly as they do in your terminal. Braid never asks
+        for a password itself.
       </p>
     </>
   );
@@ -603,78 +758,3 @@ function describe(stage: ReturnType<typeof useUpdater>["stage"]): string {
       return "Braid asks GitHub whether a newer release has been published.";
   }
 }
-
-function AboutSection() {
-  const app = useAppVersion();
-
-  return (
-    <>
-      <Field label="Braid" hint="A fast, keyboard-first Git client.">
-        <span className="settings-static">{app.version || "unknown"}</span>
-      </Field>
-
-      {app.channel && (
-        <Field
-          label={`This is ${app.channel === "rc" ? "a" : "an"} ${channelLabel(app.channel)}`}
-          hint={channelCaution(app.channel)}
-        >
-          <span className={`channel channel-${app.channel}`}>
-            {channelLabel(app.channel)}
-          </span>
-        </Field>
-      )}
-
-      <p className="settings-note">
-        Settings, shortcuts and the list of open repositories are stored as JSON beside the
-        app's own config, so they can be read, edited or deleted by hand.
-      </p>
-
-      <p className="settings-note">
-        Writes go through your own <span className="mono">git</span>, so hooks, credential
-        helpers, signing and LFS behave exactly as they do in your terminal. Braid never asks
-        for a password itself.
-      </p>
-    </>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="setting">
-      <div className="setting-text">
-        <span className="setting-label">{label}</span>
-        {hint && <span className="setting-hint">{hint}</span>}
-      </div>
-      <div className="setting-control">{children}</div>
-    </div>
-  );
-}
-
-function Toggle({
-  label,
-  hint,
-  value,
-  onChange,
-}: {
-  label: string;
-  hint?: string;
-  value: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <Field label={label} hint={hint}>
-      <input type="checkbox" checked={value} onChange={(e) => onChange(e.target.checked)} />
-    </Field>
-  );
-}
-
-const clamp = (value: number, min: number, max: number) =>
-  Number.isFinite(value) ? Math.min(Math.max(value, min), max) : min;

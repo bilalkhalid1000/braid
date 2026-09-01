@@ -1627,63 +1627,6 @@ kbd.key-live {
   color: var(--text);
 }
 
-.setting {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--s7);
-  padding: var(--s5) 0;
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.setting-text {
-  display: grid;
-  flex: 1;
-  gap: var(--s1);
-  min-width: 0;
-}
-
-.setting-label {
-  font-weight: 600;
-}
-
-.setting-hint {
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-  line-height: 1.5;
-}
-
-.setting-control {
-  flex: none;
-  padding-top: var(--s1);
-}
-
-.setting-control select,
-.setting-control input[type="number"] {
-  padding: 4px var(--s3);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: var(--fs-body);
-}
-
-.setting-control input[type="number"] {
-  width: 88px;
-  font-family: var(--mono);
-  text-align: right;
-}
-
-.setting-control input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--accent);
-}
-
-.settings-static {
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-}
-
 .settings-note {
   margin: var(--s5) 0 0;
   color: var(--text-dim);
