@@ -83,7 +83,7 @@ describe("the settings dialog, by keyboard alone", () => {
   it("opens with the keyboard on itself", async () => {
     await open();
 
-    expect(document.activeElement).toBe(host.querySelector(".settings"));
+    expect(document.activeElement).toBe(host.querySelector('[role="dialog"]'));
   });
 
   it("changes a select with the arrow keys", async () => {
@@ -139,11 +139,11 @@ describe("the settings dialog, by keyboard alone", () => {
     await open();
 
     press("3");
-    expect(host.querySelectorAll(".shortcut-row").length).toBeGreaterThan(0);
+    expect(host.querySelectorAll("[data-command]").length).toBeGreaterThan(0);
 
     press("ArrowDown");
 
-    expect(host.querySelector(".shortcut-row.bg-select")).not.toBeNull();
+    expect(host.querySelector("[data-command][data-at]")).not.toBeNull();
   });
 
   it("records a key with Enter on the highlighted command", async () => {
@@ -155,7 +155,7 @@ describe("the settings dialog, by keyboard alone", () => {
 
     // The slot goes into recording, which is what the "+" at the end of a row
     // does with the mouse.
-    expect(host.querySelector(".shortcut-key-recording")).not.toBeNull();
+    expect(host.querySelector("[data-recording]")).not.toBeNull();
   });
 
   it("toggles a checkbox with Enter once the cursor is on it", async () => {

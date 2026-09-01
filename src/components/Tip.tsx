@@ -13,6 +13,19 @@ import {
 import { useSettings } from "../lib/settings";
 import { shortcutLabel } from "../lib/shortcutLabel";
 
+/* width: max-content matters. A fixed box with `left` set and `width: auto`
+   has its shrink-to-fit width capped by the space remaining to its right, and
+   the translateX that centres it only moves the box afterwards -- it hands back
+   no room. So a control near the right edge got a tip a few characters wide
+   that broke its own words to fit. max-content sizes to the text and leaves the
+   limiting to max-width, which also makes the width measured below the real
+   one, so the clamp that keeps the tip on screen has something true to work
+   from. */
+const TIP =
+  "fixed z-30 flex w-max max-w-[min(460px,90vw)] items-center gap-3 px-4 py-2 " +
+  "bg-chrome-alt border border-border rounded-sm shadow-pop text-small " +
+  "pointer-events-none -translate-x-1/2 animate-tip-in";
+
 const DELAY = 350;
 /** How often an open tip checks that its subject is still there. */
 export const GONE_CHECK_MS = 120;
@@ -154,7 +167,7 @@ export function TipProvider({ children }: { children: ReactNode }) {
 
       {anchor && (
         <div
-          className="tip"
+          className={TIP}
           role="tooltip"
           ref={element}
           style={{
@@ -165,9 +178,9 @@ export function TipProvider({ children }: { children: ReactNode }) {
             visibility: left === null ? "hidden" : "visible",
           }}
         >
-          <span className="tip-label">{anchor.label}</span>
-          {anchor.keys && <kbd className="tip-key">{anchor.keys}</kbd>}
-          {anchor.note && <span className="tip-note">{anchor.note}</span>}
+          <span className="min-w-0 [overflow-wrap:anywhere] text-text">{anchor.label}</span>
+          {anchor.keys && <kbd className="flex-none bg-chrome">{anchor.keys}</kbd>}
+          {anchor.note && <span className="whitespace-pre-line text-text-faint">{anchor.note}</span>}
         </div>
       )}
     </TipContext.Provider>

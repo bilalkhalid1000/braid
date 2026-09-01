@@ -102,6 +102,54 @@ interface Row {
   target?: MenuTarget;
 }
 
+/* Pushed to the right of the row: it is a status on the branch, not part of
+   its name. */
+const TRACKING = "ml-auto flex gap-2 font-mono text-micro";
+
+const FILTER =
+  "sticky top-0 z-[1] px-4 py-3 bg-chrome border-b border-b-border-soft";
+
+/* Every key in the sidebar sits in this column and nothing else does, so a
+   digit here is always a key and a number on the right is always a count. */
+const RAIL = "flex w-[21px] flex-none justify-center";
+
+const SECTION_KEY = "h-[15px] min-w-[15px] px-[3px]";
+
+const HEADER =
+  "flex min-w-0 flex-1 items-center gap-3 pt-3 pr-2 pb-2 pl-0 bg-transparent border-0 " +
+  "uppercase tracking-[0.09em] text-micro font-semibold text-text-dim text-left cursor-pointer";
+
+/* A nested section is a remote's name, not a heading: it reads as the thing it
+   names rather than as a category. */
+const NESTED_HEADER =
+  "flex min-w-0 flex-1 items-center gap-3 pt-3 pr-2 pb-2 pl-6 bg-transparent border-0 " +
+  "font-mono text-small text-text-dim text-left cursor-pointer";
+
+const COUNT = "pl-3 font-mono text-micro font-normal tracking-normal text-text-faint";
+
+const ITEM =
+  "flex h-row items-center gap-3 pl-2 pr-4 border-l-2 text-text cursor-default";
+
+const FOLDER =
+  "flex h-row w-full items-center gap-3 pl-2 pr-4 bg-transparent border-0 border-l-2 " +
+  "border-l-transparent [font-family:inherit] text-body text-text-dim text-left " +
+  "cursor-default hover:bg-surface-alt hover:text-text";
+
+const CURSOR = "bg-surface-alt shadow-[inset_0_0_0_1px_var(--color-accent)]";
+
+const ITEM_LABEL =
+  "overflow-hidden text-ellipsis whitespace-nowrap font-mono text-small";
+
+const BADGE =
+  "ml-auto min-w-[18px] px-[5px] rounded-full bg-accent text-center font-mono " +
+  "text-micro leading-[15px] text-white";
+
+/* Capped: a worktree's state is an aside, and a long one must not push the
+   path it belongs to out of the row. */
+const NOTE =
+  "ml-auto max-w-24 overflow-hidden pl-3 text-ellipsis whitespace-nowrap font-mono " +
+  "text-micro text-text-faint";
+
 export function Sidebar({
   refs,
   status,
@@ -185,7 +233,7 @@ export function Sidebar({
    *  is only reserved where something is actually grouped. A repository with no
    *  slashes in its branch names looks exactly as it did before. */
   const twisty = (present: boolean) =>
-    present ? <span className="side-twisty" /> : undefined;
+    present ? <span className="flex w-7 flex-none justify-center text-text-faint" /> : undefined;
 
   const branchesGrouped = hasFolders(branchTree);
   const tagsGrouped = hasFolders(tagTree);
@@ -316,19 +364,19 @@ export function Sidebar({
 
   const rowProps = (key: string) => ({
     "data-row": key,
-    className: selectedKey === key ? "side-item side-item-cursor" : "side-item",
+    className: selectedKey === key ? `${ITEM} ${CURSOR}` : ITEM,
   });
 
   /** The same, for a folder row. It carries `data-row` for the same reason a
    *  branch does: the cursor scrolls itself into view by querying for it. */
   const folderProps = (key: string) => ({
     "data-row": key,
-    className: selectedKey === key ? "side-folder side-folder-cursor" : "side-folder",
+    className: selectedKey === key ? `${FOLDER} ${CURSOR}` : FOLDER,
   });
 
   return (
-    <nav className={`sidebar ${focused ? "sidebar-focused" : ""}`}>
-      <div className="sidebar-filter">
+    <nav className="overflow-y-auto pb-6 bg-chrome">
+      <div className={FILTER}>
         <FilterInput
           value={filter}
           onChange={setFilter}
@@ -541,7 +589,7 @@ export function Sidebar({
             }
             trailing={
               <>
-                <span className="side-note">{worktreeSubtitle(worktree)}</span>
+                <span className={NOTE}>{worktreeSubtitle(worktree)}</span>
                 {/* A prunable worktree's directory is already gone, so
                     `worktree remove` has nothing to remove; pruning is the
                     operation that actually clears it. */}
@@ -611,7 +659,7 @@ export function Sidebar({
                   onClick={() => onUpdateSubmodule(submodule.path)}
                 />
               ) : (
-                <span className="side-note">
+                <span className={NOTE}>
                   {submodule.describe ?? submodule.oid.slice(0, 7)}
                 </span>
               )
@@ -621,7 +669,7 @@ export function Sidebar({
       </Section>
 
       {focused && (
-        <p className="sidebar-hint">
+        <p className="pane-hint">
           <Keys>
             <kbd>{shortcutLabel(keymap["sidebar.next"])}</kbd>
             <kbd>{shortcutLabel(keymap["sidebar.previous"])}</kbd> move
@@ -695,15 +743,15 @@ function RefTree<T>({
                   which every row in a grouped list reserves -- blank on a
                   branch, filled on a folder -- so a folder's name sits on the
                   same left edge as the branches beside it. */}
-              <span className="side-rail" />
-              <span className="side-twisty">
+              <span className={RAIL} />
+              <span className="flex w-7 flex-none justify-center text-text-faint">
                 <IconChevron open={!isFolded(node.path)} />
               </span>
-              <span className="side-folder-label">{node.label}</span>
+              <span className="overflow-hidden text-ellipsis whitespace-nowrap">{node.label}</span>
             </button>
 
             {!isFolded(node.path) && (
-              <div className="side-nest">
+              <div className="pl-7">
                 <RefTree
                   nodes={node.children}
                   isFolded={isFolded}
@@ -749,25 +797,25 @@ function Section({
 
   return (
     <div
-      className={[
-        "side-section",
-        nested ? "side-section-nested" : "",
-        focused ? "side-section-focused" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+      data-focused={focused || undefined}
     >
-      <div className="side-header-row">
+      <div className="group flex items-center pr-4">
         {/* The rail. Every key in the sidebar sits in this column and nothing
             else does, so a digit here is always a key and a number on the
             right is always a count. */}
-        <span className="side-rail">
+        <span className={RAIL}>
           {number !== undefined && (
-            <kbd className={`side-key ${focused ? "key-live" : ""}`}>{number}</kbd>
+            <kbd
+              className={`${SECTION_KEY} ${
+                focused ? "key-live bg-accent border-accent text-white" : ""
+              }`}
+            >
+              {number}
+            </kbd>
           )}
         </span>
 
-        <button className="side-header" onClick={() => setExpanded(() => !open)}>
+        <button className={nested ? NESTED_HEADER : HEADER} onClick={() => setExpanded(() => !open)}>
           <IconChevron open={open} />
           <span>{title}</span>
         </button>
@@ -782,16 +830,16 @@ function Section({
           />
         )}
 
-        {count !== undefined && count > 0 && <span className="side-count">{count}</span>}
+        {count !== undefined && count > 0 && <span className={COUNT}>{count}</span>}
       </div>
 
-      {open && <div className="side-body">{children}</div>}
+      {open && <div>{children}</div>}
     </div>
   );
 }
 
 function Empty({ children }: { children: ReactNode }) {
-  return <div className="side-empty">{children}</div>;
+  return <div className="pt-0 pr-4 pb-2 pl-7 text-small text-text-faint">{children}</div>;
 }
 
 function Item({
@@ -838,10 +886,10 @@ function Item({
       {...rest}
       {...tip(head ?? label, undefined, note || undefined)}
       className={[
-        className ?? "side-item",
-        active ? "side-item-active" : "",
-        bold ? "side-item-bold" : "",
-        nested ? "side-item-nested" : "",
+        className ?? ITEM,
+        active ? "bg-select border-l-accent" : "border-l-transparent hover:bg-surface-alt",
+        bold ? "font-semibold" : "",
+        nested ? "pl-8" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -856,15 +904,15 @@ function Item({
         })
       }
     >
-      <span className="side-rail">
+      <span className={RAIL}>
         {number !== undefined && (
           <kbd className={`side-key ${active ? "key-live" : ""}`}>{number}</kbd>
         )}
       </span>
 
       {leading}
-      <span className="side-item-label">{label}</span>
-      {badge !== undefined && <span className="side-badge">{badge}</span>}
+      <span className={ITEM_LABEL}>{label}</span>
+      {badge !== undefined && <span className={BADGE}>{badge}</span>}
       {trailing}
     </div>
   );
@@ -907,15 +955,15 @@ function Tracking({ branch }: { branch: BranchRef }) {
   // two looked identical: both drew nothing. A branch that exists only on this
   // machine is worth saying out loud, since it is the one that gets lost.
   if (!branch.upstream) {
-    return <span className="tracking-pill tracking-local">local</span>;
+    return <span className={`${TRACKING} font-sans tracking-[0.02em] text-text-faint`}>local</span>;
   }
 
   if (!branch.ahead && !branch.behind) return null;
 
   return (
-    <span className="tracking-pill">
-      {branch.ahead > 0 && <span className="ahead">&uarr;{branch.ahead}</span>}
-      {branch.behind > 0 && <span className="behind">&darr;{branch.behind}</span>}
+    <span className={TRACKING}>
+      {branch.ahead > 0 && <span className="text-added">&uarr;{branch.ahead}</span>}
+      {branch.behind > 0 && <span className="text-removed">&darr;{branch.behind}</span>}
     </span>
   );
 }

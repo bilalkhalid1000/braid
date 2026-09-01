@@ -57,6 +57,67 @@ function isEditing(target: EventTarget | null): boolean {
   return ["text", "number", "search", "password", "email", "url"].includes(target.type);
 }
 
+const FRAME =
+  "relative grid grid-cols-[208px_minmax(0,1fr)] w-[min(880px,92vw)] h-[min(640px,88vh)] " +
+  "overflow-hidden bg-chrome border border-border rounded-lg shadow-pop-lg outline-none";
+
+const NAV =
+  "flex flex-col gap-1 px-4 pt-8 pb-4 bg-chrome-alt border-r border-r-border";
+
+const TITLE = "mt-0 mr-0 mb-6 ml-3 text-lead font-semibold tracking-[-0.01em]";
+
+const TAB =
+  "flex items-center gap-4 p-3 bg-transparent border-0 border-l-2 " +
+  "rounded-r-sm text-left cursor-pointer";
+
+const NAV_HINT =
+  "mt-auto text-micro leading-[2] text-text-faint [&_kbd]:mx-px";
+
+const CLOSE =
+  "absolute top-4 right-6 bg-transparent border-0 text-[18px] leading-none " +
+  "text-text-faint cursor-pointer hover:text-text";
+
+const NOTE = "mt-6 mb-0 text-small leading-[1.55] text-text-dim";
+const NOTE_TIGHT = "mt-0 mb-6 text-small leading-[1.55] text-text-dim";
+
+const WARNING =
+  "mt-0 mb-6 px-4 py-3 bg-modified-bg border-l-[3px] border-l-modified rounded-sm " +
+  "text-small leading-[1.5]";
+
+const GROUP_HEADING =
+  "mt-0 mb-2 uppercase tracking-[0.09em] text-micro font-semibold text-text-dim";
+
+/* `group` so a row can reveal its own reset link on hover or focus. */
+const ROW =
+  "group grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 " +
+  "pt-2 pr-3 pb-2 pl-0 border-b border-b-border-soft " +
+  "[&:hover_.hover-only]:opacity-100 [&:focus-within_.hover-only]:opacity-100";
+
+const LABEL =
+  "flex items-center gap-3 overflow-hidden text-ellipsis whitespace-nowrap";
+
+/* A fixed floor so the keys line up as a column instead of stepping in and out
+   with the width of what is bound. */
+const KEYS = "flex min-w-[150px] items-center justify-end gap-3";
+
+const KEY =
+  "inline-flex items-center gap-2 p-[2px] bg-transparent border border-transparent " +
+  "rounded-sm cursor-pointer hover:border-border";
+
+const RECORDING =
+  "px-3 py-[2px] bg-accent-soft border-accent text-small text-accent whitespace-nowrap";
+
+const REMOVE =
+  "ml-px px-[2px] bg-transparent border-0 text-body leading-none text-text-faint " +
+  "cursor-pointer hover:text-removed";
+
+/* Dashed until it holds something: it is a slot rather than a key. */
+const ADD =
+  "px-3 bg-transparent border border-dashed border-border rounded-sm text-body " +
+  "leading-4 text-text-faint cursor-pointer hover:border-solid hover:border-accent hover:text-accent";
+
+const CONFLICT = "col-span-full pb-2 text-micro text-modified";
+
 const FOCUSABLE =
   'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), ' +
   'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
@@ -198,7 +259,7 @@ export function SettingsDialog({
   return (
     <div className={SCRIM} onMouseDown={onClose}>
       <div
-        className="settings"
+        className={FRAME}
         ref={frame}
         role="dialog"
         aria-modal="true"
@@ -207,15 +268,19 @@ export function SettingsDialog({
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDownCapture={onKeyDown}
       >
-        <nav className="settings-nav" aria-label="Settings sections">
-          <h2 className="settings-title" id={titleId}>
+        <nav className={NAV} aria-label="Settings sections">
+          <h2 className={TITLE} id={titleId}>
             Settings
           </h2>
 
           {SECTIONS.map((item, index) => (
             <button
               key={item.id}
-              className={`settings-tab ${section === item.id ? "settings-tab-active" : ""}`}
+              className={`${TAB} ${
+                section === item.id
+                  ? "bg-select border-l-accent font-semibold text-text"
+                  : "border-l-transparent text-text-dim hover:bg-surface-alt hover:text-text"
+              }`}
               // One tab stop for the whole list. The digits are the keyboard
               // route between sections, so tabbing through five headings to
               // reach the settings would be five stops that do nothing the
@@ -224,12 +289,12 @@ export function SettingsDialog({
               aria-current={section === item.id}
               onClick={() => goToSection(item.id)}
             >
-              <kbd className="settings-tab-key">{index + 1}</kbd>
+              <kbd className={section === item.id ? "bg-accent border-accent text-white" : ""}>{index + 1}</kbd>
               <span>{item.label}</span>
             </button>
           ))}
 
-          <p className="settings-nav-hint">
+          <p className={NAV_HINT}>
             <Keys>
               <kbd>1</kbd>–<kbd>{SECTIONS.length}</kbd> jump
             </Keys>{" "}
@@ -254,10 +319,10 @@ export function SettingsDialog({
           </p>
         </nav>
 
-        <div className="settings-body">
-          <header className="settings-header">
-            <h3 className="settings-heading">{current.label}</h3>
-            <p className="settings-blurb">{current.blurb}</p>
+        <div className="overflow-y-auto px-12 pt-8 pb-12">
+          <header className="mb-6 pb-4 border-b border-b-border">
+            <h3 className="m-0 text-lead font-semibold tracking-[-0.01em]">{current.label}</h3>
+            <p className="mt-1 mb-0 text-small text-text-dim">{current.blurb}</p>
           </header>
 
           <SettingsCursor value={{ index: cursor, setIndex: setCursor, register }}>
@@ -269,7 +334,7 @@ export function SettingsDialog({
           </SettingsCursor>
         </div>
 
-        <button className="settings-close" {...tip("Close settings")} onClick={onClose}>
+        <button className={CLOSE} {...tip("Close settings")} onClick={onClose}>
           &times;
         </button>
       </div>
@@ -484,7 +549,7 @@ function ShortcutsSection() {
 
   return (
     <>
-      <div className="settings-toolbar">
+      <div className="mb-3 flex items-center gap-4">
         <FilterInput
           value={filter}
           onChange={setFilter}
@@ -502,20 +567,20 @@ function ShortcutsSection() {
         </button>
       </div>
 
-      <p className="settings-note settings-note-tight">
+      <p className={NOTE_TIGHT}>
         Click a key to record a new one. Escape cancels, Backspace clears.
       </p>
 
       {conflicts.length > 0 && (
-        <p className="settings-warning">
+        <p className={WARNING}>
           {conflicts.length === 1 ? "One key is" : `${conflicts.length} keys are`} bound twice
           in a way that can collide. Whichever was registered last wins.
         </p>
       )}
 
       {[...groups].map(([category, commands]) => (
-        <section key={category} className="shortcut-group">
-          <h4 className="shortcut-heading">{category}</h4>
+        <section key={category} className="mb-8">
+          <h4 className={GROUP_HEADING}>{category}</h4>
 
           {commands.map((command) => (
             <ShortcutRow
@@ -535,7 +600,7 @@ function ShortcutsSection() {
       ))}
 
       {shown.length === 0 && (
-        <p className="settings-empty">
+        <p className="text-text-faint">
           No command matches that. Try a category, like “git” or “panels”.
         </p>
       )}
@@ -578,27 +643,32 @@ function ShortcutRow({
 
   return (
     <div
+      // A hook that does not move when the styling does. The tests used to
+      // find these rows by their class, which tied them to a stylesheet
+      // rather than to what the row is.
+      data-command={command.id}
+      data-at={at || undefined}
       ref={(node) => {
         // Follow the cursor. A list this long scrolls well past the pane, and
         // a selection you cannot see is one you will change by accident.
         if (at) node?.scrollIntoView({ block: "nearest" });
       }}
       className={[
-        "shortcut-row",
-        rivals.length > 0 && "shortcut-row-conflict",
-        at && "bg-select",
+        ROW,
+        rivals.length > 0 && "shadow-[inset_3px_0_0_var(--color-modified)]",
+        at ? "bg-select" : "hover:bg-surface-alt",
       ]
         .filter(Boolean)
         .join(" ")}
     >
-      <span className="shortcut-label">
+      <span className={LABEL}>
         {command.label}
         {changed && (
-          <span className="shortcut-changed" {...tip("Changed from the default")} />
+          <span className="size-[5px] flex-none rounded-full bg-accent" {...tip("Changed from the default")} />
         )}
       </span>
 
-      <span className="shortcut-keys">
+      <span className={KEYS}>
         {bindings.map((binding, index) => (
           <KeySlot
             key={`${binding}-${index}`}
@@ -622,7 +692,7 @@ function ShortcutRow({
           />
         ) : (
           <button
-            className="shortcut-add"
+            className={ADD}
             {...tip("Add another key for this command")}
             onClick={() => onEditing(`${command.id}:new`)}
           >
@@ -631,7 +701,7 @@ function ShortcutRow({
         )}
 
         {bindings.length === 0 && !addingNew && (
-          <span className="shortcut-unbound">not bound</span>
+          <span className="text-small text-text-faint">not bound</span>
         )}
       </span>
 
@@ -640,7 +710,7 @@ function ShortcutRow({
       </button>
 
       {rivals.length > 0 && (
-        <span className="shortcut-conflict">
+        <span className={CONFLICT}>
           also {rivals.map((id) => COMMANDS_BY_ID[id]?.label ?? id).join(", ")}
         </span>
       )}
@@ -683,22 +753,26 @@ function KeySlot({
 
   if (recording) {
     return (
-      <button className="shortcut-key shortcut-key-recording" onClick={recorder.cancelRecording}>
+      <button
+        className={`${KEY} ${RECORDING}`}
+        data-recording
+        onClick={recorder.cancelRecording}
+      >
         {recorder.recordedHotkey ? formatBinding(recorder.recordedHotkey) : "Press a key…"}
       </button>
     );
   }
 
   return (
-    <span className="shortcut-slot">
+    <span className="relative inline-flex items-center">
       <button
-        className="shortcut-key"
+        className={KEY}
         {...tip("Record a different key")}
         onClick={onStart}
       >
         <kbd>{formatBinding(binding)}</kbd>
       </button>
-      <button className="shortcut-remove hover-only" {...tip("Remove this key")} onClick={onRemove}>
+      <button className={`${REMOVE} hover-only`} {...tip("Remove this key")} onClick={onRemove}>
         &times;
       </button>
     </span>
@@ -740,7 +814,7 @@ function UpdatesSection() {
     <>
       <SettingsRows rows={rows} />
 
-      <p className="settings-note">
+      <p className={NOTE}>
         Updates are signed. Braid refuses anything that is not signed with the key this
         build was made against, so a release has to come from whoever holds that key.
       </p>
@@ -775,12 +849,12 @@ function AboutSection() {
     <>
       <SettingsRows rows={rows} />
 
-      <p className="settings-note">
+      <p className={NOTE}>
         Settings, shortcuts and the list of open repositories are stored as JSON beside the
         app's own config, so they can be read, edited or deleted by hand.
       </p>
 
-      <p className="settings-note">
+      <p className={NOTE}>
         Writes go through your own <span className="mono">git</span>, so hooks, credential
         helpers, signing and LFS behave exactly as they do in your terminal. Braid never asks
         for a password itself.

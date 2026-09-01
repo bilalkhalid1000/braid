@@ -4,8 +4,10 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { badgeFor, type StatusEntry } from "../lib/api";
 import { useTip } from "./Tip";
 
+/* flex-1 because the two lists divide the column between them: the rule that
+   said so lived on the parent, keyed on this class. */
 const PANE =
-  "grid grid-rows-[auto_minmax(0,1fr)] min-h-0 border-b border-b-border-soft";
+  "grid grid-rows-[auto_minmax(0,1fr)] min-h-0 flex-1 border-b border-b-border-soft";
 
 const HEADER =
   "flex h-12 items-center gap-4 px-4 bg-surface-alt border-b border-b-border-soft " +

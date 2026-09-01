@@ -180,7 +180,7 @@ export function HistoryView({
   }, keyboardActive);
 
   return (
-    <div className="grid h-full min-h-0 flex-1 basis-auto" style={{ gridTemplateRows: `${tableHeight}px 4px minmax(0, 1fr)` }}>
+    <div className="grid min-h-0 flex-1 basis-auto" style={{ gridTemplateRows: `${tableHeight}px 4px minmax(0, 1fr)` }}>
       <div className={TABLE}>
         {/* What is being walked, said out loud. Without it a branch missing
             from the graph looks like a bug in the graph rather than a choice

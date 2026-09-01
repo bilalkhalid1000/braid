@@ -86,7 +86,7 @@ export const CommitGraph = memo(function CommitGraph({ row, lanes, height, isHea
   };
 
   return (
-    <svg className="graph" width={width} height={height} aria-hidden="true">
+    <svg className="block overflow-hidden" width={width} height={height} aria-hidden="true">
       {ordered(row.up).map((link, i) => draw(link, `u${i}`, 0, middle))}
       {ordered(row.down).map((link, i) => draw(link, `d${i}`, middle, height))}
 

@@ -100,6 +100,39 @@ const REPO_QUERY_KEYS = [
   "flow",
 ];
 
+const TABS =
+  "flex h-15 flex-none items-stretch bg-chrome-alt border-b border-b-border";
+
+const SETTINGS_BUTTON =
+  "flex w-17 flex-none items-center justify-center p-0 bg-transparent border-0 " +
+  "border-l border-l-border text-text-dim cursor-pointer hover:bg-chrome hover:text-text " +
+  "[&_svg]:size-[15px]";
+
+const STATUSBAR =
+  "flex h-12 flex-none items-center gap-8 overflow-hidden px-4 bg-chrome " +
+  "border-t border-t-border text-small whitespace-nowrap text-text-dim";
+
+const BRANCH =
+  "px-3 bg-transparent border-0 rounded-sm font-mono text-small font-semibold " +
+  "text-accent cursor-pointer hover:bg-accent-soft";
+
+const ACTIVITY =
+  "flex max-w-[300px] items-center gap-3 overflow-hidden text-ellipsis text-text";
+
+/* Capped: the point is to say something is running, not to print the argv --
+   the tooltip carries the rest. */
+const RUNNING =
+  "flex min-w-0 max-w-[40ch] items-center gap-3 overflow-hidden text-ellipsis " +
+  "whitespace-nowrap font-mono text-micro text-text-faint";
+
+const STATUS_BUTTON =
+  "flex items-center gap-3 px-3 bg-transparent border-0 rounded-sm text-small " +
+  "text-text-dim cursor-pointer hover:bg-surface-alt hover:text-text";
+
+const ERROR_COUNT =
+  "min-w-[15px] px-2 rounded-full bg-removed text-center font-mono text-micro " +
+  "leading-[14px] text-white";
+
 export default function App() {
   const queryClient = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -1924,8 +1957,8 @@ The stashed changes are discarded.`,
   }
 
   return (
-    <div className="app">
-      <header className="tabs">
+    <div className="flex h-full flex-col outline-none">
+      <header className={TABS}>
         <RepoTabs
           repos={tabs}
           activeId={activeId}
@@ -1973,7 +2006,7 @@ The stashed changes are discarded.`,
             open it would otherwise scroll off the end, and settings belong to
             the app rather than to whichever tab happens to be last. */}
         <button
-          className="tab-settings"
+          className={SETTINGS_BUTTON}
           {...tip("Settings and keyboard shortcuts", "app.settings")}
           onClick={() => setSettingsOpen("general")}
           aria-label="Settings"
@@ -2009,7 +2042,7 @@ The stashed changes are discarded.`,
           />
 
           <div
-            className={`body ${logOpen ? "body-with-log" : ""}`}
+            className="grid min-h-0 flex-1"
             style={{
               gridTemplateColumns: `${sidebarWidth}px 4px minmax(0, 1fr)${logOpen ? " 380px" : ""}`,
             }}
@@ -2058,7 +2091,7 @@ The stashed changes are discarded.`,
               max={480}
             />
 
-            <main className="content">
+            <main className="flex min-w-0 min-h-0 flex-1 flex-col bg-surface">
               {head && (
                 <OperationBanner
                   state={head.state}
@@ -2160,13 +2193,13 @@ The stashed changes are discarded.`,
         </>
       )}
 
-      <footer className="statusbar">
+      <footer className={STATUSBAR}>
         {head && (
           <>
             {/* The current branch doubles as a quick switcher, which is the
                 place people look for one. */}
             <button
-              className="branch"
+              className={BRANCH}
               {...tip("Switch branch")}
               onClick={(e) =>
                 openMenu(
@@ -2197,10 +2230,10 @@ The stashed changes are discarded.`,
         )}
 
         {busy && (
-          <span className="activity">
+          <span className={ACTIVITY}>
             <span className="spinner" />
             {activity.running[0].label}
-            {cloning && <span className="activity-detail">{cloning}</span>}
+            {cloning && <span className="ml-3 font-mono text-micro text-text-faint">{cloning}</span>}
             {activity.running.length > 1 && ` +${activity.running.length - 1}`}
           </span>
         )}
@@ -2210,7 +2243,7 @@ The stashed changes are discarded.`,
             seeing when something takes longer than it should. */}
         {gitLog.running.length > 0 && (
           <span
-            className="running-git"
+            className={RUNNING}
             {...tipFor(
               gitLog.running.length === 1
                 ? "1 git command running"
@@ -2233,11 +2266,11 @@ The stashed changes are discarded.`,
           </span>
         )}
 
-        <span className="statusbar-spacer" />
+        <span className="ml-auto" />
 
         {head && (
           <span
-            className="timing"
+            className="font-mono text-micro text-text-faint"
             {...tip("Time the last git status call took")}
           >
             status {head.durationMs}ms
@@ -2245,18 +2278,18 @@ The stashed changes are discarded.`,
         )}
 
         <button
-          className="statusbar-button"
+          className={STATUS_BUTTON}
           {...tip("Show every git operation and its output", "app.activityLog")}
           onClick={() => setLogOpen((v) => !v)}
         >
           Activity
           {activity.errorCount > 0 && (
-            <span className="statusbar-error-count">{activity.errorCount}</span>
+            <span className={ERROR_COUNT}>{activity.errorCount}</span>
           )}
         </button>
 
         <button
-          className="statusbar-button"
+          className={STATUS_BUTTON}
           {...tip("Switch between system, light and dark", "app.theme")}
           onClick={cycleTheme}
         >

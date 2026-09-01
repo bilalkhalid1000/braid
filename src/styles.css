@@ -4,23 +4,21 @@
 
      theme       Tailwind's own variables
      base        element defaults
-     components  styles/legacy.css -- everything not yet converted
+     components  styles/components.css -- the classes that cannot be utilities
      utilities   the classes written on elements in JSX
 
-   Utilities come last, so a class on an element beats whatever rule in the
-   legacy file still claims that property. That is what makes the migration
-   safe to do one component at a time: delete a component's rules, write the
-   utilities on the element, and the two never fight over anything.
+   Utilities come last, so a class written on an element beats anything in the
+   components file that claims the same property.
 
    Preflight is deliberately not imported. It resets margins, borders and
-   heading sizes across the document, and the legacy rules were written against
-   the reset that ships with them. Turning it on now would restyle every
-   component that has not been converted yet; it goes in when the legacy file
-   is empty. */
+   heading sizes across the document, and what remains in the components file
+   was written against the reset that ships with it -- buttons in particular
+   rely on the browser's own box until they say otherwise. Turning it on is a
+   change worth making on its own, with the result looked at. */
 
 @layer theme, base, components, utilities;
 
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 @import "./styles/tokens.css";
-@import "./styles/legacy.css" layer(components);
+@import "./styles/components.css" layer(components);

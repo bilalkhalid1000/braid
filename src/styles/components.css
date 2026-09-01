@@ -1,13 +1,20 @@
-/* Braid component styles, awaiting conversion
+/* Braid's component classes
    ---------------------------------------------------------------------------
-   Imported into the components layer, which is the whole point: utilities come
-   after it, so a class added to an element in JSX overrides whatever rule here
-   still claims the same property. Converting a component is therefore delete
-   its rules from this file and write the utilities on the element -- never both
-   at once, and never a fight about which wins.
+   What is left after the migration, and left on purpose. Two kinds of thing
+   live here and neither can be a utility:
 
-   This file only shrinks. When it is empty the migration is done. */
+   Classes built at runtime. A status badge is `badge-${kind}`, a ref chip is
+   picked by what the ref is, a submodule's dot is its state, and Prism emits
+   its own `token` names. Tailwind's scanner reads source text, so a class
+   assembled from a value is one it can never see.
 
+   Shared primitives. A button, a spinner, the empty state of a pane, the line
+   of keys along its bottom. These appear in a dozen places and mean one thing
+   in all of them; repeating twenty utilities at each site would make changing
+   the button harder, not easier.
+
+   Imported into the components layer, so a utility written on an element still
+   wins over anything here. */
 * {
   box-sizing: border-box;
 }
@@ -79,62 +86,18 @@ kbd.key-live {
    absent child silently hands the 1fr row to whatever follows it. A flex column
    sizes by child instead, so the body keeps the slack no matter what is
    mounted. */
-.app {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  outline: none;
-}
 
 /* The library carries its own now; these two are still waiting their turn. */
-.app > .body,
-.app > .welcome {
-  flex: 1;
-  min-height: 0;
-}
 
 /* Chrome keeps its own height; only the body absorbs what is left over. */
-.app > .tabs,
-.app > .statusbar {
-  flex: none;
-}
 
 /* --- repo tabs --------------------------------------------------------- */
 
 /* The bar itself does not scroll -- only the strip of tabs inside it does. That
    is what keeps Settings anchored at the right instead of sliding away once a
    dozen repositories are open. */
-.tabs {
-  display: flex;
-  align-items: stretch;
-  height: 30px;
-  background: var(--chrome-alt);
-  border-bottom: 1px solid var(--border);
-}
-
-.tab-settings {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 34px;
-  padding: 0;
-  background: none;
-  border: none;
-  border-left: 1px solid var(--border);
-  color: var(--text-dim);
-  cursor: pointer;
-}
-.tab-settings:hover {
-  background: var(--chrome);
-  color: var(--text);
-}
 /* The set is drawn at 20px; this sits in a 30px bar and has to come down to
    match the tab text beside it. */
-.tab-settings svg {
-  width: 15px;
-  height: 15px;
-}
 
 /* --- dragging a tab ----------------------------------------------------- */
 
@@ -162,20 +125,8 @@ kbd.key-live {
 
 /* --- body and splitters ------------------------------------------------ */
 
-.body {
-  display: grid;
-  min-height: 0;
-}
-
 /* A column, so the operation banner can sit above whichever view is showing
    and the view takes what is left rather than overflowing. */
-.content {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  background: var(--surface);
-}
 
 /* --- in-progress operation --------------------------------------------- */
 
@@ -184,146 +135,38 @@ kbd.key-live {
 
 /* --- sidebar ----------------------------------------------------------- */
 
-.sidebar {
-  overflow-y: auto;
-  padding-bottom: var(--s5);
-  background: var(--chrome);
-}
-
-.sidebar-filter {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: var(--s3) var(--s4);
-  background: var(--chrome);
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.side-header-row {
-  display: flex;
-  align-items: center;
-  padding-right: var(--s4);
-}
-
 /* Hover actions keep the sidebar quiet without hiding the feature: they are
    revealed on hover, always reachable by keyboard, and every one of them also
    exists in the right-click menu. */
+/** The line of keys along the bottom of a pane.
+ *
+ *  Shared, and always the last child of a flex column, so it carries its own
+ *  flex: none rather than each pane restating it. */
+.pane-hint {
+  flex: none;
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  background: var(--chrome);
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  line-height: 1.8;
+}
+
+.pane-hint kbd {
+  margin-right: var(--s1);
+}
+
 .hover-only {
   opacity: 0;
 }
 
-.side-header-row:hover .hover-only,
-.side-item:hover .hover-only,
-.hover-only:focus-visible {
-  opacity: 1;
-}
-
-.side-header {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  flex: 1;
-  min-width: 0;
-  padding: var(--s3) var(--s2) var(--s2) 0;
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  font-size: var(--fs-micro);
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-align: left;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
 /* Counts sit hard right, opposite the key rail. */
-.side-count {
-  padding-left: var(--s3);
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-  font-weight: 400;
-  letter-spacing: 0;
-}
-
-.side-section-nested > .side-header-row > .side-header {
-  padding-left: var(--s5);
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.side-empty {
-  padding: 0 var(--s4) var(--s2) 28px;
-  color: var(--text-faint);
-  font-size: var(--fs-small);
-}
-
-.side-item {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  height: var(--row);
-  padding: 0 var(--s4) 0 var(--s2);
-  border-left: 2px solid transparent;
-  color: var(--text);
-  cursor: default;
-}
-
-.side-item:hover {
-  background: var(--surface-alt);
-}
 
 /* A tinted row with an accent edge, rather than a saturated fill: the branch
    name has to stay the most legible thing in the row. */
-.side-item-active {
-  background: var(--select);
-  border-left-color: var(--accent);
-}
-
-.side-item-bold {
-  font-weight: 600;
-}
-
-.side-item-nested {
-  padding-left: var(--s6);
-}
 
 /* Refs are literals you type, so they are set like literals. */
-.side-item-label {
-  overflow: hidden;
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.side-badge {
-  margin-left: auto;
-  min-width: 18px;
-  padding: 0 5px;
-  background: var(--accent);
-  border-radius: 999px;
-  color: #fff;
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-  line-height: 15px;
-  text-align: center;
-}
-
-.side-note {
-  max-width: 96px;
-  margin-left: auto;
-  padding-left: var(--s3);
-  overflow: hidden;
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .sub-dot {
   flex: none;
@@ -350,30 +193,9 @@ kbd.key-live {
   border: 1px solid var(--text-faint);
 }
 
-.tracking-pill {
-  display: flex;
-  gap: var(--s2);
-  margin-left: auto;
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-}
-
 /* A branch with no upstream. Deliberately not coloured like ahead/behind: it
    is not a count of anything, it is the absence of a remote — and the one
    state where the work exists on exactly one machine. */
-.tracking-local {
-  color: var(--text-faint);
-  font-family: var(--sans);
-  letter-spacing: 0.02em;
-}
-
-.ahead {
-  color: var(--added);
-}
-
-.behind {
-  color: var(--removed);
-}
 
 /* --- file status ------------------------------------------------------- */
 
@@ -477,10 +299,6 @@ kbd.key-live {
 /* Clipped, not visible. Lanes past the cap are already clamped to the last
    column, and this is the backstop that keeps a stroke's width from bleeding
    over the commit subject beside it. */
-.graph {
-  display: block;
-  overflow: hidden;
-}
 
 .ref-chip {
   display: inline-block;
@@ -538,135 +356,13 @@ kbd.key-live {
 
 /* --- welcome ----------------------------------------------------------- */
 
-.welcome {
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: var(--s4);
-  padding: var(--s7);
-  background: var(--surface);
-  color: var(--text-dim);
-  text-align: center;
-}
-
-.welcome h1 {
-  margin: 0;
-  color: var(--text);
-  font-size: var(--fs-display);
-  font-weight: 300;
-  letter-spacing: -0.015em;
-}
-
-.welcome p {
-  max-width: 34ch;
-  margin: 0 0 var(--s2);
-  line-height: 1.5;
-}
-
-.welcome-actions {
-  display: flex;
-  gap: var(--s4);
-}
-
-.welcome-hint {
-  margin-top: var(--s5);
-  color: var(--text-faint);
-  font-size: var(--fs-small);
-}
-
 /* --- status bar -------------------------------------------------------- */
-
-.statusbar {
-  display: flex;
-  align-items: center;
-  gap: var(--s6);
-  height: 24px;
-  padding: 0 var(--s4);
-  overflow: hidden;
-  background: var(--chrome);
-  border-top: 1px solid var(--border);
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-  white-space: nowrap;
-}
-
-.branch {
-  padding: 0 var(--s3);
-  background: none;
-  border: none;
-  border-radius: var(--radius);
-  color: var(--accent);
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.branch:hover {
-  background: var(--accent-soft);
-}
 
 /* The phase of a running clone, beside the spinner. Mono because it carries a
    percentage that changes constantly, and a proportional font makes the whole
    line twitch as the digits change width. */
-.activity-detail {
-  margin-left: var(--s3);
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-}
-
-.statusbar-spacer {
-  margin-left: auto;
-}
-
-.timing {
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-}
-
-.statusbar-button {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  padding: 0 var(--s3);
-  background: none;
-  border: none;
-  border-radius: var(--radius);
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-  cursor: pointer;
-}
-
-.statusbar-button:hover {
-  background: var(--surface-alt);
-  color: var(--text);
-}
-
-.statusbar-error-count {
-  min-width: 15px;
-  padding: 0 var(--s2);
-  background: var(--removed);
-  border-radius: 999px;
-  color: #fff;
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-  line-height: 14px;
-  text-align: center;
-}
 
 /* --- busy indicator ---------------------------------------------------- */
-
-.activity {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  max-width: 300px;
-  overflow: hidden;
-  color: var(--text);
-  text-overflow: ellipsis;
-}
 
 .spinner {
   flex: none;
@@ -768,290 +464,12 @@ kbd.key-live {
 
 /* --- settings ---------------------------------------------------------- */
 
-.settings {
-  position: relative;
-  display: grid;
-  grid-template-columns: 208px minmax(0, 1fr);
-  width: min(880px, 92vw);
-  height: min(640px, 88vh);
-  overflow: hidden;
-  background: var(--chrome);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-pop-lg);
-  outline: none;
-}
-
-.settings-nav {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s1);
-  padding: var(--s6) var(--s4) var(--s4);
-  background: var(--chrome-alt);
-  border-right: 1px solid var(--border);
-}
-
-.settings-title {
-  margin: 0 0 var(--s5) var(--s3);
-  font-size: var(--fs-lead);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.settings-tab {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-  padding: var(--s3) var(--s3);
-  background: none;
-  border: none;
-  border-left: 2px solid transparent;
-  border-radius: 0 var(--radius) var(--radius) 0;
-  color: var(--text-dim);
-  text-align: left;
-  cursor: pointer;
-}
-
-.settings-tab:hover {
-  background: var(--surface-alt);
-  color: var(--text);
-}
-
-.settings-tab-active {
-  background: var(--select);
-  border-left-color: var(--accent);
-  color: var(--text);
-  font-weight: 600;
-}
-
 /* The digit is the key that gets you here, so it is set as a key. */
-.settings-tab-active .settings-tab-key {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.settings-nav-hint {
-  margin: auto 0 0;
-  padding: var(--s3);
-  color: var(--text-faint);
-  font-size: var(--fs-micro);
-  line-height: 2;
-}
-
-.settings-nav-hint kbd {
-  margin: 0 1px;
-}
-
-.settings-body {
-  padding: var(--s6) var(--s7) var(--s7);
-  overflow-y: auto;
-}
-
-.settings-header {
-  margin-bottom: var(--s5);
-  padding-bottom: var(--s4);
-  border-bottom: 1px solid var(--border);
-}
-
-.settings-heading {
-  margin: 0;
-  font-size: var(--fs-lead);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.settings-blurb {
-  margin: var(--s1) 0 0;
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-}
-
-.settings-close {
-  position: absolute;
-  top: var(--s4);
-  right: var(--s5);
-  background: none;
-  border: none;
-  color: var(--text-faint);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.settings-close:hover {
-  color: var(--text);
-}
-
-.settings-note {
-  margin: var(--s5) 0 0;
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-  line-height: 1.55;
-}
-
-.settings-note-tight {
-  margin: 0 0 var(--s5);
-}
-
-.settings-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-  margin-bottom: var(--s3);
-}
-
-.settings-warning {
-  margin: 0 0 var(--s5);
-  padding: var(--s3) var(--s4);
-  background: var(--modified-bg);
-  border-left: 3px solid var(--modified);
-  border-radius: var(--radius);
-  font-size: var(--fs-small);
-  line-height: 1.5;
-}
-
-.settings-empty {
-  color: var(--text-faint);
-}
-
-.shortcut-group {
-  margin-bottom: var(--s6);
-}
-
-.shortcut-heading {
-  margin: 0 0 var(--s2);
-  color: var(--text-dim);
-  font-size: var(--fs-micro);
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.shortcut-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  row-gap: 0;
-  align-items: center;
-  gap: var(--s4);
-  padding: var(--s2) var(--s3) var(--s2) 0;
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.shortcut-row:hover {
-  background: var(--surface-alt);
-}
-
-.shortcut-row-conflict {
-  box-shadow: inset 3px 0 0 var(--modified);
-}
-
-.shortcut-label {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* A quiet mark for a row that no longer matches what shipped. */
-.shortcut-changed {
-  flex: none;
-  width: 5px;
-  height: 5px;
-  background: var(--accent);
-  border-radius: 50%;
-}
 
 /* Each key is its own control: click it to record a replacement, use the cross
    to drop it. A command with no slots left is simply unbound. */
-.shortcut-keys {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  justify-content: flex-end;
-  min-width: 150px;
-}
-
-.shortcut-slot {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.shortcut-key {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s2);
-  padding: 2px;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-.shortcut-key:hover {
-  border-color: var(--border);
-}
-
-.shortcut-remove {
-  margin-left: 1px;
-  padding: 0 2px;
-  background: none;
-  border: none;
-  color: var(--text-faint);
-  font-size: var(--fs-body);
-  line-height: 1;
-  cursor: pointer;
-}
-
-.shortcut-remove:hover {
-  color: var(--removed);
-}
-
-.shortcut-add {
-  padding: 0 var(--s3);
-  background: none;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  color: var(--text-faint);
-  font-size: var(--fs-body);
-  line-height: 16px;
-  cursor: pointer;
-}
-
-.shortcut-add:hover {
-  border-color: var(--accent);
-  border-style: solid;
-  color: var(--accent);
-}
-
-.shortcut-key-recording {
-  padding: 2px var(--s3);
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent);
-  font-size: var(--fs-small);
-  white-space: nowrap;
-}
-
-.shortcut-unbound {
-  color: var(--text-faint);
-  font-size: var(--fs-small);
-}
-
-.shortcut-row:hover .hover-only,
-.shortcut-row:focus-within .hover-only {
-  opacity: 1;
-}
-
-.shortcut-conflict {
-  grid-column: 1 / -1;
-  padding-bottom: var(--s2);
-  color: var(--modified);
-  font-size: var(--fs-micro);
-}
 
 /* --- command palette --------------------------------------------------- */
 
@@ -1065,60 +483,16 @@ kbd.key-live {
 /* The rail: one fixed column down the left of the sidebar that holds keys and
    nothing else. Counts live on the right. A digit's position is what says
    which kind of number it is, so the two can never be confused. */
-.side-rail {
-  flex: none;
-  display: flex;
-  justify-content: center;
-  width: 21px;
-}
-
-.side-key {
-  height: 15px;
-  min-width: 15px;
-  padding: 0 3px;
-}
-
-.side-section-focused > .side-header-row > .side-header {
-  color: var(--accent);
-}
-
-.side-section-focused > .side-header-row .side-key {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
 
 /* Section headers and rows share one left edge, so the rail is a straight
    column rather than two columns a few pixels apart. */
-.side-header-row {
-  padding-left: var(--s2);
-}
 
 /* The keyboard cursor, distinct from selection: an outline rather than a fill,
    because the row underneath may already be the checked-out branch. */
-.side-item-cursor {
-  background: var(--surface-alt);
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
 
 /* The one way a panel lists its keys. Shared so a key cap in the sidebar and a
    key cap under the file lists are the same object, not two that happen to
    resemble each other. */
-.pane-hint,
-.sidebar-hint {
-  margin: 0;
-  padding: var(--s3) var(--s4);
-  background: var(--chrome);
-  border-top: 1px solid var(--border-soft);
-  color: var(--text-faint);
-  font-size: var(--fs-micro);
-  line-height: 1.8;
-}
-
-.pane-hint kbd,
-.sidebar-hint kbd {
-  margin-right: var(--s1);
-}
 
 /* A key and its label are one thing and wrap as one. Without this a hint
    breaks at whichever space happens to fall at the edge, which is as likely to
@@ -1126,44 +500,11 @@ kbd.key-live {
    the next line describing nothing. */
 
 /* The sidebar scrolls behind its hint; the file column does not. */
-.sidebar-hint {
-  position: sticky;
-  bottom: 0;
-  margin-top: var(--s5);
-}
 
 /* --- toolbar tips ------------------------------------------------------ */
 
 /* Anchored below the whole toolbar and centred on its button, so a tip never
    lands on the buttons either side of the one being described. */
-.tip {
-  position: fixed;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  padding: var(--s2) var(--s4);
-  background: var(--chrome-alt);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-pop);
-  /* Without this the tip is only as wide as the gap between `left` and the
-     right edge of the window. A fixed box with `left` set and `width: auto`
-     has its shrink-to-fit width capped by the space remaining to its right,
-     and the translateX that centres it only moves the box afterwards -- it
-     hands back no room. So a control near the right edge got a tip a few
-     characters wide, which broke its own words to fit and had its key cap
-     land on top of the text. max-content sizes to the text and leaves the
-     limiting to max-width, which also makes the width measured in Tip.tsx the
-     real one, so the clamp that keeps the tip on screen has something true to
-     work from. */
-  width: max-content;
-  max-width: min(460px, 90vw);
-  font-size: var(--fs-small);
-  pointer-events: none;
-  transform: translateX(-50%);
-  animation: tip-in 90ms ease-out;
-}
 
 @keyframes tip-in {
   from {
@@ -1172,28 +513,7 @@ kbd.key-live {
   }
 }
 
-.tip-label {
-  min-width: 0;
-  color: var(--text);
-  /* Only reachable now that the tip is max-content wide: nothing wraps until
-     it reaches max-width, and what does is a repository path with no spaces
-     to break at. */
-  overflow-wrap: anywhere;
-}
-
 /* The key cap describes the label; it never gives up room to it. */
-.tip-key {
-  flex: none;
-  background: var(--chrome);
-}
-
-.tip-note {
-  color: var(--text-faint);
-  /* A note is sometimes a list -- the git commands in flight, or a path and
-     the thing that is wrong with it -- and a flex row would otherwise run
-     them together into one line. */
-  white-space: pre-line;
-}
 
 /* Revealed only while the modifier is down, so tabs stay clean until the
    question "which number is this one" is actually being asked. */
@@ -1251,19 +571,6 @@ kbd.key-live {
 
 .channel-rc {
   color: var(--added);
-}
-
-.welcome h1 .channel {
-  margin-left: var(--s4);
-  vertical-align: 4px;
-}
-
-.welcome-caution {
-  max-width: 40ch;
-  margin: 0 0 var(--s2);
-  color: var(--modified);
-  font-size: var(--fs-small);
-  line-height: 1.5;
 }
 
 /* --- git flow plan ----------------------------------------------------- */
@@ -1410,79 +717,26 @@ kbd.key-live {
    chevron up with the rail so the column of controls stays a column. */
 /* Deliberately the same box as .side-item, down to the padding: a folder and a
    branch are the same kind of row and sit on the same left edge. */
-.side-folder {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  width: 100%;
-  height: var(--row);
-  padding: 0 var(--s4) 0 var(--s2);
-  background: none;
-  border: none;
-  border-left: 2px solid transparent;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: var(--fs-body);
-  text-align: left;
-  cursor: default;
-}
-.side-folder:hover {
-  background: var(--surface-alt);
-  color: var(--text);
-}
 
 /* The keyboard cursor, drawn exactly as it is on a branch. Landing on a folder
    and landing on a name are the same act, so they cannot look like two. */
-.side-folder-cursor {
-  background: var(--surface-alt);
-  box-shadow: inset 0 0 0 1px var(--accent);
-  color: var(--text);
-}
-.side-folder-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* The disclosure column. Reserved on every row of a grouped list and left
    blank on the ones that are not folders, which is what keeps a folder's name
    on the same left edge as the branches around it. Kept out of the rail on
    purpose: that column is for keyboard shortcuts, and a mark there should
    always mean a key. */
-.side-twisty {
-  flex: none;
-  display: flex;
-  justify-content: center;
-  width: 14px;
-  color: var(--text-faint);
-}
 
 /* Indentation by nesting rather than by a computed depth, so a folder five
    levels down needs no arithmetic and every row keeps the same markup it has
    in a flat section. One twisty's worth per level: enough to read as a step,
    little enough that a long branch name still has room in a 232px column. */
-.side-nest {
-  padding-left: 14px;
-}
 
 /* --- git command trace -------------------------------------------------- */
 
 /* What git is running right now, in the status bar. Mono and truncated: it is
    an exact command, and an exact command that has been reflowed is no longer
    the thing you could paste into a terminal. */
-.running-git {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  min-width: 0;
-  max-width: 40ch;
-  overflow: hidden;
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 /* A hairline between runs rather than around every row: the list is dense and
    a full border on each would weigh more than the text. */
 /* A non-zero exit is not always a failure — several git commands report a

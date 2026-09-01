@@ -156,7 +156,7 @@ export function FileStatusView({
 
   return (
     <div
-      className="grid h-full min-h-0 flex-1 basis-auto outline-none"
+      className="grid min-h-0 flex-1 basis-auto outline-none"
       style={{ gridTemplateColumns: `${columnWidth}px 4px minmax(0, 1fr)` }}
     >
       <div className="flex min-h-0 flex-col [&>*:first-child]:flex-none">

@@ -44,7 +44,7 @@ async function mount() {
   });
 }
 
-const shown = () => document.querySelector(".tip");
+const shown = () => document.querySelector('[role="tooltip"]');
 
 const hover = () =>
   act(() => {
