@@ -276,3 +276,121 @@ async fn a_root_commit_has_a_diff_despite_having_no_parent() {
 
     assert!(diff.added > 0);
 }
+
+/* --- which refs the walk starts from ------------------------------------ */
+
+/// A repository with a commit only on another branch, a tag on a third commit,
+/// and a ref in a namespace of its own -- the three cases the scope decides
+/// between.
+fn branched() -> TestRepo {
+    let repo = TestRepo::new();
+
+    repo.git(&["checkout", "-b", "side"]);
+    repo.write("side.txt", "side\n");
+    repo.commit_all("Only on side");
+
+    repo.git(&["checkout", "main"]);
+    repo.write("tagged.txt", "tagged\n");
+    repo.commit_all("Tagged commit");
+    repo.git(&["tag", "v1"]);
+
+    // What an agent, a stash or a notes ref looks like: reachable, real, and
+    // not something a history view was asked to show.
+    repo.git(&["update-ref", "refs/private/thing", "side"]);
+
+    repo
+}
+
+#[tokio::test]
+async fn the_current_branch_alone_leaves_other_branches_out() {
+    let repo = branched();
+
+    let page = log(repo.git_api(), 0, 50, "head").await.unwrap();
+    let subjects: Vec<&str> = page.commits.iter().map(|c| c.subject.as_str()).collect();
+
+    assert!(subjects.contains(&"Tagged commit"));
+    assert!(!subjects.contains(&"Only on side"), "side is not reachable from main");
+}
+
+#[tokio::test]
+async fn every_branch_and_tag_is_reachable_from_the_wide_scope() {
+    let repo = branched();
+
+    let page = log(repo.git_api(), 0, 50, "all").await.unwrap();
+    let subjects: Vec<&str> = page.commits.iter().map(|c| c.subject.as_str()).collect();
+
+    assert!(subjects.contains(&"Only on side"));
+    assert!(subjects.contains(&"Tagged commit"));
+}
+
+#[tokio::test]
+async fn a_ref_in_its_own_namespace_stays_out_of_the_history() {
+    // The bug this guards: --all means every ref under refs/, so an agent
+    // writing a checkpoint per turn buried this repository's own history under
+    // a hundred of them.
+    let repo = TestRepo::new();
+
+    repo.write("hidden.txt", "hidden\n");
+    repo.commit_all("Only in a private ref");
+    let hidden = repo.head();
+
+    repo.git(&["reset", "--hard", "HEAD~1"]);
+    repo.git(&["update-ref", "refs/private/checkpoint", &hidden]);
+
+    for scope in ["all", "local", "head"] {
+        let page = log(repo.git_api(), 0, 50, scope).await.unwrap();
+        let subjects: Vec<&str> = page.commits.iter().map(|c| c.subject.as_str()).collect();
+
+        assert!(
+            !subjects.contains(&"Only in a private ref"),
+            "{scope} reached a ref nobody asked for"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_detached_head_is_still_in_the_walk() {
+    // It is not a branch, so naming the branches is not enough to include the
+    // commit actually checked out.
+    let repo = TestRepo::new();
+    repo.write("detached.txt", "d\n");
+    repo.commit_all("Committed while detached");
+    let tip = repo.head();
+
+    repo.git(&["checkout", "main"]);
+    repo.git(&["reset", "--hard", "HEAD~1"]);
+    repo.git(&["checkout", &tip]);
+
+    for scope in ["all", "local"] {
+        let page = log(repo.git_api(), 0, 50, scope).await.unwrap();
+        let subjects: Vec<&str> = page.commits.iter().map(|c| c.subject.as_str()).collect();
+
+        assert!(
+            subjects.contains(&"Committed while detached"),
+            "{scope} lost the commit that is checked out"
+        );
+    }
+}
+
+#[tokio::test]
+async fn the_remote_scope_shows_a_branch_only_the_remote_has() {
+    let repo = TestRepo::new();
+    repo.write("shared.txt", "s\n");
+    repo.commit_all("On the remote only");
+    let tip = repo.head();
+
+    // A remote-tracking ref without a local branch, which is what a fetched
+    // branch nobody has checked out looks like.
+    repo.git(&["update-ref", "refs/remotes/origin/feature", &tip]);
+    repo.git(&["reset", "--hard", "HEAD~1"]);
+
+    let wide = log(repo.git_api(), 0, 50, "all").await.unwrap();
+    let local = log(repo.git_api(), 0, 50, "local").await.unwrap();
+
+    let has = |page: &log::LogPage| {
+        page.commits.iter().any(|c| c.subject == "On the remote only")
+    };
+
+    assert!(has(&wide), "all should reach remote-tracking branches");
+    assert!(!has(&local), "local is the scope that leaves the remotes out");
+}
