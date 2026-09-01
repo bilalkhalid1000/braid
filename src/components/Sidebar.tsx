@@ -332,6 +332,7 @@ export function Sidebar({
         <FilterInput
           value={filter}
           onChange={setFilter}
+          name="sidebar"
           placeholder="Filter branches and tags"
           matches={shown.count}
         />

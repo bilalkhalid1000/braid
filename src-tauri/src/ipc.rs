@@ -5,7 +5,7 @@ use tauri::{AppHandle, Emitter, State};
 use crate::error::{AppError, Result};
 use crate::git::status::EntryKind;
 use crate::git::{
-    self, Blame, CloneProgress, CommitDetail, DiffOptions, DiffTarget, FileDiff, FinishOptions, FlowConfig, FlowKind, FlowStatus, Git,
+    self, Blame, CloneProgress, CommitDetail, SearchKind, SearchResults, DiffOptions, DiffTarget, FileDiff, FinishOptions, FlowConfig, FlowKind, FlowStatus, Git,
     LogPage, RefsSnapshot, RepoStatus, Submodule, Worktree,
 };
 use crate::registry::{RepoInfo, RepoRegistry};
@@ -158,6 +158,18 @@ pub async fn file_diff(
         },
     )
     .await
+}
+
+/// Search the repository: commit messages and authors, code, or file paths.
+#[tauri::command]
+pub async fn search_repo(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    query: String,
+    kind: SearchKind,
+) -> Result<SearchResults> {
+    let session = registry.get(&id)?;
+    git::search(&session.git, &query, kind).await
 }
 
 /// Line-by-line authorship for one file, optionally as of some revision.

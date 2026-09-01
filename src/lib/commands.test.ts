@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { validateHotkey } from "@tanstack/react-hotkeys";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   COMMANDS,
@@ -222,5 +224,36 @@ describe("every default binding is a hotkey the library accepts", () => {
     for (const command of COMMANDS) {
       expect(command.binding.length, command.id).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("every command is wired to something", () => {
+  /** Every source file except the catalog itself. */
+  const sources = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) return sources(path);
+      if (!/\.tsx?$/.test(entry.name)) return [];
+      if (entry.name.startsWith("commands.")) return [];
+      return [readFileSync(path, "utf8")];
+    });
+
+  it("has a handler for every id in the catalog", () => {
+    // A command with no handler is a key that does nothing and says nothing,
+    // which is indistinguishable from one that is not bound. Two shipped that
+    // way -- view.search and view.filter -- and both were reported as "the
+    // shortcut is broken", which is the only symptom there is.
+    const src = sources("src").join("\n");
+
+    // Numbered commands are built from a template rather than written out.
+    const generated = (id: string) =>
+      (/^tab\.\d+$/.test(id) && src.includes("`tab.${")) ||
+      (/^panel\./.test(id) && src.includes("`panel.${"));
+
+    const unwired = COMMANDS.map((c) => c.id).filter(
+      (id) => !src.includes(`"${id}"`) && !generated(id),
+    );
+
+    expect(unwired).toEqual([]);
   });
 });

@@ -6,9 +6,12 @@ interface Props {
   placeholder: string;
   /** Shown when a filter is active, so a short list never looks like a bug. */
   matches?: number;
+  /** Names this box so the "focus the filter" command can find the one that
+   *  belongs to whatever is in front. */
+  name?: string;
 }
 
-export function FilterInput({ value, onChange, placeholder, matches }: Props) {
+export function FilterInput({ value, onChange, placeholder, matches, name }: Props) {
   const ref = useRef<HTMLInputElement>(null);
 
   return (
@@ -16,6 +19,7 @@ export function FilterInput({ value, onChange, placeholder, matches }: Props) {
       <input
         ref={ref}
         className="filter-input"
+        data-filter={name}
         type="search"
         value={value}
         placeholder={placeholder}

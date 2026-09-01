@@ -164,6 +164,7 @@ export function FileStatusView({
           <FilterInput
             value={filter}
             onChange={setFilter}
+            name="files"
             placeholder="Filter files"
             matches={staged.length + unstaged.length}
           />

@@ -3867,3 +3867,128 @@ kbd.key-live {
 .tab-shelf .tab-name {
   font-style: italic;
 }
+
+/* --- search ------------------------------------------------------------- */
+
+.search {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.search-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  flex: none;
+  padding: var(--s4);
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+
+/* The query leads, because it is the only thing on this screen you type. */
+.search-box {
+  flex: 1;
+  min-width: 0;
+  padding: var(--s3) var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+}
+.search-box:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* Three questions, one box. Segmented rather than a dropdown: there are three,
+   they are always the same three, and a menu would hide two of them. */
+.search-kinds {
+  display: flex;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.search-kind {
+  padding: var(--s3) var(--s5);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+.search-kind:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+.search-kind-active,
+.search-kind-active:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.search-status {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex: none;
+  padding: var(--s3) var(--s5);
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+}
+
+.search-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.search-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  width: 100%;
+  padding: 0 var(--s5);
+  cursor: default;
+}
+.search-row-cursor {
+  background: var(--select);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* The match itself, in mono: a line of code and a commit subject both want to
+   be read exactly, and a commit hash beside them has to line up. */
+.search-primary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-secondary {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search > .pane-hint {
+  flex: none;
+}

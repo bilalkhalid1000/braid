@@ -36,7 +36,7 @@ pub struct LogPage {
 const FIELD: char = '\x1f';
 const RECORD: char = '\x1e';
 
-const FORMAT: &str = "--format=%H\x1f%h\x1f%an\x1f%ae\x1f%at\x1f%P\x1f%D\x1f%s\x1e";
+pub const FORMAT: &str = "--format=%H\x1f%h\x1f%an\x1f%ae\x1f%at\x1f%P\x1f%D\x1f%s\x1e";
 
 /// Read one window of history.
 ///

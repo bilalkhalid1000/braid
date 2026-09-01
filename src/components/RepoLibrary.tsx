@@ -120,6 +120,7 @@ export function RepoLibrary({
                 <FilterInput
                   value={filter}
                   onChange={setFilter}
+                  name="library"
                   placeholder="Filter by name or path"
                   matches={shown.length}
                 />

@@ -21,7 +21,8 @@ export type CommandScope =
   | "sidebar"
   | "menu"
   | "blame"
-  | "library";
+  | "library"
+  | "search";
 
 /** commandId to every way it can be triggered. An empty list means unbound. */
 export type Keymap = Record<string, string[]>;
@@ -110,6 +111,17 @@ export const COMMANDS: CommandDef[] = [
   { id: "blame.next", label: "Next line", category: "Blame", scope: "blame", binding: ["J", "ArrowDown"] },
   { id: "blame.previous", label: "Previous line", category: "Blame", scope: "blame", binding: ["K", "ArrowUp"] },
   { id: "blame.close", label: "Close the blame", category: "Blame", scope: "blame", binding: ["Escape"] },
+
+  // Mod+K first, so that is the key the hints and the menus teach.
+  // Mod+Shift+F stays: it is what "find in files" is called in an editor,
+  // and there is no cost to answering both.
+  { id: "view.search", label: "Search the repository", category: "Panels", scope: "global", binding: ["Mod+K", "Mod+Shift+F"], needsRepo: true },
+
+  // --- Search results, live only while the search panel is showing ---
+  { id: "search.next", label: "Next result", category: "Search", scope: "search", binding: ["J", "ArrowDown"] },
+  { id: "search.previous", label: "Previous result", category: "Search", scope: "search", binding: ["K", "ArrowUp"] },
+  { id: "search.open", label: "Go to the selected result", category: "Search", scope: "search", binding: ["Enter"] },
+  { id: "search.close", label: "Close the search", category: "Search", scope: "search", binding: ["Escape"] },
 
   // --- The repository list, live only while it is the tab in front ---
   { id: "library.next", label: "Next repository", category: "Repositories", scope: "library", binding: ["J", "ArrowDown"] },

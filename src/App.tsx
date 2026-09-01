@@ -45,8 +45,9 @@ import { RepoTabs } from "./components/RepoTabs";
 import { splitUpstream } from "./lib/upstream";
 import { FlowPlan, type FlowPlanTarget } from "./components/FlowPlan";
 import { BlameView } from "./components/BlameView";
+import { SearchView } from "./components/SearchView";
 import { Splash } from "./components/Splash";
-import { IconSettings } from "./components/icons";
+import { IconSearch, IconSettings } from "./components/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Toaster } from "./components/Toaster";
 import { ActivityLog } from "./components/ActivityLog";
@@ -109,6 +110,10 @@ export default function App() {
   // rather than becoming a third workspace view, so the number keys and
   // the sidebar keep meaning exactly what they meant before.
   const [blameTarget, setBlameTarget] = useState<BlameTarget | null>(null);
+  /** The search panel is showing over the main panel. */
+  const [searchOpen, setSearchOpen] = useState(false);
+  /** A commit the history view should select, set by a search result. */
+  const [historyFocus, setHistoryFocus] = useState<string | null>(null);
   /** Whether the repository list has a tab in the strip. */
   const [libraryOpen, setLibraryOpen] = useState(false);
   /** What the sidebar's keyboard cursor is on, so Merge can act on it. */
@@ -141,7 +146,10 @@ export default function App() {
     if (panel === "history") setView("history");
     // A blame covers the main panel, so asking for a panel has to close it --
     // otherwise pressing 2 would look like it did nothing.
-    if (panel === "files" || panel === "history") setBlameTarget(null);
+    if (panel === "files" || panel === "history") {
+      setBlameTarget(null);
+      setSearchOpen(false);
+    }
     setFocusedPanel(panel);
   };
   // A hung IPC call must not strand the window on a splash. The shell appears
@@ -1575,6 +1583,15 @@ The stashed changes are discarded.`,
         ],
         [
           {
+            // Beside Explorer and Terminal: all three are ways of going and
+            // looking at something rather than changing it.
+            key: "search",
+            commandId: "view.search",
+            label: "Search",
+            icon: <IconSearch />,
+            onClick: () => setSearchOpen(true),
+          },
+          {
             key: "explorer",
             commandId: "repo.explorer",
             label: "Explorer",
@@ -1604,6 +1621,28 @@ The stashed changes are discarded.`,
     "app.quit": () => void quit(),
     "app.activityLog": () => setLogOpen((v) => !v),
     "app.theme": cycleTheme,
+
+    "view.search": id ? () => setSearchOpen(true) : undefined,
+
+    // Focuses the filter belonging to whatever is in front. It was in the
+    // catalog with no handler at all, so `/` and Ctrl+F were listed in
+    // Settings and did nothing.
+    "view.filter": () => {
+      const wanted = searchOpen
+        ? "search"
+        : showLibrary
+          ? "library"
+          : isSidebarPanel(focusedPanel)
+            ? "sidebar"
+            : "files";
+
+      const box =
+        document.querySelector<HTMLInputElement>(`[data-filter="${wanted}"]`) ??
+        document.querySelector<HTMLInputElement>('[data-filter="sidebar"]');
+
+      box?.focus();
+      box?.select();
+    },
 
     "repo.open": () => void openRepo(),
     "repo.create": createRepo,
@@ -1830,7 +1869,24 @@ The stashed changes are discarded.`,
                 />
               )}
 
-              {blameTarget ? (
+              {searchOpen ? (
+                <SearchView
+                  repoId={id}
+                  keyboardActive={!isSidebarPanel(focusedPanel) && !inputOpen}
+                  onClose={() => setSearchOpen(false)}
+                  onCommit={(oid) => {
+                    // History is where a commit is read, so going to one means
+                    // going there rather than describing it in the results.
+                    setSearchOpen(false);
+                    setView("history");
+                    setHistoryFocus(oid);
+                  }}
+                  onFile={(path) => {
+                    setSearchOpen(false);
+                    setBlameTarget({ path, rev: null });
+                  }}
+                />
+              ) : blameTarget ? (
                 <BlameView
                   repoId={id}
                   target={blameTarget}
@@ -1884,6 +1940,7 @@ The stashed changes are discarded.`,
                 <HistoryView
                   repoId={id}
                   headOid={head?.headOid ?? null}
+                  focusOid={historyFocus}
                   keyboardActive={!isSidebarPanel(focusedPanel) && !inputOpen}
                 />
               )}

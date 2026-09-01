@@ -76,6 +76,7 @@ pub fn run() {
             ipc::repo_log,
             ipc::file_diff,
             ipc::blame_file,
+            ipc::search_repo,
             ipc::clone_repo,
             ipc::publish_branch,
             ipc::delete_remote_branch,

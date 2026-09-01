@@ -229,6 +229,26 @@ export interface GitCommand {
 
 export const GIT_COMMAND_EVENT = "git://command";
 
+// --- search ---------------------------------------------------------------
+
+export type SearchKind = "commits" | "code" | "files";
+
+export interface CodeHit {
+  path: string;
+  line: number;
+  text: string;
+}
+
+export interface SearchResults {
+  commits: Commit[];
+  code: CodeHit[];
+  files: string[];
+  /** A list was cut at the limit, so the view can say so rather than implying
+   *  that is all there is. */
+  truncated: boolean;
+  durationMs: number;
+}
+
 export interface BlameCommit {
   oid: string;
   author: string;
@@ -343,6 +363,8 @@ export const api = {
   saveLibrary: (repos: Bookmark[]) => invoke<void>("save_library", { library: { repos } }),
   cloneRepo: (url: string, path: string) =>
     invoke<RepoInfo>("clone_repo", { url, path }),
+  search: (id: string, query: string, kind: SearchKind) =>
+    invoke<SearchResults>("search_repo", { id, query, kind }),
   blame: (id: string, path: string, rev: string | null) =>
     invoke<Blame>("blame_file", { id, path, rev }),
   commitDetail: (id: string, oid: string) =>

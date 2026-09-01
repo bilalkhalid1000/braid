@@ -20,13 +20,15 @@ interface Props {
   headOid: string | null;
   /** False while a sidebar panel holds the keyboard. */
   keyboardActive: boolean;
+  /** A commit to select when it arrives — set by a search result. */
+  focusOid?: string | null;
 }
 
 /** Commit history.
  *
  *  Read one page at a time and rendered through a virtualizer, so opening a
  *  repository with 200k commits costs the same as one with 20. */
-export function HistoryView({ repoId, headOid, keyboardActive }: Props) {
+export function HistoryView({ repoId, headOid, keyboardActive, focusOid }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<Commit | null>(null);
   const detailRef = useRef<CommitDetailHandle>(null);
@@ -89,6 +91,20 @@ export function HistoryView({ repoId, headOid, keyboardActive }: Props) {
       virtualizer.scrollToIndex(commits.indexOf(next), { align: "auto" });
     }
   };
+
+  // A commit asked for from elsewhere, selected once the page holding it has
+  // loaded. History reads newest first, so an old commit may be several pages
+  // down; this waits rather than guessing, and does nothing if it never
+  // arrives.
+  useEffect(() => {
+    if (!focusOid) return;
+
+    const at = commits.findIndex((commit) => commit.oid === focusOid);
+    if (at === -1) return;
+
+    setSelected(commits[at]!);
+    virtualizer.scrollToIndex(at, { align: "center" });
+  }, [focusOid, commits, virtualizer]);
 
   // Picking a different commit puts the keyboard back on the commit list: the
   // file list under it has just been replaced by another commit's.
