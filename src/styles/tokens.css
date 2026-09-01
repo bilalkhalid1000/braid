@@ -1,0 +1,198 @@
+/* Braid design tokens, as Tailwind's theme
+   ---------------------------------------------------------------------------
+   Every token is declared once here and Tailwind turns each into a utility:
+   `--color-surface` gives `bg-surface`, `--text-ui` gives `text-ui`. The names
+   are the ones the app already used, so a rule that said `var(--surface)` and a
+   class that says `bg-surface` mean the same colour and always will.
+
+   Themes still work by swapping values rather than by a variant on every
+   element. Tailwind v4 compiles utilities that *reference* these variables
+   rather than inlining them, so redefining a handful under `[data-theme]`
+   repaints the whole app at runtime -- which is what a Git client whose users
+   theme their tools needs, and what `dark:` on every colour class could not do.
+
+   One typographic rule runs through the whole app: chrome is set in the system
+   sans, and anything that is a literal string git would print -- a path, a hash,
+   a branch name, a diff line -- is set in mono. Buttons and section titles are
+   things you click; refs and paths are things you type. Letting the two look
+   different makes the window read as an instrument rather than a web page.
+
+   Light is the default because SourceTree ships light and this layout is meant
+   to be familiar on sight. */
+
+@theme {
+  /* Neutral ramp, light to dark */
+  --color-n0: #ffffff;
+  --color-n1: #f7f8fa;
+  --color-n2: #edeff3;
+  --color-n3: #e2e6ec;
+  --color-n4: #ccd2dc;
+  --color-n5: #98a1b0;
+  --color-n6: #5a6473;
+  --color-n7: #191d25;
+
+  --color-surface: var(--color-n0);
+  --color-surface-alt: var(--color-n1);
+  --color-chrome: var(--color-n2);
+  --color-chrome-alt: var(--color-n3);
+  --color-border: var(--color-n4);
+  --color-border-soft: var(--color-n3);
+  --color-text-faint: var(--color-n5);
+  --color-text-dim: var(--color-n6);
+  --color-text: var(--color-n7);
+
+  --color-accent: #1f6feb;
+  --color-accent-soft: #dbe7ff;
+  --color-select: #e4edfd;
+
+  --color-added: #147a35;
+  --color-added-bg: #e7f6ec;
+  --color-removed: #c9303c;
+  --color-removed-bg: #fdebec;
+  --color-modified: #9a6700;
+  --color-modified-bg: #fff6e0;
+  --color-conflict: #c9303c;
+  --color-hunk-bg: #eff2f7;
+
+  /* Type scale. Small on purpose: this is a dense instrument, and every extra
+     point costs a row of history somebody wanted to see. */
+  --text-micro: 10px;
+  --text-small: 11px;
+  --text-body: 12px;
+  --text-ui: 13px;
+  --text-lead: 15px;
+  --text-display: 22px;
+
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+
+  /* 2px base, which is what the app's own scale was built on: p-1 is 2px, p-2
+     is 4px, p-3 6px, p-4 8px, p-6 12px, p-8 16px, p-12 24px. The old --s1..--s7
+     land exactly on Tailwind's numbers, so nothing has to be re-measured. */
+  --spacing: 2px;
+
+  --radius-sm: 3px;
+  --radius-lg: 5px;
+
+  --shadow-pop: 0 6px 20px rgb(16 22 34 / 14%);
+  --shadow-pop-lg: 0 14px 40px rgb(16 22 34 / 20%);
+
+  /* The banner's entrance. It used to borrow the tooltip's keyframes, which
+     start at translate(-50%, -3px) because a tooltip is centred on its anchor
+     -- on a full-width bar that read as a slide in from half a window away. */
+  --animate-drop-in: drop-in 140ms ease-out;
+
+  @keyframes drop-in {
+    from {
+      opacity: 0;
+      transform: translateY(-3px);
+    }
+  }
+
+  /* Row heights. A list row is a fixed height everywhere because the
+     virtualizers measure in whole rows. */
+  --height-row: 22px;
+  --height-row-lg: 26px;
+}
+
+/* Dark swaps the ramp and the few colours that are not derived from it. Every
+   utility already points at these variables, so nothing below needs restating
+   and no element needs a second class. */
+:root[data-theme="dark"] {
+  --color-n0: #12151a;
+  --color-n1: #171b21;
+  --color-n2: #1e222a;
+  --color-n3: #262c35;
+  --color-n4: #39404c;
+  --color-n5: #6b7583;
+  --color-n6: #98a2b1;
+  --color-n7: #e0e5ed;
+
+  --color-accent: #58a6ff;
+  --color-accent-soft: #14304f;
+  --color-select: #1a2f4a;
+
+  --color-added: #4fc76a;
+  --color-added-bg: #10261a;
+  --color-removed: #f26a63;
+  --color-removed-bg: #2c1517;
+  --color-modified: #d5a03a;
+  --color-modified-bg: #2a2314;
+  --color-conflict: #f26a63;
+  --color-hunk-bg: #1b212b;
+
+  --shadow-pop: 0 6px 20px rgb(0 0 0 / 40%);
+  --shadow-pop-lg: 0 14px 40px rgb(0 0 0 / 55%);
+
+  color-scheme: dark;
+}
+
+/* Bridge for the rules not yet converted.
+   ---------------------------------------------------------------------------
+   The stylesheet still says `var(--surface)` and `var(--s4)` in thousands of
+   places. These aliases point the old names at the new ones so both spellings
+   describe one value during the migration -- a converted component and an
+   unconverted one cannot drift apart, because there is only ever one colour.
+
+   Delete an alias when the last rule using it is gone; the last of them going
+   is what finishes the migration. */
+:root {
+  --n0: var(--color-n0);
+  --n1: var(--color-n1);
+  --n2: var(--color-n2);
+  --n3: var(--color-n3);
+  --n4: var(--color-n4);
+  --n5: var(--color-n5);
+  --n6: var(--color-n6);
+  --n7: var(--color-n7);
+
+  --surface: var(--color-surface);
+  --surface-alt: var(--color-surface-alt);
+  --chrome: var(--color-chrome);
+  --chrome-alt: var(--color-chrome-alt);
+  --border: var(--color-border);
+  --border-soft: var(--color-border-soft);
+  --text-faint: var(--color-text-faint);
+  --text-dim: var(--color-text-dim);
+  --text: var(--color-text);
+
+  --accent: var(--color-accent);
+  --accent-soft: var(--color-accent-soft);
+  --select: var(--color-select);
+
+  --added: var(--color-added);
+  --added-bg: var(--color-added-bg);
+  --removed: var(--color-removed);
+  --removed-bg: var(--color-removed-bg);
+  --modified: var(--color-modified);
+  --modified-bg: var(--color-modified-bg);
+  --conflict: var(--color-conflict);
+  --hunk-bg: var(--color-hunk-bg);
+
+  --fs-micro: var(--text-micro);
+  --fs-small: var(--text-small);
+  --fs-body: var(--text-body);
+  --fs-ui: var(--text-ui);
+  --fs-lead: var(--text-lead);
+  --fs-display: var(--text-display);
+
+  --sans: var(--font-sans);
+  --mono: var(--font-mono);
+
+  --s1: 2px;
+  --s2: 4px;
+  --s3: 6px;
+  --s4: 8px;
+  --s5: 12px;
+  --s6: 16px;
+  --s7: 24px;
+
+  --radius: var(--radius-sm);
+
+  --row: var(--height-row);
+  --row-lg: var(--height-row-lg);
+
+  color-scheme: light;
+  font-family: var(--font-sans);
+  font-size: var(--text-ui);
+}

@@ -1,0 +1,3822 @@
+/* Braid component styles, awaiting conversion
+   ---------------------------------------------------------------------------
+   Imported into the components layer, which is the whole point: utilities come
+   after it, so a class added to an element in JSX overrides whatever rule here
+   still claims the same property. Converting a component is therefore delete
+   its rules from this file and write the utilities on the element -- never both
+   at once, and never a fight about which wins.
+
+   This file only shrinks. When it is empty the migration is done. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--chrome);
+  color: var(--text);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+/* One key cap, used wherever a key appears: the sidebar rail, tooltips, menus,
+   the palette, the settings list. A key has to look identical everywhere or it
+   stops reading as a key and starts reading as a number or a chip.
+   The heavier bottom edge is the one flourish — it is what separates a key from
+   the badges and ref chips it sits near. */
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 16px;
+  padding: 0 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* The key for whatever currently has the keyboard. */
+kbd.key-live {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* A column, deliberately not a grid with a fixed row template. Half of this
+   shell's children are conditional -- the update banner, the toolbar, dialogs,
+   the palette -- and a row template assigns space by child *index*, so one
+   absent child silently hands the 1fr row to whatever follows it. A flex column
+   sizes by child instead, so the body keeps the slack no matter what is
+   mounted. */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  outline: none;
+}
+
+/* Chrome keeps its own height; only the body absorbs what is left over. */
+.app > .tabs,
+.app > .toolbar,
+.app > .statusbar {
+  flex: none;
+}
+
+.app > .body,
+.app > .welcome,
+.app > .library {
+  flex: 1;
+  min-height: 0;
+}
+
+/* --- repo tabs --------------------------------------------------------- */
+
+/* The bar itself does not scroll -- only the strip of tabs inside it does. That
+   is what keeps Settings anchored at the right instead of sliding away once a
+   dozen repositories are open. */
+.tabs {
+  display: flex;
+  align-items: stretch;
+  height: 30px;
+  background: var(--chrome-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-strip {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tab-settings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.tab-settings:hover {
+  background: var(--chrome);
+  color: var(--text);
+}
+/* The set is drawn at 20px; this sits in a 30px bar and has to come down to
+   match the tab text beside it. */
+.tab-settings svg {
+  width: 15px;
+  height: 15px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  max-width: 220px;
+  padding: 0 var(--s5);
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  white-space: nowrap;
+  cursor: default;
+  /* A tab is a thing you press and drag, not a passage you read. Without this
+     a drag paints the repository name blue and leaves a selection behind. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.tab:hover {
+  background: var(--chrome);
+}
+
+.tab-active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-close {
+  color: var(--text-faint);
+  font-size: var(--fs-lead);
+  line-height: 1;
+}
+
+.tab-close:hover {
+  color: var(--removed);
+}
+
+/* --- dragging a tab ----------------------------------------------------- */
+
+/* The one being held. It rises off the strip -- the strip is --chrome-alt, so
+   --chrome reads as lifted without inventing a colour -- and it tracks the
+   pointer exactly, which is why it is the one element here with no transition.
+   Anything else would put it behind your hand. */
+.tab-lifted {
+  z-index: 2;
+  background: var(--chrome);
+  box-shadow: var(--shadow-pop);
+  border-right-color: transparent;
+  color: var(--text);
+  transition: none;
+  cursor: grabbing;
+}
+
+/* The tabs it passes. They slide by exactly its width, which opens the lane it
+   will drop into: that gap is the drop indicator, so there is no marker line
+   drawn over the top of it. */
+.tab-yielding {
+  transition: transform 150ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* Said on hover rather than only once the drag is under way, or the strip
+   keeps the fact that it rearranges to itself. */
+.tab:hover {
+  cursor: grab;
+}
+.tab-close:hover,
+.tab-add:hover {
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-yielding {
+    transition: none;
+  }
+}
+
+.tab-add {
+  padding: 0 var(--s5);
+  font-size: var(--fs-lead);
+  cursor: pointer;
+}
+
+/* --- toolbar ----------------------------------------------------------- */
+
+.toolbar {
+  display: flex;
+  align-items: stretch;
+  height: 54px;
+  padding: 0 var(--s3);
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: stretch;
+  padding: 0 var(--s5);
+}
+
+.toolbar-group + .toolbar-group {
+  border-left: 1px solid var(--border-soft);
+}
+
+.toolbar-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s1);
+  min-width: 60px;
+  margin: var(--s3) var(--s1);
+  padding: var(--s2) var(--s4);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.toolbar-button:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--border-soft);
+}
+
+.toolbar-button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* One filled button at a time: whatever the current state is asking for. */
+.toolbar-button-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.toolbar-button-primary:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  filter: brightness(1.08);
+}
+
+.toolbar-button-primary .toolbar-badge {
+  background: #fff;
+  color: var(--accent);
+}
+
+.toolbar-icon {
+  position: relative;
+  display: block;
+  line-height: 0;
+}
+
+.toolbar-badge {
+  position: absolute;
+  top: -5px;
+  right: -9px;
+  min-width: 15px;
+  padding: 0 var(--s2);
+  background: var(--accent);
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  line-height: 15px;
+  text-align: center;
+}
+
+.toolbar-label {
+  font-size: var(--fs-small);
+}
+
+/* --- body and splitters ------------------------------------------------ */
+
+.body {
+  display: grid;
+  min-height: 0;
+}
+
+/* A column, so the operation banner can sit above whichever view is showing
+   and the view takes what is left rather than overflowing. */
+.content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.content > .op-banner {
+  flex: none;
+}
+
+.content > .file-status,
+.content > .history {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+/* --- in-progress operation --------------------------------------------- */
+
+.op-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) var(--s5);
+  background: var(--modified-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.op-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--modified);
+  border-radius: 50%;
+}
+
+.op-title {
+  font-weight: 600;
+}
+
+.op-detail {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.op-actions {
+  display: flex;
+  gap: var(--s3);
+  margin-left: auto;
+}
+
+.op-actions button {
+  padding: 3px var(--s5);
+  font-size: var(--fs-small);
+}
+
+.splitter {
+  position: relative;
+  background: var(--border-soft);
+  transition: background 90ms;
+}
+
+.splitter:hover,
+.splitter-active {
+  background: var(--accent);
+}
+
+.splitter-x {
+  cursor: col-resize;
+}
+
+.splitter-y {
+  cursor: row-resize;
+}
+
+/* Widen the grab target well past the visible line: a 4px hit area is a
+   frustration, a 4px line is correct. */
+.splitter::after {
+  position: absolute;
+  content: "";
+  inset: -3px;
+}
+
+/* --- sidebar ----------------------------------------------------------- */
+
+.sidebar {
+  overflow-y: auto;
+  padding-bottom: var(--s5);
+  background: var(--chrome);
+}
+
+.sidebar-filter,
+.fs-filter {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--s3) var(--s4);
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.fs-filter {
+  background: var(--surface-alt);
+}
+
+.filter {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: 0 var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.filter:focus-within {
+  border-color: var(--accent);
+}
+
+.filter-input {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  background: none;
+  border: none;
+  font-size: var(--fs-body);
+  outline: none;
+}
+
+.filter-input::placeholder {
+  color: var(--text-faint);
+}
+
+.filter-count {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+
+.side-header-row {
+  display: flex;
+  align-items: center;
+  padding-right: var(--s4);
+}
+
+/* Hover actions keep the sidebar quiet without hiding the feature: they are
+   revealed on hover, always reachable by keyboard, and every one of them also
+   exists in the right-click menu. */
+.hover-only {
+  opacity: 0;
+}
+
+.side-header-row:hover .hover-only,
+.side-item:hover .hover-only,
+.hover-only:focus-visible {
+  opacity: 1;
+}
+
+.side-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex: 1;
+  min-width: 0;
+  padding: var(--s3) var(--s2) var(--s2) 0;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* Counts sit hard right, opposite the key rail. */
+.side-count {
+  padding-left: var(--s3);
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.side-section-nested > .side-header-row > .side-header {
+  padding-left: var(--s5);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.side-empty {
+  padding: 0 var(--s4) var(--s2) 28px;
+  color: var(--text-faint);
+  font-size: var(--fs-small);
+}
+
+.side-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  height: var(--row);
+  padding: 0 var(--s4) 0 var(--s2);
+  border-left: 2px solid transparent;
+  color: var(--text);
+  cursor: default;
+}
+
+.side-item:hover {
+  background: var(--surface-alt);
+}
+
+/* A tinted row with an accent edge, rather than a saturated fill: the branch
+   name has to stay the most legible thing in the row. */
+.side-item-active {
+  background: var(--select);
+  border-left-color: var(--accent);
+}
+
+.side-item-bold {
+  font-weight: 600;
+}
+
+.side-item-nested {
+  padding-left: var(--s6);
+}
+
+/* Refs are literals you type, so they are set like literals. */
+.side-item-label {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-badge {
+  margin-left: auto;
+  min-width: 18px;
+  padding: 0 5px;
+  background: var(--accent);
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  line-height: 15px;
+  text-align: center;
+}
+
+.side-note {
+  max-width: 96px;
+  margin-left: auto;
+  padding-left: var(--s3);
+  overflow: hidden;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  background: var(--text-faint);
+  border-radius: 50%;
+}
+
+.sub-upToDate {
+  background: var(--added);
+}
+
+.sub-modified {
+  background: var(--modified);
+}
+
+.sub-conflicted {
+  background: var(--conflict);
+}
+
+.sub-uninitialized {
+  background: transparent;
+  border: 1px solid var(--text-faint);
+}
+
+.tracking-pill {
+  display: flex;
+  gap: var(--s2);
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+
+/* A branch with no upstream. Deliberately not coloured like ahead/behind: it
+   is not a count of anything, it is the absence of a remote — and the one
+   state where the work exists on exactly one machine. */
+.tracking-local {
+  color: var(--text-faint);
+  font-family: var(--sans);
+  letter-spacing: 0.02em;
+}
+
+.ahead {
+  color: var(--added);
+}
+
+.behind {
+  color: var(--removed);
+}
+
+/* --- file status ------------------------------------------------------- */
+
+.file-status {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  outline: none;
+}
+
+/* A column for the same reason .app is one: the key hint at the bottom comes
+   and goes with the keyboard, and a row template would hand its row to the
+   commit box the moment the hint disappeared. */
+.fs-left {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.fs-left > .fs-filter,
+.fs-left > .commit-box,
+.fs-left > .pane-hint {
+  flex: none;
+}
+.fs-left > .file-list {
+  flex: 1;
+  min-height: 0;
+}
+
+.fs-right {
+  min-width: 0;
+  min-height: 0;
+}
+
+.file-list {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.pane-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  height: 24px;
+  padding: 0 var(--s4);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.pane-count {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-weight: 400;
+}
+
+.link-button {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.link-button:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.pane-body {
+  position: relative;
+  overflow-y: auto;
+  background: var(--surface);
+}
+
+.pane-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--s6);
+  color: var(--text-faint);
+  text-align: center;
+  pointer-events: none;
+}
+
+.virtual-canvas {
+  position: relative;
+  width: 100%;
+}
+
+.file-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  padding: 0 var(--s4);
+  border-left: 2px solid transparent;
+  cursor: default;
+}
+
+.file-row:hover {
+  background: var(--surface-alt);
+}
+
+.file-row-selected,
+.file-row-selected:hover {
+  background: var(--select);
+  border-left-color: var(--accent);
+}
+
+.file-row input[type="checkbox"] {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.badge {
+  width: 13px;
+  font-family: var(--mono);
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.badge-m {
+  color: var(--modified);
+}
+
+.badge-a {
+  color: var(--added);
+}
+
+.badge-d {
+  color: var(--removed);
+}
+
+.badge-r,
+.badge-c {
+  color: var(--accent);
+}
+
+.badge-untracked {
+  color: var(--text-faint);
+}
+
+.badge-conflict {
+  color: var(--conflict);
+}
+
+.file-path {
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.path-dir {
+  color: var(--text-dim);
+}
+
+.file-orig {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  white-space: nowrap;
+}
+
+/* --- commit box -------------------------------------------------------- */
+
+.commit-box {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+  background: var(--surface-alt);
+  border-top: 1px solid var(--border);
+}
+
+.commit-message {
+  min-height: 78px;
+  max-height: 220px;
+  padding: var(--s3);
+  resize: vertical;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+}
+
+.commit-message:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.commit-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+}
+
+.amend-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.amend-toggle input {
+  accent-color: var(--accent);
+}
+
+.commit-hint {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+}
+
+/* --- diff -------------------------------------------------------------- */
+
+.diff {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.diff-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  height: 26px;
+  padding: 0 var(--s5);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: var(--fs-small);
+}
+
+.diff-path {
+  overflow: hidden;
+  font-family: var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-path.muted {
+  color: var(--text-faint);
+  font-family: var(--sans);
+}
+
+.diff-stat {
+  display: flex;
+  gap: var(--s4);
+  font-family: var(--mono);
+}
+
+.diff-stat .added {
+  color: var(--added);
+}
+
+.diff-stat .removed {
+  color: var(--removed);
+}
+
+.diff-timing {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-family: var(--mono);
+}
+
+.diff-body {
+  overflow: auto;
+  background: var(--surface);
+}
+
+.diff-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  min-width: 100%;
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+  line-height: 18px;
+  white-space: pre;
+}
+
+.gutter {
+  flex: none;
+  width: 44px;
+  padding-right: var(--s4);
+  color: var(--text-faint);
+  text-align: right;
+  user-select: none;
+}
+
+.diff-marker {
+  flex: none;
+  width: 16px;
+  text-align: center;
+  user-select: none;
+}
+
+.diff-text {
+  padding-right: var(--s6);
+}
+
+.diff-added {
+  background: var(--added-bg);
+  color: var(--added);
+}
+
+.diff-removed {
+  background: var(--removed-bg);
+  color: var(--removed);
+}
+
+.diff-meta {
+  color: var(--text-faint);
+}
+
+.diff-hunk {
+  background: var(--hunk-bg);
+  color: var(--text-dim);
+}
+
+.diff-notice {
+  padding: var(--s3) var(--s5);
+  background: var(--surface-alt);
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+/* --- history ----------------------------------------------------------- */
+
+.history {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+}
+
+.history-table {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  outline: none;
+}
+
+/* The 4px column is the graph's resize handle, which lives in the header but
+   is reserved on every row so the headings stay over their values. */
+.history-head,
+.history-row {
+  display: grid;
+  grid-template-columns: auto 4px minmax(0, 1fr) 92px 148px 74px;
+  align-items: center;
+  gap: var(--s4);
+  padding-right: var(--s5);
+}
+
+/* The graph resizer. It lives in a 24px header, so the visible line stays a
+   hairline while the grab area is widened either side of it -- a four-pixel
+   target in a strip that short is a target people miss. */
+.history-head .splitter-x {
+  align-self: stretch;
+}
+.history-head .splitter-x::after {
+  content: "";
+  position: absolute;
+  inset: 0 -5px;
+}
+
+/* How many lanes are folded onto the last column, so the pile-up at the edge
+   is labelled rather than just dense. */
+.history-graph-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+.history-lane-more {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+
+.history-head {
+  height: 24px;
+  padding-left: var(--s5);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  font-weight: 600;
+}
+
+.history-body {
+  position: relative;
+  overflow-y: auto;
+  background: var(--surface);
+}
+
+.history-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding-left: var(--s5);
+  border-left: 2px solid transparent;
+  cursor: default;
+}
+
+/* The gap a crossing line cuts in the one it passes. It has to be the row's
+   own background, not a fixed colour, or the gap shows up as a bright dash the
+   moment a row is selected or hovered. */
+.graph-casing {
+  stroke: var(--surface);
+}
+.history-row:hover .graph-casing {
+  stroke: var(--surface-alt);
+}
+.history-row-selected .graph-casing,
+.history-row-selected:hover .graph-casing {
+  stroke: var(--select);
+}
+
+.history-row:hover {
+  background: var(--surface-alt);
+}
+
+.history-row-selected,
+.history-row-selected:hover {
+  background: var(--select);
+  border-left-color: var(--accent);
+}
+
+/* Two lists on screen, one keyboard. The ring marks whichever of them the keys
+   are actually driving; the other keeps its selection, quietly, so you can see
+   what it will go back to. */
+.history-row-cursor,
+.commit-file-cursor {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* The lane graph. Rows draw only their own cell, which is what keeps the
+   history list virtualized while still reading as continuous lines. */
+/* Clipped, not visible. Lanes past the cap are already clamped to the last
+   column, and this is the backstop that keeps a stroke's width from bleeding
+   over the commit subject beside it. */
+.graph {
+  display: block;
+  overflow: hidden;
+}
+
+.col-subject,
+.col-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.col-date,
+.col-author {
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.col-oid {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+}
+
+.ref-chip {
+  display: inline-block;
+  margin-right: var(--s3);
+  padding: 0 var(--s3);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  line-height: 15px;
+  vertical-align: 1px;
+}
+
+.ref-head {
+  background: var(--accent);
+  color: #fff;
+}
+
+.ref-local {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ref-remote {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.ref-tag {
+  background: var(--added-bg);
+  color: var(--added);
+}
+
+.history-detail {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+/* --- commit detail ------------------------------------------------------ */
+
+/* Same shape as the File Status view — list on the left, diff on the right —
+   so the two places you read a change work the same way. */
+.commit {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+}
+
+.commit-left {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+}
+
+.commit-right {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Capped at half the pane so a long message can never squeeze the file list
+   out of existence, and scrolls inside that cap rather than being clipped. */
+.commit-head {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: var(--s2);
+  min-height: 0;
+  max-height: 50%;
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* The subject and the hash stay put; only the message body moves, so you never
+   lose track of which commit you are reading. */
+.commit-subject,
+.commit-meta {
+  flex: none;
+}
+
+.commit-subject {
+  margin: 0;
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+.commit-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.commit-oid {
+  padding: 0 var(--s2);
+  background: var(--surface-alt);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  cursor: pointer;
+}
+
+.commit-oid:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.commit-merge {
+  padding: 0 var(--s3);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: var(--fs-micro);
+}
+
+.commit-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: var(--s2) 0 0;
+  overflow-y: auto;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.commit-summary {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--s5);
+  height: 24px;
+  padding: 0 var(--s5);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.commit-summary .added,
+.commit-summary .removed {
+  font-family: var(--mono);
+  font-weight: 600;
+}
+
+.commit-files {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--surface);
+}
+
+.commit-file {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  padding: 0 var(--s5);
+  border-left: 2px solid transparent;
+  cursor: default;
+}
+
+.commit-file:hover {
+  background: var(--surface-alt);
+}
+
+.commit-file-selected,
+.commit-file-selected:hover {
+  background: var(--select);
+  border-left-color: var(--accent);
+}
+
+/* Two parts, laid out left to right in path order. Only the directory shrinks;
+   the filename keeps its full width because it is what names the row. */
+.commit-file-path {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+/* `dir="rtl"` on this span alone moves its ellipsis to the front, so a long
+   directory loses its root rather than the folder next to the file.
+   `unicode-bidi: plaintext` keeps the text itself in reading order — without
+   it the segments themselves would reverse. */
+.commit-file-path .path-dir {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  text-overflow: ellipsis;
+  unicode-bidi: plaintext;
+}
+
+.commit-file-path .path-name {
+  flex: none;
+}
+
+.commit-file-stat {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.commit-file-counts {
+  display: flex;
+  gap: var(--s3);
+  justify-content: flex-end;
+  min-width: 76px;
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+
+.commit-file-binary {
+  min-width: 76px;
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  text-align: right;
+}
+
+/* The meter. Additions then deletions, always in that order, with the counts
+   beside it — red and green alone would not be readable to everyone. */
+.meter {
+  display: flex;
+  gap: 2px;
+  width: 64px;
+  height: 6px;
+  background: var(--border-soft);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.meter-add,
+.meter-del {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.meter-add {
+  background: var(--added);
+}
+
+.meter-del {
+  background: var(--removed);
+}
+
+/* --- welcome ----------------------------------------------------------- */
+
+.welcome {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--s4);
+  padding: var(--s7);
+  background: var(--surface);
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.welcome h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-display);
+  font-weight: 300;
+  letter-spacing: -0.015em;
+}
+
+.welcome p {
+  max-width: 34ch;
+  margin: 0 0 var(--s2);
+  line-height: 1.5;
+}
+
+.welcome-actions {
+  display: flex;
+  gap: var(--s4);
+}
+
+.welcome-hint {
+  margin-top: var(--s5);
+  color: var(--text-faint);
+  font-size: var(--fs-small);
+}
+
+/* --- status bar -------------------------------------------------------- */
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s6);
+  height: 24px;
+  padding: 0 var(--s4);
+  overflow: hidden;
+  background: var(--chrome);
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+.branch {
+  padding: 0 var(--s3);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.branch:hover {
+  background: var(--accent-soft);
+}
+
+/* The phase of a running clone, beside the spinner. Mono because it carries a
+   percentage that changes constantly, and a proportional font makes the whole
+   line twitch as the digits change width. */
+.activity-detail {
+  margin-left: var(--s3);
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+
+.statusbar-spacer {
+  margin-left: auto;
+}
+
+.timing {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+
+.statusbar-button {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: 0 var(--s3);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.statusbar-button:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+.statusbar-error-count {
+  min-width: 15px;
+  padding: 0 var(--s2);
+  background: var(--removed);
+  border-radius: 999px;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  line-height: 14px;
+  text-align: center;
+}
+
+/* --- busy indicator ---------------------------------------------------- */
+
+.activity {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  max-width: 300px;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+}
+
+.spinner {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 620ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- toasts ------------------------------------------------------------ */
+
+.toaster {
+  position: fixed;
+  right: var(--s5);
+  bottom: 34px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--s4);
+  width: 340px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.toast {
+  padding: var(--s4) var(--s5);
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-faint);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop);
+  animation: toast-in 140ms ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.toast-success {
+  border-left-color: var(--added);
+}
+
+.toast-error {
+  border-left-color: var(--removed);
+}
+
+.toast-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+}
+
+.toast-mark {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+.toast-success .toast-mark {
+  background: var(--added);
+}
+
+.toast-error .toast-mark {
+  background: var(--removed);
+}
+
+.toast-label {
+  flex: 1;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toast-time {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: var(--fs-lead);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.toast-close:hover {
+  color: var(--text);
+}
+
+.toast-detail {
+  margin: var(--s2) 0 0 23px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.toast-detail.muted {
+  color: var(--text-faint);
+  font-family: var(--sans);
+}
+
+/* The interpretation leads and git's own words follow, so the actionable
+   sentence is read first without hiding what actually happened. */
+.toast-hint {
+  margin: var(--s3) 0 0 23px;
+  color: var(--text);
+  font-size: var(--fs-body);
+  line-height: 1.45;
+}
+
+.toast-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  margin-left: 23px;
+}
+
+.toast-footer:empty {
+  display: none;
+}
+
+.btn-small {
+  padding: 2px var(--s4);
+  font-size: var(--fs-small);
+}
+
+.toast-expand {
+  padding: var(--s1) 0 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+
+.toast-output {
+  max-height: 180px;
+  margin: var(--s3) 0 0 23px;
+  padding: var(--s3);
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* --- activity log ------------------------------------------------------ */
+
+.log-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  background: var(--chrome);
+  border-left: 1px solid var(--border);
+}
+
+.log-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  height: 26px;
+  padding: 0 var(--s4);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: var(--fs-small);
+  font-weight: 600;
+}
+
+.log-count {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-weight: 400;
+}
+
+.log-close {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: var(--fs-lead);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.log-body {
+  position: relative;
+  overflow-y: auto;
+}
+
+.log-entry {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.log-entry-row {
+  display: grid;
+  grid-template-columns: 9px minmax(0, auto) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  padding: var(--s3) var(--s4);
+  background: none;
+  border: none;
+  font-size: var(--fs-small);
+  text-align: left;
+  cursor: pointer;
+}
+
+.log-entry-row:hover {
+  background: var(--surface-alt);
+}
+
+.log-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--text-faint);
+  border-radius: 50%;
+}
+
+.log-success {
+  background: var(--added);
+}
+
+.log-error {
+  background: var(--removed);
+}
+
+.log-running {
+  background: var(--accent);
+  animation: pulse 900ms ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.log-label {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-summary {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-meta {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  white-space: nowrap;
+}
+
+.log-output {
+  max-height: 240px;
+  margin: 0;
+  padding: var(--s3) var(--s4) var(--s4) 26px;
+  overflow: auto;
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* --- buttons, menus, dialogs ------------------------------------------- */
+
+.btn,
+.btn-primary,
+.btn-danger {
+  padding: var(--s2) var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--surface-alt);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-danger {
+  background: var(--removed);
+  border-color: var(--removed);
+  color: #fff;
+}
+
+.btn-primary:disabled {
+  background: var(--border-soft);
+  border-color: var(--border-soft);
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+}
+
+.menu {
+  position: fixed;
+  min-width: 200px;
+  padding: var(--s2);
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop-lg);
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  padding: 5px var(--s4);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  font-size: var(--fs-body);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.menu-item:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* The keyboard cursor reads the same as hover -- and hovering moves the
+   cursor -- so the mouse and the keyboard never highlight two different
+   entries. */
+.menu-item-cursor:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+}
+
+.menu-item:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.menu-item-danger {
+  color: var(--removed);
+}
+
+.menu-item-danger:hover:not(:disabled) {
+  background: var(--removed);
+  color: #fff;
+}
+
+.menu-separator {
+  height: 1px;
+  margin: var(--s2);
+  background: var(--border-soft);
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  display: grid;
+  place-items: center;
+  background: rgb(10 14 20 / 42%);
+}
+
+/* The frame takes focus when there is no field to take it, purely so the key
+   handling has somewhere to land. It should not draw a ring around the whole
+   panel for that -- the scrim already says which surface has the keyboard. */
+.dialog:focus {
+  outline: none;
+}
+
+.dialog {
+  display: grid;
+  gap: var(--s5);
+  width: 400px;
+  /* The git flow setup form is eight fields tall; it scrolls rather than
+     running off a short window. */
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: var(--s6);
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop-lg);
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.dialog-message {
+  margin: 0;
+  color: var(--text-dim);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.dialog-field {
+  display: grid;
+  gap: var(--s2);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.dialog-input-row {
+  display: flex;
+  gap: var(--s3);
+}
+
+.dialog-field input {
+  padding: 5px var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+}
+
+.dialog-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.dialog-field input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.dialog-check {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.dialog-check input {
+  accent-color: var(--accent);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .spinner {
+    animation: spin 1.2s linear infinite !important;
+  }
+}
+
+/* --- settings ---------------------------------------------------------- */
+
+.settings {
+  position: relative;
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  width: min(880px, 92vw);
+  height: min(640px, 88vh);
+  overflow: hidden;
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop-lg);
+  outline: none;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  padding: var(--s6) var(--s4) var(--s4);
+  background: var(--chrome-alt);
+  border-right: 1px solid var(--border);
+}
+
+.settings-title {
+  margin: 0 0 var(--s5) var(--s3);
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) var(--s3);
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--text-dim);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-tab:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+.settings-tab-active {
+  background: var(--select);
+  border-left-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* The digit is the key that gets you here, so it is set as a key. */
+.settings-tab-active .settings-tab-key {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.settings-nav-hint {
+  margin: auto 0 0;
+  padding: var(--s3);
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  line-height: 2;
+}
+
+.settings-nav-hint kbd {
+  margin: 0 1px;
+}
+
+.settings-body {
+  padding: var(--s6) var(--s7) var(--s7);
+  overflow-y: auto;
+}
+
+.settings-header {
+  margin-bottom: var(--s5);
+  padding-bottom: var(--s4);
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-heading {
+  margin: 0;
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.settings-blurb {
+  margin: var(--s1) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+.settings-close {
+  position: absolute;
+  top: var(--s4);
+  right: var(--s5);
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.settings-close:hover {
+  color: var(--text);
+}
+
+.setting {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s7);
+  padding: var(--s5) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.setting-text {
+  display: grid;
+  flex: 1;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+.setting-label {
+  font-weight: 600;
+}
+
+.setting-hint {
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  line-height: 1.5;
+}
+
+.setting-control {
+  flex: none;
+  padding-top: var(--s1);
+}
+
+.setting-control select,
+.setting-control input[type="number"] {
+  padding: 4px var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--fs-body);
+}
+
+.setting-control input[type="number"] {
+  width: 88px;
+  font-family: var(--mono);
+  text-align: right;
+}
+
+.setting-control input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+}
+
+.settings-static {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+}
+
+.settings-note {
+  margin: var(--s5) 0 0;
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  line-height: 1.55;
+}
+
+.settings-note-tight {
+  margin: 0 0 var(--s5);
+}
+
+.settings-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  margin-bottom: var(--s3);
+}
+
+.settings-toolbar .filter {
+  flex: 1;
+}
+
+.settings-warning {
+  margin: 0 0 var(--s5);
+  padding: var(--s3) var(--s4);
+  background: var(--modified-bg);
+  border-left: 3px solid var(--modified);
+  border-radius: var(--radius);
+  font-size: var(--fs-small);
+  line-height: 1.5;
+}
+
+.settings-empty {
+  color: var(--text-faint);
+}
+
+.shortcut-group {
+  margin-bottom: var(--s6);
+}
+
+.shortcut-heading {
+  margin: 0 0 var(--s2);
+  color: var(--text-dim);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.shortcut-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  row-gap: 0;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s2) var(--s3) var(--s2) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.shortcut-row:hover {
+  background: var(--surface-alt);
+}
+
+.shortcut-row-conflict {
+  box-shadow: inset 3px 0 0 var(--modified);
+}
+
+.shortcut-label {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A quiet mark for a row that no longer matches what shipped. */
+.shortcut-changed {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+/* Each key is its own control: click it to record a replacement, use the cross
+   to drop it. A command with no slots left is simply unbound. */
+.shortcut-keys {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  justify-content: flex-end;
+  min-width: 150px;
+}
+
+.shortcut-slot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.shortcut-key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 2px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.shortcut-key:hover {
+  border-color: var(--border);
+}
+
+.shortcut-remove {
+  margin-left: 1px;
+  padding: 0 2px;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: var(--fs-body);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.shortcut-remove:hover {
+  color: var(--removed);
+}
+
+.shortcut-add {
+  padding: 0 var(--s3);
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-faint);
+  font-size: var(--fs-body);
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.shortcut-add:hover {
+  border-color: var(--accent);
+  border-style: solid;
+  color: var(--accent);
+}
+
+.shortcut-key-recording {
+  padding: 2px var(--s3);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+.shortcut-unbound {
+  color: var(--text-faint);
+  font-size: var(--fs-small);
+}
+
+.shortcut-row:hover .hover-only,
+.shortcut-row:focus-within .hover-only {
+  opacity: 1;
+}
+
+.shortcut-conflict {
+  grid-column: 1 / -1;
+  padding-bottom: var(--s2);
+  color: var(--modified);
+  font-size: var(--fs-micro);
+}
+
+/* --- command palette --------------------------------------------------- */
+
+.scrim-top {
+  align-items: flex-start;
+  padding-top: 14vh;
+}
+
+.palette {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(620px, 92vw);
+  max-height: 60vh;
+  overflow: hidden;
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop-lg);
+}
+
+.palette-input {
+  padding: var(--s5);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-lead);
+  outline: none;
+}
+
+.palette-list {
+  overflow-y: auto;
+  padding: var(--s2);
+}
+
+.palette-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) var(--s4);
+  border-radius: var(--radius);
+  cursor: default;
+}
+
+.palette-row-selected {
+  background: var(--select);
+}
+
+.palette-category {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.palette-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-keys {
+  display: flex;
+  gap: var(--s2);
+}
+
+.palette-empty {
+  padding: var(--s6);
+  color: var(--text-faint);
+  text-align: center;
+}
+
+/* A menu entry names its key on the right, so the menu teaches the keyboard
+   rather than competing with it. */
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s6);
+}
+
+.menu-label {
+  flex: 1;
+}
+
+.menu-item:hover:not(:disabled) .menu-hint {
+  background: rgb(255 255 255 / 18%);
+  border-color: rgb(255 255 255 / 35%);
+  color: #fff;
+}
+
+/* --- panel focus ------------------------------------------------------- */
+
+/* The digit that jumps to a panel, shown where the panel is. It is the literal
+   key, so it is set like a key rather than styled as a badge. */
+/* The rail: one fixed column down the left of the sidebar that holds keys and
+   nothing else. Counts live on the right. A digit's position is what says
+   which kind of number it is, so the two can never be confused. */
+.side-rail {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  width: 21px;
+}
+
+.side-key {
+  height: 15px;
+  min-width: 15px;
+  padding: 0 3px;
+}
+
+.side-section-focused > .side-header-row > .side-header {
+  color: var(--accent);
+}
+
+.side-section-focused > .side-header-row .side-key {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Section headers and rows share one left edge, so the rail is a straight
+   column rather than two columns a few pixels apart. */
+.side-header-row {
+  padding-left: var(--s2);
+}
+
+/* The keyboard cursor, distinct from selection: an outline rather than a fill,
+   because the row underneath may already be the checked-out branch. */
+.side-item-cursor {
+  background: var(--surface-alt);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* The one way a panel lists its keys. Shared so a key cap in the sidebar and a
+   key cap under the file lists are the same object, not two that happen to
+   resemble each other. */
+.pane-hint,
+.sidebar-hint {
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  background: var(--chrome);
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+  line-height: 1.8;
+}
+
+.pane-hint kbd,
+.sidebar-hint kbd {
+  margin-right: var(--s1);
+}
+
+/* A key and its label are one thing and wrap as one. Without this a hint
+   breaks at whichever space happens to fall at the edge, which is as likely to
+   be the one inside a pair as the one between two -- leaving a lone "close" on
+   the next line describing nothing. */
+.hint-pair {
+  white-space: nowrap;
+}
+
+/* The sidebar scrolls behind its hint; the file column does not. */
+.sidebar-hint {
+  position: sticky;
+  bottom: 0;
+  margin-top: var(--s5);
+}
+
+/* --- toolbar tips ------------------------------------------------------ */
+
+/* Anchored below the whole toolbar and centred on its button, so a tip never
+   lands on the buttons either side of the one being described. */
+.tip {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s2) var(--s4);
+  background: var(--chrome-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+  /* Without this the tip is only as wide as the gap between `left` and the
+     right edge of the window. A fixed box with `left` set and `width: auto`
+     has its shrink-to-fit width capped by the space remaining to its right,
+     and the translateX that centres it only moves the box afterwards -- it
+     hands back no room. So a control near the right edge got a tip a few
+     characters wide, which broke its own words to fit and had its key cap
+     land on top of the text. max-content sizes to the text and leaves the
+     limiting to max-width, which also makes the width measured in Tip.tsx the
+     real one, so the clamp that keeps the tip on screen has something true to
+     work from. */
+  width: max-content;
+  max-width: min(460px, 90vw);
+  font-size: var(--fs-small);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: tip-in 90ms ease-out;
+}
+
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -3px);
+  }
+}
+
+.tip-label {
+  min-width: 0;
+  color: var(--text);
+  /* Only reachable now that the tip is max-content wide: nothing wraps until
+     it reaches max-width, and what does is a repository path with no spaces
+     to break at. */
+  overflow-wrap: anywhere;
+}
+
+/* The key cap describes the label; it never gives up room to it. */
+.tip-key {
+  flex: none;
+  background: var(--chrome);
+}
+
+.tip-note {
+  flex: none;
+  color: var(--text-faint);
+}
+
+/* Revealed only while the modifier is down, so tabs stay clean until the
+   question "which number is this one" is actually being asked. */
+.tab-key {
+  height: 14px;
+  min-width: 14px;
+  padding: 0 3px;
+  animation: tab-key-in 90ms ease-out;
+}
+
+@keyframes tab-key-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+.tab-active .tab-key {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* --- hunk and line staging --------------------------------------------- */
+
+/* Actions sit on the hunk header, where the thing they act on begins. They
+   appear on hover so a diff stays a diff until you reach for them. */
+.hunk-actions {
+  position: sticky;
+  right: var(--s4);
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-left: auto;
+  padding-right: var(--s4);
+  opacity: 0;
+}
+
+.diff-hunk:hover .hunk-actions,
+.hunk-actions:focus-within {
+  opacity: 1;
+}
+
+.hunk-count {
+  color: var(--accent);
+  font-family: var(--sans);
+  font-size: var(--fs-micro);
+}
+
+.hunk-button {
+  padding: 1px var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  font-family: var(--sans);
+  font-size: var(--fs-micro);
+  line-height: 15px;
+  cursor: pointer;
+}
+
+.hunk-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.hunk-button-danger:hover {
+  border-color: var(--removed);
+  color: var(--removed);
+}
+
+/* Only a changed line can be picked; context has nothing to stage. */
+.diff-line-selectable {
+  cursor: pointer;
+}
+
+/* The marker column carries the selection, so the line's own added/removed
+   colour is left alone — one signal per channel. */
+.diff-line-picked .diff-marker {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.diff-line-picked {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* --- conflicts ---------------------------------------------------------- */
+
+/* Above the diff, so the choice sits next to the thing being decided. */
+.conflict-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  padding: var(--s3) var(--s5);
+  background: var(--removed-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.conflict-text {
+  display: grid;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+.conflict-title {
+  color: var(--conflict);
+  font-weight: 600;
+}
+
+.conflict-hint {
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+  line-height: 1.45;
+}
+
+.conflict-actions {
+  display: flex;
+  flex: none;
+  gap: var(--s3);
+  margin-left: auto;
+}
+
+.conflict-actions button {
+  padding: 3px var(--s4);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+
+/* The diff sits under the bar, so the pane becomes a column. */
+.fs-right {
+  display: flex;
+  flex-direction: column;
+}
+
+.fs-right > .diff {
+  flex: 1;
+  min-height: 0;
+}
+
+/* --- release channel ---------------------------------------------------- */
+
+/* Derived from the version, so it disappears on its own at 1.0.0 rather than
+   waiting for someone to remember to delete it. */
+.channel {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--s3);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-family: var(--sans);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 15px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.channel-alpha {
+  color: var(--modified);
+}
+
+.channel-beta,
+.channel-dev {
+  color: var(--accent);
+}
+
+.channel-rc {
+  color: var(--added);
+}
+
+.welcome h1 .channel {
+  margin-left: var(--s4);
+  vertical-align: 4px;
+}
+
+.welcome-caution {
+  max-width: 40ch;
+  margin: 0 0 var(--s2);
+  color: var(--modified);
+  font-size: var(--fs-small);
+  line-height: 1.5;
+}
+
+/* --- git flow plan ----------------------------------------------------- */
+
+/* The diagram in the finish dialog. Chrome is sans and data is mono
+   everywhere else in the app, and a branch name is data. */
+.flow-plan {
+  width: 100%;
+  margin: var(--s4) 0 var(--s5);
+}
+.flow-rail {
+  stroke: var(--border);
+  stroke-width: 1.5;
+  fill: none;
+}
+.flow-arrow-head {
+  fill: var(--border);
+}
+.flow-node {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.flow-node-source {
+  fill: var(--accent);
+}
+.flow-branch {
+  fill: var(--text);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+}
+.flow-note {
+  fill: var(--text-faint);
+  font-family: var(--sans);
+  font-size: var(--fs-micro);
+}
+
+/* --- blame ------------------------------------------------------------- */
+
+.blame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.blame-header {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex: none;
+  padding: var(--s3) var(--s4);
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+.blame-path {
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+}
+.blame-rev,
+.blame-count {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+.blame-spacer {
+  flex: 1;
+}
+
+/* The commit under the cursor. A fixed strip rather than something that
+   appears on hover: it is the answer to the question the view exists for, and
+   it should not move or vanish while being read. */
+.blame-focus {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s5);
+  flex: none;
+  padding: var(--s3) var(--s4);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border-soft);
+  font-size: var(--fs-small);
+}
+.blame-focus-oid {
+  flex: none;
+  color: var(--accent);
+  font-family: var(--mono);
+}
+.blame-focus-author {
+  flex: none;
+  color: var(--text);
+}
+.blame-focus-date {
+  flex: none;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+.blame-focus-summary {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.blame-focus-uncommitted .blame-focus-summary {
+  color: var(--accent);
+}
+
+.blame-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.blame-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  min-width: 100%;
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+  line-height: 19px;
+  white-space: pre;
+  cursor: default;
+}
+/* Where one commit's run gives way to the next. Most of the gutter is blank by
+   design, so without this a block of forty lines has no visible bottom. */
+.blame-row-start {
+  box-shadow: inset 0 1px 0 var(--border-soft);
+}
+/* Every line of the commit under the cursor, not just the one the cursor is
+   on. Kept far weaker than the cursor itself so the two never compete. */
+.blame-row-kin {
+  background: var(--surface-alt);
+}
+.blame-row-selected {
+  background: var(--accent-soft);
+}
+
+/* The age spine: one hue, stepped by opacity so it holds up in both themes
+   without a second set of tokens. Never the only signal — the date is right
+   beside it — so it can afford to stay this quiet. */
+.blame-age {
+  flex: none;
+  width: 3px;
+  align-self: stretch;
+  background: var(--accent);
+}
+.blame-age-0 {
+  opacity: 0.14;
+}
+.blame-age-1 {
+  opacity: 0.3;
+}
+.blame-age-2 {
+  opacity: 0.48;
+}
+.blame-age-3 {
+  opacity: 0.7;
+}
+.blame-age-4 {
+  opacity: 1;
+}
+/* Not yet committed, so it has no place on a ramp of commit dates. */
+.blame-row-uncommitted .blame-age {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--accent) 0 2px,
+    transparent 2px 4px
+  );
+  opacity: 0.9;
+}
+
+/* Fixed width so code starts at the same column on every row, whether or not
+   that row begins a run. */
+.blame-gutter {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex: none;
+  width: 196px;
+  padding: 0 var(--s4);
+  overflow: hidden;
+  font-size: var(--fs-micro);
+  white-space: nowrap;
+}
+.blame-oid {
+  flex: none;
+  width: 50px;
+  color: var(--text-faint);
+}
+/* The name is what the eye scans for, so it is the one thing here at full
+   strength; the hash beside it is an identifier you almost never read. */
+.blame-author {
+  flex: 1;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-family: var(--sans);
+  text-overflow: ellipsis;
+}
+.blame-date {
+  flex: none;
+  color: var(--text-faint);
+}
+.blame-row-uncommitted .blame-author {
+  color: var(--accent);
+}
+
+.blame-line-no {
+  flex: none;
+  width: 48px;
+  padding-right: var(--s4);
+  border-right: 1px solid var(--border-soft);
+  color: var(--text-faint);
+  text-align: right;
+  user-select: none;
+}
+.blame-content {
+  padding-left: var(--s4);
+}
+
+.blame > .pane-hint {
+  flex: none;
+}
+
+/* --- searchable field -------------------------------------------------- */
+
+/* The wrapper is the positioning context for the list, and has to stretch like
+   the bare input it replaces or the Browse button beside it would take the
+   slack instead. */
+.combo {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.combo input {
+  width: 100%;
+}
+
+/* Fixed, and rendered into the body rather than into the field. A dialog that
+   scrolls would otherwise clip the list and grow its own scroll height around
+   it, burying whatever comes after the field. Its position is measured from
+   the field each time it opens. */
+.combo-list {
+  position: fixed;
+  z-index: 40;
+  max-height: 232px;
+  margin: 0;
+  padding: var(--s2);
+  overflow-y: auto;
+  list-style: none;
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop-lg);
+}
+
+.combo-option {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  padding: 4px var(--s3);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+  text-align: left;
+  cursor: pointer;
+}
+.combo-option-cursor {
+  background: var(--accent);
+  color: #fff;
+}
+.combo-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.combo-note {
+  flex: none;
+  font-family: var(--sans);
+  font-size: var(--fs-micro);
+  opacity: 0.75;
+}
+
+.combo-more {
+  padding: 4px var(--s3);
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+}
+
+/* What the value in the field will actually do, said before the button is
+   pressed rather than reported afterwards as an error. */
+.dialog-describe {
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+}
+
+/* --- syntax ------------------------------------------------------------ */
+
+/* One palette, two themes, set as variables so a token rule is written once.
+   Every colour here clears 4.5:1 against all three backgrounds it can land on
+   — the plain surface and the added and removed tints of a diff — which is
+   checked rather than judged by eye. Four of them had to move to get there,
+   including dark punctuation, which failed even on the plain surface.
+   The hues are the familiar ones — red keywords, blue strings, purple calls —
+   because a code view is the last place to be inventive: anyone reading this
+   has spent years with an editor, and matching that costs nothing and saves
+   them relearning what a colour means here. */
+:root {
+  --syn-comment: #5f6873;
+  --syn-keyword: #cf222e;
+  --syn-string: #0a3069;
+  --syn-number: #0550ae;
+  --syn-function: #7a45d6;
+  --syn-type: #953800;
+  --syn-tag: #116329;
+  --syn-punct: var(--n6);
+}
+
+:root[data-theme="dark"] {
+  --syn-comment: #8b949e;
+  --syn-keyword: #ff7b72;
+  --syn-string: #a5d6ff;
+  --syn-number: #79c0ff;
+  --syn-function: #d2a8ff;
+  --syn-type: #ffa657;
+  --syn-tag: #7ee787;
+  --syn-punct: #9aa4b0;
+}
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: var(--syn-comment);
+  font-style: italic;
+}
+
+.token.keyword,
+.token.rule,
+.token.important,
+.token.atrule {
+  color: var(--syn-keyword);
+}
+
+.token.string,
+.token.char,
+.token.attr-value,
+.token.regex {
+  color: var(--syn-string);
+}
+
+.token.number,
+.token.boolean,
+.token.constant,
+.token.symbol,
+.token.attr-name {
+  color: var(--syn-number);
+}
+
+.token.function,
+.token.function-variable,
+.token.method {
+  color: var(--syn-function);
+}
+
+.token.class-name,
+.token.builtin,
+.token.namespace,
+.token.macro,
+.token.annotation {
+  color: var(--syn-type);
+}
+
+.token.tag,
+.token.selector,
+.token.inserted {
+  color: var(--syn-tag);
+}
+
+/* Brackets, commas and operators are structure rather than meaning. They stay
+   quiet so the words carry the colour — highlighting everything highlights
+   nothing. */
+.token.punctuation,
+.token.operator {
+  color: var(--syn-punct);
+}
+
+/* A key in JSON or YAML is closer to a label than to a string, and reading it
+   as one is what makes a config file scannable. */
+.token.property,
+.token.key {
+  color: var(--syn-type);
+}
+
+/* --- grouped refs ------------------------------------------------------ */
+
+/* A folder inside Branches or Tags. Quieter than a section header — a section
+   is a part of the app, a folder is just a shared prefix — and it lines its
+   chevron up with the rail so the column of controls stays a column. */
+/* Deliberately the same box as .side-item, down to the padding: a folder and a
+   branch are the same kind of row and sit on the same left edge. */
+.side-folder {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  height: var(--row);
+  padding: 0 var(--s4) 0 var(--s2);
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: var(--fs-body);
+  text-align: left;
+  cursor: default;
+}
+.side-folder:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+/* The keyboard cursor, drawn exactly as it is on a branch. Landing on a folder
+   and landing on a name are the same act, so they cannot look like two. */
+.side-folder-cursor {
+  background: var(--surface-alt);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  color: var(--text);
+}
+.side-folder-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The disclosure column. Reserved on every row of a grouped list and left
+   blank on the ones that are not folders, which is what keeps a folder's name
+   on the same left edge as the branches around it. Kept out of the rail on
+   purpose: that column is for keyboard shortcuts, and a mark there should
+   always mean a key. */
+.side-twisty {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  width: 14px;
+  color: var(--text-faint);
+}
+
+/* Indentation by nesting rather than by a computed depth, so a folder five
+   levels down needs no arithmetic and every row keeps the same markup it has
+   in a flat section. One twisty's worth per level: enough to read as a step,
+   little enough that a long branch name still has room in a 232px column. */
+.side-nest {
+  padding-left: 14px;
+}
+
+/* --- splash ------------------------------------------------------------ */
+
+/* Same surface the app itself uses, so the hand-over is a change of content
+   rather than a flash of a different window. */
+.splash {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--s5);
+  height: 100%;
+  background: var(--surface);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.splash-block {
+  display: grid;
+  justify-items: center;
+  gap: var(--s4);
+  text-align: center;
+}
+
+.splash-mark {
+  width: 88px;
+  height: 88px;
+}
+
+.splash-name {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  margin: 0;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.splash-status {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--fs-small);
+}
+
+/* The mark draws itself, then holds, then starts again. Written in fractions
+   of each path -- the paths carry pathLength="1" -- because the trunk and the
+   lane are not the same length and a shared pixel dasharray would run them at
+   different speeds. */
+.splash-trunk,
+.splash-lane {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.splash-trunk {
+  animation: splash-draw 2.4s ease-in-out infinite;
+}
+.splash-lane {
+  animation: splash-draw 2.4s ease-in-out 0.28s infinite;
+}
+
+@keyframes splash-draw {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  /* Drawn by 45%, then held: a loop with no pause reads as a machine rather
+     than as something completing. */
+  45%,
+  82% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+.splash-dot {
+  opacity: 0;
+  animation: splash-dot 2.4s ease-in-out infinite;
+}
+/* Each commit lands as the line reaches it. */
+.splash-dot-1 {
+  animation-delay: 0.35s;
+}
+.splash-dot-2 {
+  animation-delay: 0.75s;
+}
+.splash-dot-3 {
+  animation-delay: 1.05s;
+}
+
+@keyframes splash-dot {
+  0%,
+  6% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  18%,
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  90%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+/* Scaling a circle needs its own centre, not the corner of the viewBox. */
+.splash-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Motion here is decoration on top of a message that already says everything.
+   Without it the mark simply sits there, complete. */
+@media (prefers-reduced-motion: reduce) {
+  .splash-trunk,
+  .splash-lane,
+  .splash-dot {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+/* --- git command trace -------------------------------------------------- */
+
+/* What git is running right now, in the status bar. Mono and truncated: it is
+   an exact command, and an exact command that has been reflowed is no longer
+   the thing you could paste into a terminal. */
+.running-git {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-width: 0;
+  max-width: 40ch;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-tab {
+  padding: 0 var(--s2);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+}
+.log-tab-active {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
+.git-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  padding: 3px var(--s4);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  line-height: 1.55;
+}
+/* A hairline between runs rather than around every row: the list is dense and
+   a full border on each would weigh more than the text. */
+.git-row + .git-row {
+  border-top: 1px solid var(--border-soft);
+}
+.git-row:hover {
+  background: var(--surface-alt);
+}
+.git-row-running {
+  color: var(--text);
+}
+/* A non-zero exit is not always a failure — several git commands report a
+   result that way — so this is a mark, not an alarm. */
+.git-row-failed .git-line {
+  color: var(--removed);
+}
+/* The clock, in its own column at the left, so a burst reads as a burst: the
+   times line up and the gaps between them are visible without reading a single
+   argument.
+
+   Sized by its content rather than a guessed width -- every timestamp is the
+   same length, so they align anyway, and a fixed `ch` value was one character
+   short of "13:03:56.673" and ran underneath the command. */
+.git-at {
+  flex: none;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.git-line {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.git-time {
+  flex: none;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The spinner sits where the duration will be, so a row does not shift
+   sideways the moment its command finishes. */
+.git-row-running .spinner {
+  flex: none;
+  margin-left: auto;
+}
+
+/* A toolbar button whose operation is running.
+ *
+ * The spinner sits in the icon's box at the icon's size, so the label below it
+ * does not move and the bar does not reflow the moment you press something. */
+.toolbar-button-busy .toolbar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+.toolbar-button-busy .spinner {
+  width: 14px;
+  height: 14px;
+}
+
+/* It is disabled while it runs, but it is not unavailable — it is working, and
+   the flat grey of a genuinely disabled button would say the wrong thing. */
+.toolbar-button-busy:disabled {
+  opacity: 1;
+  color: var(--text-dim);
+}
+
+/* --- repository library ------------------------------------------------- */
+
+/* A shelf of repositories, not a landing page. The window is as wide as the
+   monitor and a row of four is not; the content sits in a column it can
+   actually be read across, and the rest of the width is left alone. */
+.library {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  outline: none;
+}
+
+.library-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: var(--s7) var(--s6) 0;
+}
+
+.library-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s4);
+  flex: none;
+}
+/* No wordmark and no channel badge: the status bar already carries both, and
+   repeating them here made a list of four repositories look like a splash. */
+.library-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.library-count {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+}
+.library-actions {
+  display: flex;
+  gap: var(--s3);
+  margin-left: auto;
+}
+
+.library-filter {
+  flex: none;
+  max-width: 320px;
+  margin: var(--s6) 0 var(--s3);
+}
+
+.library-list {
+  flex: 1;
+  min-height: 0;
+  margin: var(--s5) 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.library-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s4);
+  border-bottom: 1px solid var(--border-soft);
+}
+.library-row:hover {
+  background: var(--surface-alt);
+}
+/* The keyboard cursor, drawn as the sidebar draws its own so that landing on a
+   row means the same thing everywhere in the app. */
+.library-row-cursor {
+  background: var(--surface-alt);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* The lane. Lit where a tab is open on this repository, faint where none is --
+   the app's own mark, saying the one thing about a row that is not already
+   written across it. */
+.library-lane {
+  flex: none;
+  width: 3px;
+  margin: var(--s3) 0;
+  background: var(--border);
+  border-radius: 2px;
+}
+.library-row-open .library-lane {
+  background: var(--accent);
+}
+
+/* Name over path rather than beside it: a path is long and a name is short,
+   and side by side the path pushed every name into a narrow column of its own
+   while leaving the row two thirds empty. */
+.library-body {
+  display: grid;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+  padding: var(--s4) 0;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.library-name {
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.library-body:hover .library-name {
+  color: var(--accent);
+}
+
+.library-path {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Shown at rest, quiet until the row is under the pointer or the cursor. */
+.library-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  flex: none;
+  padding-right: var(--s4);
+}
+.library-action {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+.library-row:hover .library-action,
+.library-row-cursor .library-action {
+  color: var(--text-dim);
+}
+.library-action:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.library-action-danger:hover {
+  color: var(--removed);
+}
+
+.library-empty {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--s3);
+  max-width: 44ch;
+  margin: 0 auto;
+  text-align: center;
+}
+.library-empty-lead {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-lead);
+}
+.library-empty-hint {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--fs-small);
+}
+
+.library-none {
+  padding: var(--s5) 0;
+  color: var(--text-faint);
+}
+
+.library > .pane-hint {
+  flex: none;
+}
+
+/* The repository list's own tab. Italic rather than a different colour: it is
+   still a tab, it just holds the shelf instead of a repository. */
+.tab-shelf .tab-name {
+  font-style: italic;
+}
+
+/* --- search ------------------------------------------------------------- */
+
+.search {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.search-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  flex: none;
+  padding: var(--s4);
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+
+/* The query leads, because it is the only thing on this screen you type. */
+.search-box {
+  flex: 1;
+  min-width: 0;
+  padding: var(--s3) var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+}
+.search-box:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* Three questions, one box. Segmented rather than a dropdown: there are three,
+   they are always the same three, and a menu would hide two of them. */
+.search-kinds {
+  display: flex;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.search-kind {
+  padding: var(--s3) var(--s5);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+.search-kind:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+.search-kind-active,
+.search-kind-active:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.search-status {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex: none;
+  padding: var(--s3) var(--s5);
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-faint);
+  font-size: var(--fs-micro);
+}
+
+.search-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.search-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  width: 100%;
+  padding: 0 var(--s5);
+  cursor: default;
+}
+.search-row-cursor {
+  background: var(--select);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* The match itself, in mono: a line of code and a commit subject both want to
+   be read exactly, and a commit hash beside them has to line up. */
+.search-primary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-secondary {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search > .pane-hint {
+  flex: none;
+}
