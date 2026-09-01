@@ -883,12 +883,6 @@ kbd.key-live {
   font-size: var(--fs-small);
 }
 
-.col-oid {
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-}
-
 .ref-chip {
   display: inline-block;
   margin-right: var(--s3);
@@ -987,22 +981,6 @@ kbd.key-live {
   margin: 0;
   color: var(--text-dim);
   font-size: var(--fs-small);
-}
-
-.commit-oid {
-  padding: 0 var(--s2);
-  background: var(--surface-alt);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-  cursor: pointer;
-}
-
-.commit-oid:hover {
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
 .commit-merge {

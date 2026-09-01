@@ -8,6 +8,8 @@ import { CommitGraph, LANE_WIDTH } from "./CommitGraph";
 import { Splitter, usePaneSize } from "./Splitter";
 import { CommitDetail, type CommitDetailHandle } from "./CommitDetail";
 import { useCommands } from "../lib/useCommands";
+import { useCopy } from "../lib/useCopy";
+import { CopyHash } from "./CopyHash";
 import { useSettings } from "../lib/settings";
 
 const ROW_HEIGHT = 26;
@@ -112,6 +114,8 @@ export function HistoryView({ repoId, headOid, keyboardActive, focusOid }: Props
 
   const toCommits = () => setPane("commits");
 
+  const { copied, copy } = useCopy();
+
   useCommands({
     "history.next": () => (pane === "files" ? detailRef.current?.move(1) : move(1)),
     "history.previous": () =>
@@ -132,6 +136,12 @@ export function HistoryView({ repoId, headOid, keyboardActive, focusOid }: Props
 
       setPane("files");
       detailRef.current?.move(1);
+    },
+    // The full hash, not the abbreviation on screen: a short hash is for
+    // reading, and pasting one into a command is how you learn it was
+    // ambiguous.
+    "history.copyHash": () => {
+      if (selected) void copy(selected.oid, selected.oid);
     },
     "history.back": toCommits,
   }, keyboardActive);
@@ -216,7 +226,11 @@ export function HistoryView({ repoId, headOid, keyboardActive, focusOid }: Props
                   <span className="col-author" title={commit.email}>
                     {commit.author}
                   </span>
-                  <span className="col-oid">{commit.short}</span>
+                  <CopyHash
+                    short={commit.short}
+                    copied={copied === commit.oid}
+                    onCopy={() => void copy(commit.oid, commit.oid)}
+                  />
                 </div>
               );
             })}

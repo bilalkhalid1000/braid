@@ -160,6 +160,7 @@ export const COMMANDS: CommandDef[] = [
   { id: "history.files", label: "Go to the commit's files", category: "History", scope: "history", binding: ["Enter"] },
   { id: "history.back", label: "Back to the commit list", category: "History", scope: "history", binding: ["Escape"] },
   { id: "history.top", label: "Jump to the newest commit", category: "History", scope: "history", binding: ["G G"] },
+  { id: "history.copyHash", label: "Copy the commit hash", category: "History", scope: "history", binding: ["Y"] },
 ];
 
 export const COMMANDS_BY_ID: Record<string, CommandDef> = Object.fromEntries(

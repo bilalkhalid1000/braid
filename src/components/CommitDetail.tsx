@@ -11,6 +11,8 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { api, type FileStat } from "../lib/api";
 import { useSettings } from "../lib/settings";
+import { useCopy } from "../lib/useCopy";
+import { CopyHash } from "./CopyHash";
 import { DiffView } from "./DiffView";
 import { Splitter, usePaneSize } from "./Splitter";
 import { useTip } from "./Tip";
@@ -56,6 +58,7 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
   const [listWidth, setListWidth] = usePaneSize("commit-files", 380);
   const scrollRef = useRef<HTMLDivElement>(null);
   const tip = useTip();
+  const { copied, copy } = useCopy();
 
   const detail = useQuery({
     queryKey: ["commit", repoId, oid],
@@ -143,13 +146,12 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
           <h2 className="commit-subject">{commit.subject}</h2>
 
           <p className="commit-meta">
-            <button
-              className="commit-oid"
-              {...tip("Copy the full hash")}
-              onClick={() => void navigator.clipboard.writeText(commit.oid)}
-            >
-              {commit.short}
-            </button>
+            <CopyHash
+              chip
+              short={commit.short}
+              copied={copied === commit.oid}
+              onCopy={() => void copy(commit.oid, commit.oid)}
+            />
             <span>{commit.author}</span>
             <span {...tip(new Date(commit.timestamp * 1000).toLocaleString())}>
               {relativeTime(commit.timestamp)}
