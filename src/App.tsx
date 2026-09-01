@@ -9,7 +9,9 @@ import {
   isReleaseKind,
   onCloneProgress,
   onRepoChanged,
+  type Commit,
   type CurrentFlow,
+  type ResetMode,
   type BlameTarget,
   type BranchRef,
   type FlowKind,
@@ -139,6 +141,7 @@ export default function App() {
   /** What a running clone is doing, or null when none is. */
   const [cloning, setCloning] = useState<string | null>(null);
   const { settings, keymap, update: updateSettings, loaded: settingsLoaded } = useSettings();
+  const { copy } = useCopy();
 
   /** Numbers jump to a panel. Files and History also switch the main view;
    *  the sidebar panels leave it alone so you can browse branches while still
@@ -1222,6 +1225,100 @@ The stashed changes are discarded.`,
 
   // --- menus --------------------------------------------------------------
 
+  /** Reset the current branch to a commit, once the cost is known.
+   *
+   *  The impact is fetched before the question is asked rather than after it is
+   *  answered: "3 commits will be dropped, 2 of which origin/main already has"
+   *  is the whole basis for deciding, and a confirmation that only repeats the
+   *  verb is one people learn to click through.
+   */
+  const confirmReset = async (commit: Commit, mode: ResetMode) => {
+    if (!id) return;
+
+    const impact = await api.resetImpact(id, commit.oid);
+    const branch = head?.head ?? "HEAD";
+
+    const dropped =
+      impact.dropped === 1 ? "1 commit" : `${impact.dropped} commits`;
+
+    const explain: Record<ResetMode, string> = {
+      soft: `${branch} moves back past ${dropped}. Their changes stay staged, ready to commit again.`,
+      mixed: `${branch} moves back past ${dropped}. Their changes stay in your files, unstaged.`,
+      hard: `${branch} moves back past ${dropped}, and their changes go with them. Anything not committed elsewhere cannot be recovered.`,
+    };
+
+    const what = explain[mode];
+
+    // The published case is the one worth interrupting for: the commits are on
+    // a branch other people pull, so this is a rewrite rather than a local
+    // tidy-up, and putting it back needs a force push.
+    const warning =
+      impact.published > 0
+        ? ` ${impact.published} of them ${impact.published === 1 ? "is" : "are"} already on ${impact.upstream}. Anyone who has pulled will still have ${impact.published === 1 ? "it" : "them"}, and pushing this will need forcing.`
+        : "";
+
+    setDialog({
+      title: `Reset ${branch} to ${commit.short}`,
+      message: `${what}${warning}`,
+      graphic: undefined,
+      confirmLabel: mode === "hard" ? "Reset and discard" : "Reset",
+      danger: mode === "hard" || impact.published > 0,
+      onConfirm: () =>
+        act(`Reset ${branch} to ${commit.short}`, () =>
+          api.resetTo(id, commit.oid, mode),
+        ),
+    });
+  };
+
+  const confirmRevert = (commit: Commit) => {
+    if (!id) return;
+
+    setDialog({
+      title: `Revert ${commit.short}`,
+      message:
+        "Makes a new commit that undoes this one. History is added to rather than rewritten, so this is the safe way to undo something other people already have.",
+      confirmLabel: "Revert",
+      onConfirm: () =>
+        act(`Revert ${commit.short}`, () => api.revertCommit(id, commit.oid)),
+    });
+  };
+
+  /** Right-click on a commit in the history. */
+  const openCommitMenu = (commit: Commit, at: { x: number; y: number }) => {
+    const branch = head?.head;
+    // Nothing here can move a branch that is not checked out.
+    const detached = !branch;
+
+    openMenuAt(at.x, at.y, [
+      {
+        label: "Copy hash",
+        onClick: () => void copy(commit.oid, commit.oid, commit.short),
+      },
+      "separator",
+      {
+        label: `Revert ${commit.short}…`,
+        onClick: () => confirmRevert(commit),
+      },
+      "separator",
+      {
+        label: `Reset ${branch ?? "HEAD"} here, keep changes staged…`,
+        disabled: detached,
+        onClick: () => void confirmReset(commit, "soft"),
+      },
+      {
+        label: `Reset ${branch ?? "HEAD"} here, keep changes…`,
+        disabled: detached,
+        onClick: () => void confirmReset(commit, "mixed"),
+      },
+      {
+        label: `Reset ${branch ?? "HEAD"} here, discard changes…`,
+        disabled: detached,
+        danger: true,
+        onClick: () => void confirmReset(commit, "hard"),
+      },
+    ]);
+  };
+
   const openMenuAt = (x: number, y: number, entries: MenuEntry[]) =>
     setMenu({ x, y, entries });
 
@@ -1989,6 +2086,7 @@ The stashed changes are discarded.`,
                   headOid={head?.headOid ?? null}
                   focusOid={historyFocus}
                   keyboardActive={!isSidebarPanel(focusedPanel) && !inputOpen}
+                  onCommitMenu={openCommitMenu}
                 />
               )}
             </main>

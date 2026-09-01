@@ -33,6 +33,22 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   </React.StrictMode>,
 );
 
+/** A window, not a web page.
+ *
+ *  Without this a right-click anywhere the app does not handle itself raises
+ *  the webview's own menu -- Back, Reload, Save as, Print, Inspect -- which
+ *  offers nothing that means anything here and says plainly that the thing you
+ *  are using is a browser.
+ *
+ *  Text fields keep theirs. It is the only route to paste for anyone who does
+ *  not reach for the key, and there is nothing in it that misleads. */
+document.addEventListener("contextmenu", (event) => {
+  const target = event.target as HTMLElement | null;
+  if (target?.closest("input, textarea, [contenteditable='true']")) return;
+
+  event.preventDefault();
+});
+
 /** The window is created hidden and revealed here.
  *
  *  Starting hidden is what removes the blank frame entirely: there is nothing

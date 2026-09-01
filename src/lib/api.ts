@@ -318,6 +318,18 @@ export interface TerminalOption {
  *  stored value reads as what the user chose. */
 export type HistoryScope = "all" | "local" | "head";
 
+/** How much of the branch a reset would move past. */
+export type ResetMode = "soft" | "mixed" | "hard";
+
+export interface ResetImpact {
+  /** Commits the branch would stop pointing at. */
+  dropped: number;
+  upstream: string | null;
+  /** How many of the dropped commits the upstream already has. Non-zero means
+   *  the history is published. */
+  published: number;
+}
+
 export interface Session {
   /** Worktree roots, in tab order. */
   repos: string[];
@@ -344,6 +356,10 @@ export const api = {
 
   repoStatus: (id: string) => invoke<RepoStatus>("repo_status", { id }),
   repoRefs: (id: string) => invoke<RefsSnapshot>("repo_refs", { id }),
+  resetImpact: (id: string, oid: string) => invoke<ResetImpact>("reset_impact", { id, oid }),
+  resetTo: (id: string, oid: string, mode: ResetMode) =>
+    invoke<string>("reset_to", { id, oid, mode }),
+  revertCommit: (id: string, oid: string) => invoke<string>("revert_commit", { id, oid }),
   repoLog: (id: string, skip: number, limit: number, scope: HistoryScope) =>
     invoke<LogPage>("repo_log", { id, skip, limit, scope }),
   applyHunk: (

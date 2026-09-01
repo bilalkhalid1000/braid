@@ -24,13 +24,22 @@ interface Props {
   keyboardActive: boolean;
   /** A commit to select when it arrives — set by a search result. */
   focusOid?: string | null;
+  /** Right-click on a commit. The menu itself belongs to the app, which is
+   *  what knows how to run the things on it. */
+  onCommitMenu: (commit: Commit, at: { x: number; y: number }) => void;
 }
 
 /** Commit history.
  *
  *  Read one page at a time and rendered through a virtualizer, so opening a
  *  repository with 200k commits costs the same as one with 20. */
-export function HistoryView({ repoId, headOid, keyboardActive, focusOid }: Props) {
+export function HistoryView({
+  repoId,
+  headOid,
+  keyboardActive,
+  focusOid,
+  onCommitMenu,
+}: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<Commit | null>(null);
   const detailRef = useRef<CommitDetailHandle>(null);
@@ -223,6 +232,14 @@ export function HistoryView({ repoId, headOid, keyboardActive, focusOid }: Props
                   onMouseDown={() => {
                     toCommits();
                     setSelected(commit);
+                  }}
+                  // Select first, so the menu always acts on the row it was
+                  // raised over rather than on whatever was selected before.
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    toCommits();
+                    setSelected(commit);
+                    onCommitMenu(commit, { x: e.clientX, y: e.clientY });
                   }}
                 >
                   <CommitGraph

@@ -777,6 +777,38 @@ pub async fn open_in_terminal(
     .await
 }
 
+/// What a reset to this commit would throw away, asked before it is offered.
+#[tauri::command]
+pub async fn reset_impact(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    oid: String,
+) -> Result<git::ResetImpact> {
+    let session = registry.get(&id)?;
+    git::impact(&session.git, &oid).await
+}
+
+#[tauri::command]
+pub async fn reset_to(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    oid: String,
+    mode: git::ResetMode,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    git::reset(&session.git, &oid, mode).await
+}
+
+#[tauri::command]
+pub async fn revert_commit(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    oid: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    git::revert(&session.git, &oid).await
+}
+
 /// The terminals this platform can offer, for the settings picker.
 #[tauri::command]
 pub fn terminal_options() -> Vec<system::TerminalOption> {
