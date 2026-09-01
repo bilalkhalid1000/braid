@@ -40,6 +40,78 @@ pub fn file_manager_command(path: &str) -> (&'static str, Vec<String>) {
     }
 }
 
+/// The directory holding a path, for either separator.
+///
+/// Windows hands us both: PATH entries are backslashed, and everything git
+/// reports is forward-slashed.
+fn parent_dir(path: &str) -> Option<&str> {
+    let cut = path.rfind(|c| c == '/' || c == '\\')?;
+    Some(&path[..cut])
+}
+
+/// Find a program on PATH.
+fn on_path(program: &str) -> Option<String> {
+    let path = std::env::var_os("PATH")?;
+
+    std::env::split_paths(&path)
+        .map(|dir| dir.join(program))
+        .find(|candidate| candidate.is_file())
+        .map(|found| found.to_string_lossy().into_owned())
+}
+
+/// Where Git for Windows keeps its Bash launcher.
+///
+/// git-bash.exe is deliberately not on PATH: the installer adds `cmd`, which
+/// holds git.exe, and leaves the launcher in the install root. So it is found
+/// by walking up from a git.exe that *is* on PATH -- which works for a portable
+/// or scoop install too, where the usual Program Files guesses would not --
+/// with the standard locations after that.
+pub fn git_bash_candidates(git_exe: Option<&str>, roots: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+
+    // git.exe lives in cmd/, bin/ or mingw64/bin/ depending on the install, so
+    // the launcher is one, two or three levels up.
+    if let Some(exe) = git_exe {
+        let mut dir = parent_dir(exe);
+        for _ in 0..3 {
+            let Some(current) = dir else { break };
+            out.push(format!("{current}/git-bash.exe"));
+            dir = parent_dir(current);
+        }
+    }
+
+    for root in roots {
+        out.push(format!("{root}/Git/git-bash.exe"));
+    }
+
+    out
+}
+
+fn install_roots() -> Vec<String> {
+    ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"]
+        .iter()
+        .filter_map(|name| std::env::var(name).ok())
+        .map(|root| {
+            // Git installs per-user under Local/Programs, not Local itself.
+            if root.ends_with("Local") { format!("{root}/Programs") } else { root }
+        })
+        .collect()
+}
+
+/// The Bash launcher, or the bare name if none of the guesses exist -- letting
+/// the spawn fail and be reported rather than pretending we know better.
+fn git_bash() -> String {
+    let candidates = git_bash_candidates(on_path("git.exe").as_deref(), &install_roots());
+
+    candidates
+        .into_iter()
+        .find(|candidate| std::path::Path::new(candidate).is_file())
+        // Built by joining, so it comes back with both separators in it. The
+        // OS does not mind, but this path is shown in the activity log.
+        .map(|found| native_path(&found))
+        .unwrap_or_else(|| "git-bash.exe".to_string())
+}
+
 /// A terminal the user can pick in settings.
 #[derive(serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -110,7 +182,9 @@ pub fn named_terminal(id: &str, path: &str) -> Option<(String, Vec<String>)> {
         "pwsh" => ("pwsh.exe", powershell_cd(&native)),
         "cmd" => ("cmd.exe", vec!["/K".into(), format!("cd /d \"{native}\"")]),
         // Git Bash wants the path in its own POSIX-ish spelling, not Windows'.
-        "gitbash" => ("git-bash.exe", vec![format!("--cd={}", native.replace('\\', "/"))]),
+        "gitbash" => {
+            return Some((git_bash(), vec![format!("--cd={}", native.replace('\\', "/"))]))
+        }
 
         "terminal" => ("open", vec!["-a".into(), "Terminal".into(), native.clone()]),
         "iterm" => ("open", vec!["-a".into(), "iTerm".into(), native.clone()]),
@@ -231,17 +305,47 @@ pub async fn open_file_manager(path: &str) -> Result<String> {
 /// something rather than leaving the button dead. The message names the program
 /// that actually started, so a fallback is visible in the activity log instead
 /// of being a silent substitution.
-pub async fn open_terminal(path: &str, choice: &str, custom: &str) -> Result<String> {
-    let mut candidates = Vec::new();
+/// Everything to try, in order, for a given setting.
+///
+/// Separate from launching so the choice can be tested: whether the terminal
+/// the user picked is what actually starts is the whole question, and it is not
+/// one that can be asked of a function whose only observable behaviour is that
+/// a window appeared on somebody's desktop.
+pub fn terminal_candidates(path: &str, choice: &str, custom: &str) -> Vec<(String, Vec<String>)> {
+    let chosen = match choice {
+        "custom" => custom_terminal(custom, path),
+        "" | "auto" => None,
+        id => named_terminal(id, path),
+    };
 
-    match choice {
-        "custom" => candidates.extend(custom_terminal(custom, path)),
-        "" | "auto" => {}
-        id => candidates.extend(named_terminal(id, path)),
+    // A choice we can honour is the only thing tried. Falling back to another
+    // terminal is indistinguishable from the setting being ignored -- which is
+    // exactly how it looked when Git Bash could not be found and Windows
+    // Terminal opened in its place. A failure the user can see and act on beats
+    // a success that was not what they asked for.
+    if let Some(chosen) = chosen {
+        return vec![chosen];
     }
 
-    candidates.extend(terminal_commands(path));
+    // Nothing to honour: no choice made, an id this platform has never had, or
+    // a custom command with nothing in it. The automatic list beats a dead
+    // button here, because there is no instruction being overridden.
+    terminal_commands(path)
+}
 
+fn terminal_label(id: &str) -> Option<String> {
+    terminal_options()
+        .into_iter()
+        .find(|option| option.id == id)
+        .map(|option| option.label)
+}
+
+/// Open a terminal at a path.
+///
+/// `choice` is the id from settings: "auto", one of `terminal_options`, or
+/// "custom", in which case `custom` is the user's own command line.
+pub async fn open_terminal(path: &str, choice: &str, custom: &str) -> Result<String> {
+    let candidates = terminal_candidates(path, choice, custom);
     let mut tried: Vec<String> = Vec::new();
 
     for (program, args) in &candidates {
@@ -251,9 +355,17 @@ pub async fn open_terminal(path: &str, choice: &str, custom: &str) -> Result<Str
         }
     }
 
+    let named = terminal_label(choice).unwrap_or_else(|| choice.to_string());
+
     Err(AppError::Git {
         code: -1,
-        stderr: format!("No terminal could be launched. Tried: {}.", tried.join(", ")),
+        stderr: match tried.as_slice() {
+            [] => format!("Nothing to launch for the terminal setting {choice:?}."),
+            [one] => format!(
+                "{named} could not be started: {one} is not there.                  Pick a different terminal in Settings."
+            ),
+            many => format!("No terminal could be launched. Tried: {}.", many.join(", ")),
+        },
     })
 }
 
@@ -335,6 +447,120 @@ mod tests {
         let powershell = candidates.iter().find(|(p, _)| *p == "powershell.exe").unwrap();
 
         assert!(powershell.1.last().unwrap().contains("it''s mine"));
+    }
+
+    #[test]
+    fn the_chosen_terminal_is_tried_first() {
+        // The bug this guards: a choice that is collected, stored and passed
+        // all the way down, and then queued behind the automatic list, so the
+        // setting appears to do nothing.
+        for option in terminal_options() {
+            if option.id == "auto" || option.id == "custom" {
+                continue;
+            }
+
+            let expected = named_terminal(&option.id, "/tmp/repo").unwrap();
+            let candidates = terminal_candidates("/tmp/repo", &option.id, "");
+
+            assert_eq!(
+                candidates,
+                vec![expected],
+                "{} was chosen but something else could start",
+                option.id
+            );
+        }
+    }
+
+    #[test]
+    fn a_custom_command_is_the_only_thing_tried() {
+        let candidates = terminal_candidates("/tmp/repo", "custom", "my-term --cd {path}");
+
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].0, "my-term");
+    }
+
+    #[test]
+    fn choosing_nothing_leaves_the_automatic_order_alone() {
+        let auto = terminal_candidates("/tmp/repo", "auto", "");
+        let unset = terminal_candidates("/tmp/repo", "", "");
+
+        assert_eq!(auto, terminal_commands("/tmp/repo"));
+        assert_eq!(unset, auto);
+    }
+
+    #[test]
+    fn a_chosen_terminal_that_fails_is_not_quietly_replaced() {
+        // The bug as reported: Git Bash was chosen, could not be started, and
+        // Windows Terminal opened instead -- so the setting looked ignored.
+        // Nothing else may be queued behind a choice we can honour.
+        let candidates = terminal_candidates("/tmp/repo", &terminal_options()[1].id, "");
+
+        assert_eq!(candidates.len(), 1, "a choice must not fall back to another terminal");
+    }
+
+    #[test]
+    fn the_launcher_is_looked_for_next_to_the_git_that_is_on_path() {
+        // git-bash.exe is not on PATH -- the installer adds cmd/, which holds
+        // git.exe -- so naming it is not enough to start it.
+        let found = git_bash_candidates(Some("C:/Program Files/Git/cmd/git.exe"), &[]);
+
+        assert!(
+            found.contains(&"C:/Program Files/Git/git-bash.exe".to_string()),
+            "walking up from git.exe should reach the install root: {found:?}"
+        );
+    }
+
+    #[test]
+    fn the_launcher_is_found_from_a_deeper_git_too() {
+        // where.exe reports this one first on a normal install.
+        let found = git_bash_candidates(Some("C:/Program Files/Git/mingw64/bin/git.exe"), &[]);
+
+        assert!(found.contains(&"C:/Program Files/Git/git-bash.exe".to_string()));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn git_bash_resolves_to_something_that_exists() {
+        // The end of the chain, on a real machine: whatever we would hand to
+        // the OS has to be a file, or the button fails the way it did.
+        let (program, _) = named_terminal("gitbash", "C:/tmp").expect("Windows offers Git Bash");
+
+        eprintln!("git bash resolved to: {program}");
+
+        if on_path("git.exe").is_some() {
+            assert!(
+                std::path::Path::new(&program).is_file(),
+                "resolved to {program}, which is not there"
+            );
+        }
+    }
+
+    #[test]
+    fn the_standard_locations_are_tried_when_git_is_not_on_path() {
+        let found = git_bash_candidates(None, &["C:/Program Files".to_string()]);
+
+        assert_eq!(found, ["C:/Program Files/Git/git-bash.exe"]);
+    }
+
+    #[test]
+    fn a_directory_is_found_through_either_separator() {
+        assert_eq!(parent_dir("C:/a/b"), Some("C:/a"));
+        assert_eq!(parent_dir(concat!("C:", "\\", "a", "\\", "b")), Some(concat!("C:", "\\", "a")));
+        assert_eq!(parent_dir("git.exe"), None);
+    }
+
+    #[test]
+    fn a_choice_this_platform_does_not_have_still_opens_something() {
+        let candidates = terminal_candidates("/tmp/repo", "no-such-terminal", "");
+
+        assert!(!candidates.is_empty(), "the button must not go dead");
+    }
+
+    #[test]
+    fn an_empty_custom_command_still_opens_something() {
+        let candidates = terminal_candidates("/tmp/repo", "custom", "");
+
+        assert!(!candidates.is_empty());
     }
 
     #[test]

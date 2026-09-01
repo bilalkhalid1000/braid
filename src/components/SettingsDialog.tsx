@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useHotkeyRecorder } from "@tanstack/react-hotkeys";
 import { useQuery } from "@tanstack/react-query";
 
-import { api } from "../lib/api";
+import { api, type TerminalOption } from "../lib/api";
 
 import { COMMANDS, COMMANDS_BY_ID, findConflicts, type CommandDef } from "../lib/commands";
 import { formatBinding } from "../lib/shortcutLabel";
@@ -205,7 +205,17 @@ function TerminalField() {
     staleTime: Infinity,
   });
 
-  const available = options.data ?? [];
+  // The two that need nothing from the backend to mean something: one is a
+  // decision not to choose, the other is a command the user types here. If the
+  // list cannot be fetched these still work, and a picker with nothing in it
+  // would leave no way to change the setting at all -- which looks exactly like
+  // the setting being ignored.
+  const available: TerminalOption[] = options.data?.length
+    ? options.data
+    : [
+        { id: "auto", label: "Choose automatically" },
+        { id: "custom", label: "Custom command" },
+      ];
 
   // A settings file carried from another machine can name a terminal this one
   // has never heard of. Showing it keeps the select honest about what is
@@ -233,6 +243,14 @@ function TerminalField() {
           )}
         </select>
       </Field>
+
+      {options.isError && (
+        <p className="text-small text-modified">
+          This copy of Braid cannot list the terminals it can start, which means the
+          app is running an older build than the settings it is showing. Restart it to
+          pick from the full list; “Custom command” works either way.
+        </p>
+      )}
 
       {settings.terminal === "custom" && (
         <Field
