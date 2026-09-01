@@ -26,21 +26,40 @@ interface Props {
   groups: ToolbarAction[][];
 }
 
+const BAR = "flex flex-none items-stretch h-[54px] px-3 bg-chrome border-b border-b-border";
+
+const BUTTON =
+  "flex flex-col items-center justify-center gap-1 min-w-[60px] mx-1 my-3 px-4 py-2 " +
+  "bg-transparent border border-transparent rounded-sm text-text cursor-pointer " +
+  "enabled:hover:bg-surface enabled:hover:border-border-soft " +
+  "disabled:text-text-faint disabled:cursor-default disabled:opacity-55";
+
+const PRIMARY =
+  "bg-accent border-accent text-white enabled:hover:bg-accent " +
+  "enabled:hover:border-accent enabled:hover:brightness-[1.08]";
+
+/* A running button stays at full strength: it is not unavailable, it is busy,
+   and fading it would say the wrong thing about why it cannot be pressed. */
+const BUSY = "disabled:opacity-100 disabled:text-text-dim";
+
+const BADGE =
+  "absolute -top-[5px] -right-[9px] min-w-[15px] px-2 rounded-full " +
+  "font-mono text-micro leading-[15px] text-center";
+
 export function Toolbar({ groups }: Props) {
   const tip = useTip();
 
   return (
-    <div className="toolbar">
+    <div className={BAR}>
       {groups.map((group, i) => (
-        <div className="toolbar-group" key={i}>
+        <div
+          className={`flex items-stretch px-6 ${i > 0 ? "border-l border-l-border-soft" : ""}`}
+          key={i}
+        >
           {group.map((action) => (
             <button
               key={action.key}
-              className={[
-                "toolbar-button",
-                action.primary && "toolbar-button-primary",
-                action.busy && "toolbar-button-busy",
-              ]
+              className={[BUTTON, action.primary && PRIMARY, action.busy && BUSY]
                 .filter(Boolean)
                 .join(" ")}
               onClick={action.onClick}
@@ -56,15 +75,27 @@ export function Toolbar({ groups }: Props) {
                 action.disabled ? action.disabledReason : undefined,
               )}
             >
-              <span className="toolbar-icon">
+              <span
+                className={
+                  action.busy
+                    ? "relative flex size-10 items-center justify-center leading-[0]"
+                    : "relative block leading-[0]"
+                }
+              >
                 {/* The spinner takes the icon's place rather than sitting
                     beside it, so nothing on the bar moves while it runs. */}
-                {action.busy ? <span className="spinner" /> : action.icon}
+                {action.busy ? <span className="spinner size-7" /> : action.icon}
                 {!action.busy && action.badge ? (
-                  <span className="toolbar-badge">{action.badge}</span>
+                  <span
+                    className={`${BADGE} ${
+                      action.primary ? "bg-white text-accent" : "bg-accent text-white"
+                    }`}
+                  >
+                    {action.badge}
+                  </span>
                 ) : null}
               </span>
-              <span className="toolbar-label">{action.label}</span>
+              <span className="text-small">{action.label}</span>
             </button>
           ))}
         </div>

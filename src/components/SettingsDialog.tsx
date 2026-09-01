@@ -268,6 +268,7 @@ function ShortcutsSection() {
           onChange={setFilter}
           placeholder="Filter commands"
           matches={shown.length}
+          className="flex-1"
         />
         <button
           className="btn"

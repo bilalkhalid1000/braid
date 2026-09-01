@@ -6,7 +6,22 @@ interface Props {
   onChange: (value: number) => void;
   min: number;
   max: number;
+  /** Layout from whoever placed it -- how it sits in its own parent is not
+   *  something a divider can know. */
+  className?: string;
+  /** A wider grab area, for a divider sitting in a header where the rows above
+   *  and below leave less room to aim at. */
+  wide?: boolean;
 }
+
+/* A 1px divider is a 1px target, which is not one anybody can hit. The grab
+   area is grown with a pseudo-element rather than with padding so the line
+   itself stays hairline while what the pointer is aiming at does not. */
+const GRIP = "after:absolute after:content-['']";
+
+const BASE =
+  "relative bg-border-soft transition-[background] duration-[90ms] hover:bg-accent " +
+  GRIP;
 
 /** Draggable pane divider.
  *
@@ -14,7 +29,7 @@ interface Props {
  *  outrun the handle and drop it, and so the drag survives passing over the
  *  webview's own scrollbars. Arrow keys move it too — a pane you can only
  *  resize with a mouse is a pane some people cannot resize. */
-export function Splitter({ axis, value, onChange, min, max }: Props) {
+export function Splitter({ axis, value, onChange, min, max, className, wide }: Props) {
   const origin = useRef({ pointer: 0, value: 0 });
   const [dragging, setDragging] = useState(false);
 
@@ -25,7 +40,15 @@ export function Splitter({ axis, value, onChange, min, max }: Props) {
 
   return (
     <div
-      className={`splitter splitter-${axis} ${dragging ? "splitter-active" : ""}`}
+      className={[
+        BASE,
+        wide ? "after:inset-[0_-5px]" : "after:inset-[-3px]",
+        axis === "x" ? "cursor-col-resize" : "cursor-row-resize",
+        dragging && "bg-accent",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
       role="separator"
       aria-orientation={axis === "x" ? "vertical" : "horizontal"}
       aria-valuenow={value}

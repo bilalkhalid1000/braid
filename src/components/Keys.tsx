@@ -8,5 +8,5 @@ import type { ReactNode } from "react";
  *  unbreakable run, so the line breaks between pairs instead.
  */
 export function Keys({ children }: { children: ReactNode }) {
-  return <span className="hint-pair">{children}</span>;
+  return <span className="whitespace-nowrap">{children}</span>;
 }

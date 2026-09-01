@@ -89,6 +89,8 @@
     }
   }
 
+  --animate-toast-in: toast-in 140ms ease-out;
+
   /* Row heights. A list row is a fixed height everywhere because the
      virtualizers measure in whole rows. */
   --height-row: 22px;

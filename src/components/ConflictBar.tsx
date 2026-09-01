@@ -38,6 +38,9 @@ function sideLabels(state: RepoState): { ours: string; theirs: string; note: str
   };
 }
 
+const BAR = "flex items-center gap-6 border-b border-b-border bg-removed-bg px-6 py-3";
+const ACTION = "px-4 py-[3px] text-small whitespace-nowrap";
+
 /** Resolving one conflicted file.
  *
  *  Sits above the diff so the choice is next to the thing being decided. Taking
@@ -47,23 +50,23 @@ export function ConflictBar({ path, state, busy, onTake, onMarkResolved }: Props
   const labels = sideLabels(state);
 
   return (
-    <div className="conflict-bar">
-      <div className="conflict-text">
-        <span className="conflict-title">This file has conflicts</span>
-        <span className="conflict-hint">
+    <div className={BAR}>
+      <div className="grid min-w-0 gap-1">
+        <span className="font-semibold text-conflict">This file has conflicts</span>
+        <span className="text-small leading-[1.45] text-text-dim">
           Take one side whole, or edit {shortPath(path)} and mark it resolved.
           {labels.note && ` ${labels.note}`}
         </span>
       </div>
 
-      <div className="conflict-actions">
-        <button className="btn" disabled={busy} onClick={() => onTake("ours")}>
+      <div className="ml-auto flex flex-none gap-3">
+        <button className={`btn ${ACTION}`} disabled={busy} onClick={() => onTake("ours")}>
           Take {labels.ours}
         </button>
-        <button className="btn" disabled={busy} onClick={() => onTake("theirs")}>
+        <button className={`btn ${ACTION}`} disabled={busy} onClick={() => onTake("theirs")}>
           Take {labels.theirs}
         </button>
-        <button className="btn-primary" disabled={busy} onClick={onMarkResolved}>
+        <button className={`btn-primary ${ACTION}`} disabled={busy} onClick={onMarkResolved}>
           Mark resolved
         </button>
       </div>

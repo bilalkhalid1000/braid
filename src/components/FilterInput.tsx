@@ -9,16 +9,28 @@ interface Props {
   /** Names this box so the "focus the filter" command can find the one that
    *  belongs to whatever is in front. */
   name?: string;
+  /** Layout from whoever placed it. The box has no opinion about how wide it
+   *  should be -- in a toolbar it takes the free space, in a sidebar it does
+   *  not -- and that is the caller's business rather than a variant here. */
+  className?: string;
 }
 
-export function FilterInput({ value, onChange, placeholder, matches, name }: Props) {
+const BOX =
+  "flex items-center gap-3 rounded-sm border border-border bg-surface px-3 " +
+  "focus-within:border-accent";
+
+const INPUT =
+  "h-row min-w-0 flex-1 border-0 bg-transparent text-body outline-none " +
+  "placeholder:text-text-faint";
+
+export function FilterInput({ value, onChange, placeholder, matches, name, className }: Props) {
   const ref = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="filter">
+    <div className={className ? `${BOX} ${className}` : BOX}>
       <input
         ref={ref}
-        className="filter-input"
+        className={INPUT}
         data-filter={name}
         type="search"
         value={value}
@@ -34,7 +46,7 @@ export function FilterInput({ value, onChange, placeholder, matches, name }: Pro
           }
         }}
       />
-      {value && <span className="filter-count">{matches ?? 0}</span>}
+      {value && <span className="font-mono text-micro text-text-faint">{matches ?? 0}</span>}
     </div>
   );
 }

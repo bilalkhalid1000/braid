@@ -9,6 +9,15 @@ interface Props {
   onSkip: () => void;
 }
 
+const BANNER =
+  "flex flex-none items-center gap-4 border-b border-b-border bg-modified-bg px-6 py-3";
+
+/* The detail is what gets cut when the window is narrow; the operation's name
+   is the part nothing else on screen says. */
+const DETAIL = "overflow-hidden text-ellipsis whitespace-nowrap text-small text-text-dim";
+
+const ACTION = "px-6 py-[3px] text-small";
+
 /** What the repository is in the middle of, and the way out.
  *
  *  A pull that hits a conflict leaves a half-finished merge behind, and until
@@ -30,12 +39,12 @@ export function OperationBanner({
   const resolved = conflictedCount === 0;
 
   return (
-    <div className="op-banner" role="status">
-      <span className="op-dot" />
+    <div className={BANNER} role="status">
+      <span className="size-4 flex-none rounded-full bg-modified" />
 
-      <span className="op-title">{operationLabel[state]}</span>
+      <span className="font-semibold">{operationLabel[state]}</span>
 
-      <span className="op-detail">
+      <span className={DETAIL}>
         {conflictedCount > 0
           ? `${conflictedCount} file${conflictedCount === 1 ? "" : "s"} still conflicted`
           : state === "bisecting"
@@ -43,16 +52,16 @@ export function OperationBanner({
             : "Conflicts resolved — ready to continue"}
       </span>
 
-      <div className="op-actions">
+      <div className="ml-auto flex gap-3">
         {canSkip && (
-          <button className="btn" disabled={busy} onClick={onSkip}>
+          <button className={`btn ${ACTION}`} disabled={busy} onClick={onSkip}>
             Skip commit
           </button>
         )}
 
         {canContinue && (
           <button
-            className="btn-primary"
+            className={`btn-primary ${ACTION}`}
             // Continuing with files still unmerged only produces another
             // refusal, so the button says so by being unavailable.
             disabled={busy || !resolved}
@@ -63,7 +72,7 @@ export function OperationBanner({
           </button>
         )}
 
-        <button className="btn-danger" disabled={busy} onClick={onAbort}>
+        <button className={`btn-danger ${ACTION}`} disabled={busy} onClick={onAbort}>
           Abort
         </button>
       </div>

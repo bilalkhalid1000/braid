@@ -17,6 +17,14 @@ interface Props {
   onCommit: (message: string, amend: boolean) => Promise<boolean>;
 }
 
+const BOX = "grid flex-none gap-3 p-4 bg-surface-alt border-t border-t-border";
+
+/* Resizable vertically and capped: a long message is worth room, and a box
+   that can grow without limit is one that can hide the file list entirely. */
+const MESSAGE =
+  "min-h-[78px] max-h-[220px] resize-y p-3 bg-surface border border-border rounded-sm " +
+  "font-mono text-body leading-[1.5] focus:border-accent focus:outline-none";
+
 /** The commit message box.
  *
  *  Submitting is exposed as a handle rather than bound to a key here, so the
@@ -49,10 +57,10 @@ export const CommitBox = forwardRef<CommitBoxHandle, Props>(
     }));
 
     return (
-      <div className="commit-box">
+      <div className={BOX}>
         <textarea
           ref={textarea}
-          className="commit-message"
+          className={MESSAGE}
           placeholder="Commit message"
           value={message}
           spellCheck={false}
@@ -67,17 +75,18 @@ export const CommitBox = forwardRef<CommitBoxHandle, Props>(
           }}
         />
 
-        <div className="commit-actions">
-          <label className="amend-toggle">
+        <div className="flex items-center gap-6">
+          <label className="flex items-center gap-3 text-small text-text-dim">
             <input
               type="checkbox"
+              className="accent-accent"
               checked={amend}
               onChange={(e) => setAmend(e.target.checked)}
             />
             Amend
           </label>
 
-          <span className="commit-hint">{stagedCount} staged</span>
+          <span className="ml-auto text-micro text-text-faint">{stagedCount} staged</span>
 
           <button
             className="btn-primary"

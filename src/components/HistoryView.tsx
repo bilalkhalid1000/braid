@@ -156,6 +156,8 @@ export function HistoryView({ repoId, headOid, keyboardActive, focusOid }: Props
             onChange={setGraphWidth}
             min={LANE_WIDTH}
             max={520}
+            className="self-stretch"
+            wide
           />
 
           <span>Description</span>

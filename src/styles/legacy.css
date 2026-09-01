@@ -88,7 +88,6 @@ kbd.key-live {
 
 /* Chrome keeps its own height; only the body absorbs what is left over. */
 .app > .tabs,
-.app > .toolbar,
 .app > .statusbar {
   flex: none;
 }
@@ -236,94 +235,7 @@ kbd.key-live {
 
 /* --- toolbar ----------------------------------------------------------- */
 
-.toolbar {
-  display: flex;
-  align-items: stretch;
-  height: 54px;
-  padding: 0 var(--s3);
-  background: var(--chrome);
-  border-bottom: 1px solid var(--border);
-}
-
-.toolbar-group {
-  display: flex;
-  align-items: stretch;
-  padding: 0 var(--s5);
-}
-
-.toolbar-group + .toolbar-group {
-  border-left: 1px solid var(--border-soft);
-}
-
-.toolbar-button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--s1);
-  min-width: 60px;
-  margin: var(--s3) var(--s1);
-  padding: var(--s2) var(--s4);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.toolbar-button:hover:not(:disabled) {
-  background: var(--surface);
-  border-color: var(--border-soft);
-}
-
-.toolbar-button:disabled {
-  color: var(--text-faint);
-  cursor: default;
-  opacity: 0.55;
-}
-
 /* One filled button at a time: whatever the current state is asking for. */
-.toolbar-button-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.toolbar-button-primary:hover:not(:disabled) {
-  background: var(--accent);
-  border-color: var(--accent);
-  filter: brightness(1.08);
-}
-
-.toolbar-button-primary .toolbar-badge {
-  background: #fff;
-  color: var(--accent);
-}
-
-.toolbar-icon {
-  position: relative;
-  display: block;
-  line-height: 0;
-}
-
-.toolbar-badge {
-  position: absolute;
-  top: -5px;
-  right: -9px;
-  min-width: 15px;
-  padding: 0 var(--s2);
-  background: var(--accent);
-  border-radius: 999px;
-  color: #fff;
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-  line-height: 15px;
-  text-align: center;
-}
-
-.toolbar-label {
-  font-size: var(--fs-small);
-}
 
 /* --- body and splitters ------------------------------------------------ */
 
@@ -342,10 +254,6 @@ kbd.key-live {
   background: var(--surface);
 }
 
-.content > .op-banner {
-  flex: none;
-}
-
 .content > .file-status,
 .content > .history {
   flex: 1 1 auto;
@@ -355,72 +263,8 @@ kbd.key-live {
 
 /* --- in-progress operation --------------------------------------------- */
 
-.op-banner {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-  padding: var(--s3) var(--s5);
-  background: var(--modified-bg);
-  border-bottom: 1px solid var(--border);
-}
-
-.op-dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  background: var(--modified);
-  border-radius: 50%;
-}
-
-.op-title {
-  font-weight: 600;
-}
-
-.op-detail {
-  overflow: hidden;
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.op-actions {
-  display: flex;
-  gap: var(--s3);
-  margin-left: auto;
-}
-
-.op-actions button {
-  padding: 3px var(--s5);
-  font-size: var(--fs-small);
-}
-
-.splitter {
-  position: relative;
-  background: var(--border-soft);
-  transition: background 90ms;
-}
-
-.splitter:hover,
-.splitter-active {
-  background: var(--accent);
-}
-
-.splitter-x {
-  cursor: col-resize;
-}
-
-.splitter-y {
-  cursor: row-resize;
-}
-
 /* Widen the grab target well past the visible line: a 4px hit area is a
    frustration, a 4px line is correct. */
-.splitter::after {
-  position: absolute;
-  content: "";
-  inset: -3px;
-}
 
 /* --- sidebar ----------------------------------------------------------- */
 
@@ -442,40 +286,6 @@ kbd.key-live {
 
 .fs-filter {
   background: var(--surface-alt);
-}
-
-.filter {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  padding: 0 var(--s3);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.filter:focus-within {
-  border-color: var(--accent);
-}
-
-.filter-input {
-  flex: 1;
-  min-width: 0;
-  height: 22px;
-  background: none;
-  border: none;
-  font-size: var(--fs-body);
-  outline: none;
-}
-
-.filter-input::placeholder {
-  color: var(--text-faint);
-}
-
-.filter-count {
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
 }
 
 .side-header-row {
@@ -672,7 +482,6 @@ kbd.key-live {
   min-height: 0;
 }
 .fs-left > .fs-filter,
-.fs-left > .commit-box,
 .fs-left > .pane-hint {
   flex: none;
 }
@@ -832,56 +641,6 @@ kbd.key-live {
 
 /* --- commit box -------------------------------------------------------- */
 
-.commit-box {
-  display: grid;
-  gap: var(--s3);
-  padding: var(--s4);
-  background: var(--surface-alt);
-  border-top: 1px solid var(--border);
-}
-
-.commit-message {
-  min-height: 78px;
-  max-height: 220px;
-  padding: var(--s3);
-  resize: vertical;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-family: var(--mono);
-  font-size: var(--fs-body);
-  line-height: 1.5;
-}
-
-.commit-message:focus {
-  border-color: var(--accent);
-  outline: none;
-}
-
-.commit-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--s5);
-}
-
-.amend-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-}
-
-.amend-toggle input {
-  accent-color: var(--accent);
-}
-
-.commit-hint {
-  margin-left: auto;
-  color: var(--text-faint);
-  font-size: var(--fs-micro);
-}
-
 /* --- diff -------------------------------------------------------------- */
 
 .diff {
@@ -1028,14 +787,6 @@ kbd.key-live {
 /* The graph resizer. It lives in a 24px header, so the visible line stays a
    hairline while the grab area is widened either side of it -- a four-pixel
    target in a strip that short is a target people miss. */
-.history-head .splitter-x {
-  align-self: stretch;
-}
-.history-head .splitter-x::after {
-  content: "";
-  position: absolute;
-  inset: 0 -5px;
-}
 
 /* How many lanes are folded onto the last column, so the pile-up at the edge
    is labelled rather than just dense. */
@@ -1553,29 +1304,6 @@ kbd.key-live {
 
 /* --- toasts ------------------------------------------------------------ */
 
-.toaster {
-  position: fixed;
-  right: var(--s5);
-  bottom: 34px;
-  z-index: 15;
-  display: flex;
-  flex-direction: column-reverse;
-  gap: var(--s4);
-  width: 340px;
-  max-height: calc(100vh - 80px);
-  overflow-y: auto;
-}
-
-.toast {
-  padding: var(--s4) var(--s5);
-  background: var(--chrome);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--text-faint);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-pop);
-  animation: toast-in 140ms ease-out;
-}
-
 @keyframes toast-in {
   from {
     opacity: 0;
@@ -1583,127 +1311,12 @@ kbd.key-live {
   }
 }
 
-.toast-success {
-  border-left-color: var(--added);
-}
-
-.toast-error {
-  border-left-color: var(--removed);
-}
-
-.toast-row {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-}
-
-.toast-mark {
-  flex: none;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  color: #fff;
-  font-size: var(--fs-micro);
-  font-weight: 700;
-  line-height: 15px;
-  text-align: center;
-}
-
-.toast-success .toast-mark {
-  background: var(--added);
-}
-
-.toast-error .toast-mark {
-  background: var(--removed);
-}
-
-.toast-label {
-  flex: 1;
-  overflow: hidden;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.toast-time {
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-}
-
-.toast-close {
-  background: none;
-  border: none;
-  color: var(--text-faint);
-  font-size: var(--fs-lead);
-  line-height: 1;
-  cursor: pointer;
-}
-
-.toast-close:hover {
-  color: var(--text);
-}
-
-.toast-detail {
-  margin: var(--s2) 0 0 23px;
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-  line-height: 1.45;
-  word-break: break-word;
-}
-
-.toast-detail.muted {
-  color: var(--text-faint);
-  font-family: var(--sans);
-}
-
 /* The interpretation leads and git's own words follow, so the actionable
    sentence is read first without hiding what actually happened. */
-.toast-hint {
-  margin: var(--s3) 0 0 23px;
-  color: var(--text);
-  font-size: var(--fs-body);
-  line-height: 1.45;
-}
-
-.toast-footer {
-  display: flex;
-  align-items: center;
-  gap: var(--s5);
-  margin-left: 23px;
-}
-
-.toast-footer:empty {
-  display: none;
-}
 
 .btn-small {
   padding: 2px var(--s4);
   font-size: var(--fs-small);
-}
-
-.toast-expand {
-  padding: var(--s1) 0 0;
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-size: var(--fs-small);
-  cursor: pointer;
-}
-
-.toast-output {
-  max-height: 180px;
-  margin: var(--s3) 0 0 23px;
-  padding: var(--s3);
-  overflow: auto;
-  background: var(--surface);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 /* --- activity log ------------------------------------------------------ */
@@ -2228,10 +1841,6 @@ kbd.key-live {
   margin-bottom: var(--s3);
 }
 
-.settings-toolbar .filter {
-  flex: 1;
-}
-
 .settings-warning {
   margin: 0 0 var(--s5);
   padding: var(--s3) var(--s4);
@@ -2542,9 +2151,6 @@ kbd.key-live {
    breaks at whichever space happens to fall at the edge, which is as likely to
    be the one inside a pair as the one between two -- leaving a lone "close" on
    the next line describing nothing. */
-.hint-pair {
-  white-space: nowrap;
-}
 
 /* The sidebar scrolls behind its hint; the file column does not. */
 .sidebar-hint {
@@ -2703,44 +2309,6 @@ kbd.key-live {
 /* --- conflicts ---------------------------------------------------------- */
 
 /* Above the diff, so the choice sits next to the thing being decided. */
-.conflict-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--s5);
-  padding: var(--s3) var(--s5);
-  background: var(--removed-bg);
-  border-bottom: 1px solid var(--border);
-}
-
-.conflict-text {
-  display: grid;
-  gap: var(--s1);
-  min-width: 0;
-}
-
-.conflict-title {
-  color: var(--conflict);
-  font-weight: 600;
-}
-
-.conflict-hint {
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-  line-height: 1.45;
-}
-
-.conflict-actions {
-  display: flex;
-  flex: none;
-  gap: var(--s3);
-  margin-left: auto;
-}
-
-.conflict-actions button {
-  padding: 3px var(--s4);
-  font-size: var(--fs-small);
-  white-space: nowrap;
-}
 
 /* The diff sits under the bar, so the pane becomes a column. */
 .fs-right {
@@ -3482,24 +3050,9 @@ kbd.key-live {
  *
  * The spinner sits in the icon's box at the icon's size, so the label below it
  * does not move and the bar does not reflow the moment you press something. */
-.toolbar-button-busy .toolbar-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-}
-.toolbar-button-busy .spinner {
-  width: 14px;
-  height: 14px;
-}
 
 /* It is disabled while it runs, but it is not unavailable — it is working, and
    the flat grey of a genuinely disabled button would say the wrong thing. */
-.toolbar-button-busy:disabled {
-  opacity: 1;
-  color: var(--text-dim);
-}
 
 /* --- repository library ------------------------------------------------- */
 
