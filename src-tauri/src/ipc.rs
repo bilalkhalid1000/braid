@@ -9,6 +9,7 @@ use crate::git::{
     LogPage, RefsSnapshot, RepoStatus, Submodule, Worktree,
 };
 use crate::registry::{RepoInfo, RepoRegistry};
+use crate::library::{self, Library};
 use crate::session::{self, Session};
 use crate::settings;
 use crate::system;
@@ -82,6 +83,17 @@ pub async fn load_session(app: AppHandle) -> Result<Session> {
 #[tauri::command]
 pub async fn save_session(app: AppHandle, session: Session) -> Result<()> {
     session::save(&app, &session).await
+}
+
+/// The repositories the user has added, open or not.
+#[tauri::command]
+pub async fn load_library(app: AppHandle) -> Result<Library> {
+    Ok(library::load(&app).await)
+}
+
+#[tauri::command]
+pub async fn save_library(app: AppHandle, library: Library) -> Result<()> {
+    library::save(&app, &library).await
 }
 
 #[tauri::command]

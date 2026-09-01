@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+
+import type { Bookmark } from "./library";
 import { listen } from "@tauri-apps/api/event";
 
 // --- status ---------------------------------------------------------------
@@ -337,6 +339,8 @@ export const api = {
     invoke<string>("delete_remote_branch", { id, remote, branch }),
   publishBranch: (id: string, branch: string, remote: string | null) =>
     invoke<string>("publish_branch", { id, branch, remote }),
+  loadLibrary: () => invoke<{ repos: Bookmark[] }>("load_library"),
+  saveLibrary: (repos: Bookmark[]) => invoke<void>("save_library", { library: { repos } }),
   cloneRepo: (url: string, path: string) =>
     invoke<RepoInfo>("clone_repo", { url, path }),
   blame: (id: string, path: string, rev: string | null) =>

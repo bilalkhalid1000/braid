@@ -14,7 +14,14 @@
  *  on both J and ArrowDown, the way every list does.
  */
 
-export type CommandScope = "global" | "status" | "history" | "sidebar" | "menu" | "blame";
+export type CommandScope =
+  | "global"
+  | "status"
+  | "history"
+  | "sidebar"
+  | "menu"
+  | "blame"
+  | "library";
 
 /** commandId to every way it can be triggered. An empty list means unbound. */
 export type Keymap = Record<string, string[]>;
@@ -45,7 +52,9 @@ export const COMMANDS: CommandDef[] = [
   { id: "repo.open", label: "Open repository", category: "Repository", scope: "global", binding: ["Mod+O"] },
   { id: "repo.create", label: "Create repository", category: "Repository", scope: "global", binding: ["Mod+N"] },
   { id: "repo.clone", label: "Clone a repository", category: "Repository", scope: "global", binding: ["Mod+Shift+O"] },
-  { id: "repo.close", label: "Close repository tab", category: "Repository", scope: "global", binding: ["Mod+W"], needsRepo: true },
+  { id: "repo.library", label: "All repositories", category: "Repository", scope: "global", binding: ["Mod+Shift+R"] },
+  { id: "repo.rename", label: "Rename this repository", category: "Repository", scope: "global", binding: ["F2"], needsRepo: true },
+  { id: "repo.close", label: "Close this tab", category: "Repository", scope: "global", binding: ["Mod+W"] },
   { id: "repo.explorer", label: "Open in file manager", category: "Repository", scope: "global", binding: ["Mod+E"], needsRepo: true },
   { id: "repo.terminal", label: "Open in terminal", category: "Repository", scope: "global", binding: ["Mod+T"], needsRepo: true },
 
@@ -56,6 +65,8 @@ export const COMMANDS: CommandDef[] = [
   // far more often than a literal ninth tab would be.
   { id: "tab.next", label: "Next repository", category: "Repository", scope: "global", binding: ["]", "Mod+Tab", "Mod+PageDown"], needsRepo: true },
   { id: "tab.previous", label: "Previous repository", category: "Repository", scope: "global", binding: ["[", "Mod+Shift+Tab", "Mod+PageUp"], needsRepo: true },
+  { id: "tab.moveLeft", label: "Move this tab left", category: "Repository", scope: "global", binding: ["Mod+Shift+PageUp"], needsRepo: true },
+  { id: "tab.moveRight", label: "Move this tab right", category: "Repository", scope: "global", binding: ["Mod+Shift+PageDown"], needsRepo: true },
   { id: "tab.1", label: "Go to repository 1", category: "Repository", scope: "global", binding: ["Mod+1"], needsRepo: true },
   { id: "tab.2", label: "Go to repository 2", category: "Repository", scope: "global", binding: ["Mod+2"], needsRepo: true },
   { id: "tab.3", label: "Go to repository 3", category: "Repository", scope: "global", binding: ["Mod+3"], needsRepo: true },
@@ -99,6 +110,13 @@ export const COMMANDS: CommandDef[] = [
   { id: "blame.next", label: "Next line", category: "Blame", scope: "blame", binding: ["J", "ArrowDown"] },
   { id: "blame.previous", label: "Previous line", category: "Blame", scope: "blame", binding: ["K", "ArrowUp"] },
   { id: "blame.close", label: "Close the blame", category: "Blame", scope: "blame", binding: ["Escape"] },
+
+  // --- The repository list, live only while it is the tab in front ---
+  { id: "library.next", label: "Next repository", category: "Repositories", scope: "library", binding: ["J", "ArrowDown"] },
+  { id: "library.previous", label: "Previous repository", category: "Repositories", scope: "library", binding: ["K", "ArrowUp"] },
+  { id: "library.open", label: "Open the selected repository", category: "Repositories", scope: "library", binding: ["Enter"] },
+  { id: "library.edit", label: "Edit the selected repository", category: "Repositories", scope: "library", binding: ["E"] },
+  { id: "library.remove", label: "Remove the selected repository", category: "Repositories", scope: "library", binding: ["D"] },
 
   // --- Git, lazygit-style single letters ---
   { id: "git.fetch", label: "Fetch", category: "Git", scope: "global", binding: ["F"], needsRepo: true },

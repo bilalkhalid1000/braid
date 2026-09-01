@@ -195,7 +195,8 @@ kbd.key-live {
 }
 
 .app > .body,
-.app > .welcome {
+.app > .welcome,
+.app > .library {
   flex: 1;
   min-height: 0;
 }
@@ -258,6 +259,10 @@ kbd.key-live {
   color: var(--text-dim);
   white-space: nowrap;
   cursor: default;
+  /* A tab is a thing you press and drag, not a passage you read. Without this
+     a drag paints the repository name blue and leaves a selection behind. */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .tab:hover {
@@ -283,6 +288,45 @@ kbd.key-live {
 
 .tab-close:hover {
   color: var(--removed);
+}
+
+/* --- dragging a tab ----------------------------------------------------- */
+
+/* The one being held. It rises off the strip -- the strip is --chrome-alt, so
+   --chrome reads as lifted without inventing a colour -- and it tracks the
+   pointer exactly, which is why it is the one element here with no transition.
+   Anything else would put it behind your hand. */
+.tab-lifted {
+  z-index: 2;
+  background: var(--chrome);
+  box-shadow: var(--shadow);
+  border-right-color: transparent;
+  color: var(--text);
+  transition: none;
+  cursor: grabbing;
+}
+
+/* The tabs it passes. They slide by exactly its width, which opens the lane it
+   will drop into: that gap is the drop indicator, so there is no marker line
+   drawn over the top of it. */
+.tab-yielding {
+  transition: transform 150ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* Said on hover rather than only once the drag is under way, or the strip
+   keeps the fact that it rearranges to itself. */
+.tab:hover {
+  cursor: grab;
+}
+.tab-close:hover,
+.tab-add:hover {
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-yielding {
+    transition: none;
+  }
 }
 
 .tab-add {
@@ -3627,4 +3671,199 @@ kbd.key-live {
 .toolbar-button-busy:disabled {
   opacity: 1;
   color: var(--text-dim);
+}
+
+/* --- repository library ------------------------------------------------- */
+
+/* A shelf of repositories, not a landing page. The window is as wide as the
+   monitor and a row of four is not; the content sits in a column it can
+   actually be read across, and the rest of the width is left alone. */
+.library {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  outline: none;
+}
+
+.library-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: var(--s7) var(--s6) 0;
+}
+
+.library-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s4);
+  flex: none;
+}
+/* No wordmark and no channel badge: the status bar already carries both, and
+   repeating them here made a list of four repositories look like a splash. */
+.library-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.library-count {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-small);
+}
+.library-actions {
+  display: flex;
+  gap: var(--s3);
+  margin-left: auto;
+}
+
+.library-filter {
+  flex: none;
+  max-width: 320px;
+  margin: var(--s6) 0 var(--s3);
+}
+
+.library-list {
+  flex: 1;
+  min-height: 0;
+  margin: var(--s5) 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.library-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s4);
+  border-bottom: 1px solid var(--border-soft);
+}
+.library-row:hover {
+  background: var(--surface-alt);
+}
+/* The keyboard cursor, drawn as the sidebar draws its own so that landing on a
+   row means the same thing everywhere in the app. */
+.library-row-cursor {
+  background: var(--surface-alt);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* The lane. Lit where a tab is open on this repository, faint where none is --
+   the app's own mark, saying the one thing about a row that is not already
+   written across it. */
+.library-lane {
+  flex: none;
+  width: 3px;
+  margin: var(--s3) 0;
+  background: var(--border);
+  border-radius: 2px;
+}
+.library-row-open .library-lane {
+  background: var(--accent);
+}
+
+/* Name over path rather than beside it: a path is long and a name is short,
+   and side by side the path pushed every name into a narrow column of its own
+   while leaving the row two thirds empty. */
+.library-body {
+  display: grid;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+  padding: var(--s4) 0;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.library-name {
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.library-body:hover .library-name {
+  color: var(--accent);
+}
+
+.library-path {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Shown at rest, quiet until the row is under the pointer or the cursor. */
+.library-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  flex: none;
+  padding-right: var(--s4);
+}
+.library-action {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: var(--fs-small);
+  cursor: pointer;
+}
+.library-row:hover .library-action,
+.library-row-cursor .library-action {
+  color: var(--text-dim);
+}
+.library-action:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.library-action-danger:hover {
+  color: var(--removed);
+}
+
+.library-empty {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--s3);
+  max-width: 44ch;
+  margin: 0 auto;
+  text-align: center;
+}
+.library-empty-lead {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-lead);
+}
+.library-empty-hint {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--fs-small);
+}
+
+.library-none {
+  padding: var(--s5) 0;
+  color: var(--text-faint);
+}
+
+.library > .pane-hint {
+  flex: none;
+}
+
+/* The repository list's own tab. Italic rather than a different colour: it is
+   still a tab, it just holds the shelf instead of a repository. */
+.tab-shelf .tab-name {
+  font-style: italic;
 }

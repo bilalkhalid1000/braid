@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useKeyHold } from "@tanstack/react-hotkeys";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -32,6 +32,16 @@ import { HistoryView } from "./components/HistoryView";
 import { Dialog, type DialogSpec } from "./components/Dialog";
 import type { ComboOption } from "./components/Combo";
 import { cloneDestination, repoNameFromUrl } from "./lib/cloneTarget";
+import { applyOrder, moveItem } from "./lib/tabOrder";
+import { useLibrary } from "./lib/useLibrary";
+import {
+  displayName,
+  find as findBookmark,
+  samePath,
+  LIBRARY_TAB,
+} from "./lib/library";
+import { RepoLibrary } from "./components/RepoLibrary";
+import { RepoTabs } from "./components/RepoTabs";
 import { splitUpstream } from "./lib/upstream";
 import { FlowPlan, type FlowPlanTarget } from "./components/FlowPlan";
 import { BlameView } from "./components/BlameView";
@@ -99,6 +109,8 @@ export default function App() {
   // rather than becoming a third workspace view, so the number keys and
   // the sidebar keep meaning exactly what they meant before.
   const [blameTarget, setBlameTarget] = useState<BlameTarget | null>(null);
+  /** Whether the repository list has a tab in the strip. */
+  const [libraryOpen, setLibraryOpen] = useState(false);
   /** What the sidebar's keyboard cursor is on, so Merge can act on it. */
   const [sidebarCursor, setSidebarCursor] = useState<MenuTarget | null>(null);
   const [settingsOpen, setSettingsOpen] = useState<false | "general" | "shortcuts">(false);
@@ -106,6 +118,9 @@ export default function App() {
   // Nothing may be written back until the restore has finished, or the first
   // save would overwrite the stored session with an empty list.
   const [restored, setRestored] = useState(false);
+  /** Tab order, by repo id. The backend lists repositories alphabetically,
+   *  which is a default rather than an arrangement; this is the arrangement. */
+  const [tabOrder, setTabOrder] = useState<string[]>([]);
   /** How many tabs the restore is reopening, so the wait can say so. */
   const [restoring, setRestoring] = useState(0);
   /** Reveal the app even if the restore never finishes.
@@ -173,6 +188,7 @@ export default function App() {
   };
   const activity = useActivity();
   const gitLog = useGitLog();
+  const library = useLibrary();
   const [sidebarWidth, setSidebarWidth] = usePaneSize("sidebar", 232);
   const updater = useUpdater(settingsLoaded && settings.checkForUpdates);
   const app = useAppVersion();
@@ -271,6 +287,14 @@ export default function App() {
         if (cancelled) return;
 
         const opened = results.flatMap((r) => (r.id ? [r.id] : []));
+
+        // The session stores tabs in the order they were shown, so restoring
+        // that list restores the arrangement as well as the contents.
+        setTabOrder(opened);
+
+        // A session written before this list existed still names real
+        // repositories; adopting them means an upgrade does not start empty.
+        for (const path of stored.repos) library.add(path);
         const missing = results.flatMap((r) => (r.id ? [] : [r.path]));
 
         await queryClient.invalidateQueries({ queryKey: ["repos"] });
@@ -311,24 +335,57 @@ export default function App() {
     };
   }, [queryClient]);
 
+  /** The repositories in the order their tabs are shown.
+   *
+   *  Everything that counts tabs — the number keys, cycling, the session file —
+   *  reads this rather than the query, or the arrangement on screen and the one
+   *  those act on would be two different things. */
+  /** The repository tabs, in the order their tabs are shown. */
+  const repoTabs = useMemo(
+    () =>
+      applyOrder(repos.data, tabOrder, (repo) => repo.id).map((repo) => {
+        // The name comes from the library when one was chosen there, so
+        // renaming a tab and renaming a list entry are the same act.
+        const listed = findBookmark(library.repos, repo.root);
+        return listed ? { ...repo, name: displayName(listed) } : repo;
+      }),
+    [repos.data, tabOrder, library.repos],
+  );
+
+  /** Everything in the strip, which is the repositories plus the list itself
+   *  when it has been opened. It closes like any other tab. */
+  const tabs = useMemo(
+    () =>
+      libraryOpen
+        ? [...repoTabs, { id: LIBRARY_TAB, name: "Repositories", root: "" }]
+        : repoTabs,
+    [repoTabs, libraryOpen],
+  );
+
+  /** The list is the whole window when it is the tab in front, and when there
+   *  is no repository open at all — an empty app has nothing else to show. */
+  const showLibrary = activeId === LIBRARY_TAB || repoTabs.length === 0;
+
   // A string rather than the array, so a refetch that returns an identical list
   // does not rewrite the file.
-  const sessionKey = JSON.stringify([repos.data.map((r) => r.root), activeId]);
+  const sessionKey = JSON.stringify([repoTabs.map((r) => r.root), activeId]);
 
   useEffect(() => {
     if (!restored) return;
 
     void api.saveSession({
-      repos: repos.data.map((r) => r.root),
+      repos: repoTabs.map((r) => r.root),
       active: activeId,
     });
     // sessionKey is the value that decides whether a write is needed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restored, sessionKey]);
 
-  const activeRepo = repos.data.find((r) => r.id === activeId);
+  const activeRepo = tabs.find((r) => r.id === activeId && r.id !== LIBRARY_TAB);
   const head = status.data;
-  const id = activeId;
+  // Null while the repository list is the tab in front: everything scoped to a
+  // repository has none, which is exactly true.
+  const id = activeId === LIBRARY_TAB ? null : activeId;
   const busy = activity.running.length > 0;
 
   /** Run a git action with a name attached.
@@ -368,9 +425,100 @@ export default function App() {
     perform(`Open ${path}`, async () => {
       const repo = await api.openRepo(path);
       await queryClient.invalidateQueries({ queryKey: ["repos"] });
+
+      // Remembered by its real root rather than the path that was picked: a
+      // subfolder of a repository opens the repository, and the list should
+      // hold the thing that was opened.
+      library.add(repo.root);
       setActiveId(repo.id);
       return `Opened ${repo.root}`;
     });
+
+  /** Open a repository from the list, or go to its tab if it already has one. */
+  const openFromLibrary = async (path: string) => {
+    const already = tabs.find((repo) => samePath(repo.root, path));
+    if (already) {
+      setActiveId(already.id);
+      return;
+    }
+
+    await addRepo(path);
+  };
+
+
+  /** Take a repository off the list.
+   *
+   *  Asks first, not because the folder is at risk -- it is untouched -- but
+   *  because the entry carries a name you chose, and that is the part that
+   *  would be gone. */
+  const confirmForgetRepo = (path: string) => {
+    const listed = findBookmark(library.repos, path);
+
+    setDialog({
+      title: `Remove ${listed ? displayName(listed) : path}`,
+      message: `${path}
+
+Takes it off this list only. Nothing on disk is touched, and you can add it again from the same folder.`,
+      confirmLabel: "Remove",
+      danger: true,
+      onConfirm: () => library.remove(path),
+    });
+  };
+
+  /** Show the repository list, as a tab in the strip. */
+  const openLibraryTab = () => {
+    setLibraryOpen(true);
+    setActiveId(LIBRARY_TAB);
+  };
+
+  /** Edit a repository: what it is called, and where it is.
+   *
+   *  One dialog rather than a rename here and a folder picker there. They are
+   *  one edit — a repository that moved usually gets a new name at the same
+   *  time — and splitting them meant two ways to change one entry. */
+  const editRepo = (root: string) => {
+    const listed = findBookmark(library.repos, root);
+    const folderName = displayName({ path: root, name: "" });
+
+    setDialog({
+      title: `Edit ${listed ? displayName(listed) : folderName}`,
+      fields: [
+        {
+          key: "name",
+          label: "Show it as",
+          value: listed?.name ?? "",
+          placeholder: folderName,
+          optional: true,
+          describe: (value) =>
+            value.trim() === "" ? `Uses the folder’s own name, ${folderName}.` : undefined,
+        },
+        {
+          key: "path",
+          label: "Folder",
+          value: root,
+          browse: true,
+          describe: (value) =>
+            samePath(value, root)
+              ? undefined
+              : "Points this entry at a different folder. Nothing on disk moves.",
+        },
+      ],
+      confirmLabel: "Save",
+      onConfirm: (v) => {
+        // Added first for a repository opened before this list existed, so an
+        // edit cannot quietly go nowhere.
+        library.add(root);
+
+        if (!library.edit(root, { path: v.path, name: v.name })) {
+          activity.note(
+            "Edit repository",
+            `${v.path} is already on the list. Two entries for one repository would only disagree with each other.`,
+            "error",
+          );
+        }
+      },
+    });
+  };
 
   const openRepo = async () => {
     const picked = await openDialog({ directory: true, multiple: false });
@@ -480,12 +628,35 @@ export default function App() {
         hint: shortcutLabel(keymap["repo.clone"]),
         onClick: cloneRepo,
       },
+      "separator",
+      // Below the line because it is not another way to add one: it is the
+      // list of the ones already added, which is usually what you want when
+      // the repository you are after is one you have opened before.
+      {
+        label: "All repositories…",
+        hint: shortcutLabel(keymap["repo.library"]),
+        onClick: openLibraryTab,
+      },
     ]);
+
+  const reorderTabs = (from: number, to: number) =>
+    setTabOrder(moveItem(tabs.map((repo) => repo.id), from, to));
+
+  /** Shift the tab you are on one place, and stop at the ends rather than
+   *  wrapping: a rearrangement that jumps a tab from one end to the other is
+   *  almost never what a nudge meant. */
+  const moveActiveTab = (step: number) => {
+    const from = tabs.findIndex((repo) => repo.id === activeId);
+    if (from === -1) return;
+
+    const to = Math.min(Math.max(from + step, 0), tabs.length - 1);
+    reorderTabs(from, to);
+  };
 
   /** Tabs are listed in the order the strip shows them, so an index here is
    *  the position you can actually see. */
   const goToTab = (index: number) => {
-    const repo = repos.data[index];
+    const repo = tabs[index];
     if (repo) setActiveId(repo.id);
   };
 
@@ -495,12 +666,12 @@ export default function App() {
    *  only one still worth labelling. */
   const tabDigit = (index: number): number | null => {
     if (index < 8) return index + 1;
-    return index === repos.data.length - 1 ? 9 : null;
+    return index === tabs.length - 1 ? 9 : null;
   };
 
   /** Wraps, so Ctrl+Tab keeps cycling rather than stopping at the last one. */
   const cycleTab = (delta: number) => {
-    const list = repos.data;
+    const list = tabs;
     if (list.length < 2) return;
 
     const current = list.findIndex((repo) => repo.id === activeId);
@@ -509,10 +680,18 @@ export default function App() {
   };
 
   const closeRepo = async (repoId: string) => {
+    // The list is a tab but not a repository: closing it puts it away rather
+    // than asking the backend to drop a session it never had.
+    if (repoId === LIBRARY_TAB) {
+      setLibraryOpen(false);
+      if (activeId === LIBRARY_TAB) setActiveId(repoTabs[0]?.id ?? null);
+      return;
+    }
+
     await api.closeRepo(repoId);
     await queryClient.invalidateQueries({ queryKey: ["repos"] });
     if (activeId === repoId) {
-      setActiveId(repos.data.find((r) => r.id !== repoId)?.id ?? null);
+      setActiveId(tabs.find((r) => r.id !== repoId)?.id ?? null);
     }
   };
 
@@ -1429,19 +1608,27 @@ The stashed changes are discarded.`,
     "repo.open": () => void openRepo(),
     "repo.create": createRepo,
     "repo.clone": cloneRepo,
-    "repo.close": id ? () => void closeRepo(id) : undefined,
+    "repo.library": openLibraryTab,
+    "repo.rename": activeRepo ? () => editRepo(activeRepo.root) : undefined,
+    // The tab in front, not the repository in front: the repository list is
+    // a tab too, and it was the one case this could not close.
+    "repo.close": activeId ? () => void closeRepo(activeId) : undefined,
     "repo.explorer": id ? () => act("Open in Explorer", () => api.openInFileManager(id)) : undefined,
     "repo.terminal": id ? () => act("Open in terminal", () => api.openInTerminal(id)) : undefined,
 
     // A tab shortcut only exists while that tab does, so the palette never
     // lists a repository you do not have open.
-    "tab.next": repos.data.length > 1 ? () => cycleTab(1) : undefined,
-    "tab.previous": repos.data.length > 1 ? () => cycleTab(-1) : undefined,
-    "tab.last": repos.data.length > 1 ? () => goToTab(repos.data.length - 1) : undefined,
+    "tab.next": tabs.length > 1 ? () => cycleTab(1) : undefined,
+    "tab.previous": tabs.length > 1 ? () => cycleTab(-1) : undefined,
+    "tab.last": tabs.length > 1 ? () => goToTab(tabs.length - 1) : undefined,
+    // Rearranging with the keyboard as well as the pointer. The browsers'
+    // own shortcut for it, so it is already in some fingers.
+    "tab.moveLeft": tabs.length > 1 ? () => moveActiveTab(-1) : undefined,
+    "tab.moveRight": tabs.length > 1 ? () => moveActiveTab(1) : undefined,
     ...Object.fromEntries(
       Array.from({ length: 8 }, (_, i) => [
         `tab.${i + 1}`,
-        repos.data.length > i ? () => goToTab(i) : undefined,
+        tabs.length > i ? () => goToTab(i) : undefined,
       ]),
     ),
     ...Object.fromEntries(
@@ -1499,46 +1686,48 @@ The stashed changes are discarded.`,
   return (
     <div className="app">
       <header className="tabs">
-        <div className="tab-strip">
-          {repos.data.map((repo, index) => (
-            <div
-              key={repo.id}
-              className={`tab ${repo.id === activeId ? "tab-active" : ""}`}
-              onClick={() => setActiveId(repo.id)}
-              {...tip(
-                repo.root,
-                index < 8
-                  ? `tab.${index + 1}`
-                  : index === repos.data.length - 1
-                    ? "tab.last"
-                    : undefined,
-              )}
-            >
-              {modHeld && tabDigit(index) !== null && (
-                <kbd className="tab-key">{tabDigit(index)}</kbd>
-              )}
-              <span className="tab-name">{repo.name}</span>
-              <span
-                className="tab-close"
-                {...tip("Close repository", "repo.close")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void closeRepo(repo.id);
-                }}
-              >
-                &times;
-              </span>
-          </div>
-        ))}
+        <RepoTabs
+          repos={tabs}
+          activeId={activeId}
+          modHeld={modHeld}
+          digitFor={tabDigit}
+          commandFor={(index) =>
+            index < 8
+              ? `tab.${index + 1}`
+              : index === tabs.length - 1
+                ? "tab.last"
+                : undefined
+          }
+          onAdd={openAddRepoMenu}
+          onSelect={setActiveId}
+          onClose={(repoId) => void closeRepo(repoId)}
+          // Written as ids rather than positions, so an order saved with one
+          // set of tabs open still means something with another.
+          onReorder={reorderTabs}
+          onMenu={(repoId, at) => {
+            const repo = tabs.find((r) => r.id === repoId);
+            if (!repo) return;
 
-          <button
-            className="tab tab-add"
-            {...tip("Open or create a repository", "repo.open")}
-            onClick={openAddRepoMenu}
-          >
-            +
-          </button>
-        </div>
+            openMenuAt(at.x, at.y, [
+              {
+                label: "Edit…",
+                hint: shortcutLabel(keymap["repo.rename"]),
+                onClick: () => editRepo(repo.root),
+              },
+              {
+                label: "All repositories…",
+                hint: shortcutLabel(keymap["repo.library"]),
+                onClick: openLibraryTab,
+              },
+              "separator",
+              {
+                label: "Close",
+                hint: shortcutLabel(keymap["repo.close"]),
+                onClick: () => void closeRepo(repo.id),
+              },
+            ]);
+          }}
+        />
 
         {/* Outside the scrolling strip on purpose: with a dozen repositories
             open it would otherwise scroll off the end, and settings belong to
@@ -1553,33 +1742,21 @@ The stashed changes are discarded.`,
         </button>
       </header>
 
-      {id === null ? (
-        <div className="welcome">
-          <h1>
-            Braid
-            {app.channel && (
-              <span className={`channel channel-${app.channel}`}>
-                {channelLabel(app.channel)}
-              </span>
-            )}
-          </h1>
-          <p>
-            Open a repository to see its working copy and history. Open as many as you
-            like — each one gets a tab, and idle tabs cost nothing.
-          </p>
-          <p className="welcome-caution">
-            {channelCaution(app.channel)}
-          </p>
-          <div className="welcome-actions">
-            <button className="btn-primary" onClick={() => void openRepo()}>
-              Open repository
-            </button>
-            <button className="btn" onClick={createRepo}>
-              Create repository
-            </button>
-          </div>
-          <p className="welcome-hint">Ctrl+O to open · Ctrl+N to create</p>
-        </div>
+      {/* `id === null` as well as the flag, so the branch below can rely on
+          there being a repository -- with no tab selected there is nothing
+          else to show anyway. */}
+      {showLibrary || id === null ? (
+        <RepoLibrary
+          repos={library.repos}
+          openPaths={tabs.map((repo) => repo.root)}
+          keyboardActive={!inputOpen}
+          onOpen={(path) => void openFromLibrary(path)}
+          onEdit={editRepo}
+          onRemove={confirmForgetRepo}
+          onAdd={() => void openRepo()}
+          onCreate={createRepo}
+          onClone={cloneRepo}
+        />
       ) : (
         <>
           <Toolbar groups={actions} />

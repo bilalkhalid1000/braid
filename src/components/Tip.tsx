@@ -34,6 +34,7 @@ interface TipHandlers {
   onMouseLeave: () => void;
   onFocus: (event: React.FocusEvent<HTMLElement>) => void;
   onBlur: () => void;
+  onPointerDown: () => void;
 }
 
 interface TipContextValue {
@@ -110,6 +111,9 @@ export function TipProvider({ children }: { children: ReactNode }) {
         onMouseLeave: hide,
         onFocus: (e) => open(e.currentTarget, label, commandId, note),
         onBlur: hide,
+        // Pressing something answers the question the tip was asking. Leaving
+        // it up is how a tooltip ends up hovering over a tab being dragged.
+        onPointerDown: hide,
       }),
     }),
     [open, hide],
@@ -147,6 +151,12 @@ export function useTip(): TipContextValue["tip"] {
   // tooltip should never take a window down.
   return (
     value?.tip ??
-    (() => ({ onMouseEnter() {}, onMouseLeave() {}, onFocus() {}, onBlur() {} }))
+    (() => ({
+      onMouseEnter() {},
+      onMouseLeave() {},
+      onFocus() {},
+      onBlur() {},
+      onPointerDown() {},
+    }))
   );
 }

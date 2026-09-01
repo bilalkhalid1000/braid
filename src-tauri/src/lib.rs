@@ -2,6 +2,7 @@ pub mod error;
 pub mod git;
 mod ipc;
 mod registry;
+mod library;
 mod session;
 mod settings;
 mod system;
@@ -63,6 +64,8 @@ pub fn run() {
             ipc::open_repo,
             ipc::init_repo,
             ipc::load_session,
+            ipc::load_library,
+            ipc::save_library,
             ipc::save_session,
             ipc::load_settings,
             ipc::save_settings,
