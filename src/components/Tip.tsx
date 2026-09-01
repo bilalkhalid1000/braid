@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -13,6 +14,8 @@ import { useSettings } from "../lib/settings";
 import { shortcutLabel } from "../lib/shortcutLabel";
 
 const DELAY = 350;
+/** How often an open tip checks that its subject is still there. */
+export const GONE_CHECK_MS = 120;
 const GAP = 8;
 /** Keep this much clear of every window edge. */
 const MARGIN = 8;
@@ -58,6 +61,8 @@ export function TipProvider({ children }: { children: ReactNode }) {
   const [left, setLeft] = useState<number | null>(null);
   const timer = useRef(0);
   const element = useRef<HTMLDivElement>(null);
+  /** What the tip is describing, so it can notice when that thing is gone. */
+  const trigger = useRef<HTMLElement | null>(null);
 
   const hide = useCallback(() => {
     window.clearTimeout(timer.current);
@@ -68,6 +73,8 @@ export function TipProvider({ children }: { children: ReactNode }) {
   const open = useCallback(
     (target: HTMLElement, label: string, commandId?: string, note?: string) => {
       window.clearTimeout(timer.current);
+
+      trigger.current = target;
 
       timer.current = window.setTimeout(() => {
         const box = target.getBoundingClientRect();
@@ -88,6 +95,28 @@ export function TipProvider({ children }: { children: ReactNode }) {
     },
     [keymap],
   );
+
+  /** Close when the thing being described stops existing.
+   *
+   *  A control can be removed while the pointer is still resting on it -- the
+   *  running-git indicator disappears the moment the last command finishes --
+   *  and React fires no mouseleave for an element that is simply gone. Nothing
+   *  else was ever going to tell the tip to close, so it sat there describing
+   *  something that was not on screen any more.
+   *
+   *  Polled rather than observed, because it is not only removal that matters:
+   *  a control hidden by its parent, or one whose row was replaced under the
+   *  cursor, leaves the tip just as stranded. Only runs while a tip is up.
+   */
+  useEffect(() => {
+    if (!anchor) return;
+
+    const check = window.setInterval(() => {
+      if (!trigger.current?.isConnected) hide();
+    }, GONE_CHECK_MS);
+
+    return () => window.clearInterval(check);
+  }, [anchor, hide]);
 
   // Keeping the tip on screen needs its width, and its width depends on its
   // text — a long repository path is far wider than a toolbar label. So it is
