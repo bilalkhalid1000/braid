@@ -2857,36 +2857,43 @@ kbd.key-live {
 /* --- updates ------------------------------------------------------------ */
 
 /* Under the toolbar rather than over the window: a new version is never urgent
-   enough to take the app away from someone mid-commit. */
+   enough to take the app away from someone mid-commit.
+
+   One line rather than two. Stacked, the note under the title made this as tall
+   as the toolbar above it — more of the window than something being offered
+   should take, and across a wide monitor it read as a band of colour with a
+   sentence lost in it. */
 .update-banner {
   display: flex;
   align-items: center;
-  gap: var(--s5);
+  gap: var(--s4);
   padding: var(--s3) var(--s5);
   background: var(--accent-soft);
   border-bottom: 1px solid var(--border);
+  /* The lane the app is named for, in place of the loose dot that used to sit
+     here: same signal, attached to the bar instead of floating beside it. */
+  border-left: 3px solid var(--accent);
   animation: tip-in 140ms ease-out;
 }
 
-.update-dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  background: var(--accent);
-  border-radius: 50%;
-}
-
+/* Baseline, not centre: the title and the smaller note sit on one line, and
+   centring two different sizes leaves neither of them level. */
 .update-text {
-  display: grid;
-  gap: var(--s1);
+  display: flex;
+  align-items: baseline;
+  gap: var(--s4);
   min-width: 0;
 }
 
 .update-title {
+  flex: none;
   font-weight: 600;
 }
 
+/* The note is what gets cut when the window is narrow. The version in the title
+   is the part that cannot be guessed from anywhere else. */
 .update-notes {
+  min-width: 0;
   overflow: hidden;
   color: var(--text-dim);
   font-size: var(--fs-small);
