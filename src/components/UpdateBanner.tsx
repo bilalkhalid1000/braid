@@ -1,3 +1,4 @@
+import { summarise } from "../lib/releaseNotes";
 import type { UpdateStage } from "../lib/useUpdater";
 
 interface Props {
@@ -26,13 +27,11 @@ export function UpdateBanner({ stage, onInstall, onRestart, onDismiss }: Props) 
 
   return (
     <div className="update-banner" role="status">
-      <span className="update-dot" />
-
       {stage.state === "available" && (
         <>
           <span className="update-text">
             <span className="update-title">Version {stage.version} is available</span>
-            {stage.notes && <span className="update-notes">{firstLine(stage.notes)}</span>}
+            {stage.notes && <span className="update-notes">{summarise(stage.notes)}</span>}
           </span>
 
           <div className="update-actions">
@@ -86,8 +85,4 @@ export function UpdateBanner({ stage, onInstall, onRestart, onDismiss }: Props) 
       )}
     </div>
   );
-}
-
-function firstLine(notes: string) {
-  return notes.split("\n").find((line) => line.trim() !== "") ?? "";
 }
