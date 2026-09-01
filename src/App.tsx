@@ -1035,14 +1035,48 @@ The stashed changes are discarded.`,
    *  Every one of these already had a menu entry; this is the same action
    *  reached by a key. All of them confirm first -- the key is one press, and
    *  none of these are things to lose by leaning on D. */
-  const onSidebarDelete = (target: MenuTarget) => {
+  /** Delete a remote branch, named as the remote knows it. */
+  const confirmDeleteRemoteBranch = (remote: string, branch: string) => {
     if (!id) return;
+
+    setDialog({
+      title: `Delete ${remote}/${branch}`,
+      message: `This removes the branch from ${remote} for everyone, not just here.`,
+      confirmLabel: "Delete",
+      danger: true,
+      onConfirm: () =>
+        act(`Delete ${remote}/${branch}`, () =>
+          api.deleteRemoteBranch(id, remote, branch),
+        ),
+    });
+  };
+
+  /** Delete whatever the sidebar cursor is on.
+   *
+   *  Every path answers, including the ones that cannot act. A key that does
+   *  nothing and says nothing reads as a key that is not bound at all, which
+   *  is worse than a refusal. */
+  const onSidebarDelete = (target: MenuTarget | null) => {
+    if (!id) return;
+
+    const refuse = (why: string) => activity.note("Delete", why, "error");
+
+    if (!target) {
+      refuse("Nothing is selected. Move to a branch, stash or worktree first.");
+      return;
+    }
 
     switch (target.kind) {
       case "branch":
-        // The branch you are standing on cannot be deleted, and offering it
-        // would only produce git's refusal a dialog later.
-        if (!target.branch.isHead) confirmDeleteBranch(target.branch);
+        if (target.branch.isHead) {
+          refuse(`You are on ${target.branch.name}. Check out another branch to delete this one.`);
+          return;
+        }
+        confirmDeleteBranch(target.branch);
+        break;
+
+      case "remote":
+        confirmDeleteRemoteBranch(target.remote, target.branch);
         break;
 
       case "stash":
@@ -1050,12 +1084,19 @@ The stashed changes are discarded.`,
         break;
 
       case "worktree":
-        if (!target.worktree.isMain) confirmRemoveWorktree(target.worktree.path);
+        if (target.worktree.isMain) {
+          refuse("The main worktree is the repository itself and cannot be removed.");
+          return;
+        }
+        confirmRemoveWorktree(target.worktree.path);
         break;
 
-      // A remote branch, a tag and a submodule each need their own operation,
-      // and none of them exist yet. Doing nothing beats guessing.
-      default:
+      case "tag":
+        refuse(`Deleting a tag is not supported yet (${target.tag}).`);
+        break;
+
+      case "submodule":
+        refuse("Removing a submodule is not supported yet.");
         break;
     }
   };

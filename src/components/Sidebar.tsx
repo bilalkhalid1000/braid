@@ -89,7 +89,7 @@ interface Props {
   onCursor?: (target: MenuTarget | null) => void;
   /** Delete whatever the cursor is on. Which things can be deleted, and what
    *  deleting one means, is decided where the git actions live. */
-  onDelete: (target: MenuTarget) => void;
+  onDelete: (target: MenuTarget | null) => void;
 }
 
 /** One row the keyboard can land on. */
@@ -303,13 +303,10 @@ export function Sidebar({
         const row = rows[index];
         if (row) row.menu(anchorOf(row.key));
       },
-      // Nothing happens on a row with nothing to delete -- a folder, a
-      // submodule -- rather than a confirmation for an action that does not
-      // exist.
-      "sidebar.delete": () => {
-        const target = rows[index]?.target;
-        if (target) onDelete(target);
-      },
+      // Reported even when the row points at nothing -- a folder, say. A key
+      // that silently does nothing is indistinguishable from one that is not
+      // bound, which is exactly how this looked.
+      "sidebar.delete": () => onDelete(rows[index]?.target ?? null),
       "sidebar.leave": () => onFocusPanel(view === "history" ? "history" : "files"),
     },
     // Escape belongs to whatever is on top: without this the sidebar would
