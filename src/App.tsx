@@ -1759,6 +1759,7 @@ The stashed changes are discarded.`,
     return (
       <Splash
         channel={app.channel}
+        version={app.version}
         status={
           restoring > 0
             ? `Reopening ${restoring} ${restoring === 1 ? "repository" : "repositories"}…`
