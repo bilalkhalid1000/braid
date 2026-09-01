@@ -5,6 +5,7 @@ import type { DiffLine, FileDiff } from "../lib/api";
 import { useSettings } from "../lib/settings";
 import { highlightHunks, languageOf } from "../lib/highlight";
 import { Code } from "./Code";
+import { useTip } from "./Tip";
 
 const LINE_HEIGHT = 18;
 
@@ -40,6 +41,7 @@ interface Props {
 export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { settings } = useSettings();
+  const tip = useTip();
 
   /** Selected lines, keyed "hunk:index". Cleared whenever the file changes. */
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -109,7 +111,7 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
       <header className="diff-header">
         {diff ? (
           <>
-            <span className="diff-path" title={diff.path}>
+            <span className="diff-path" {...tip(diff.path)}>
               {diff.path}
             </span>
             <span className="diff-stat">

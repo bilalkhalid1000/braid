@@ -676,6 +676,8 @@ function RefTree<T>({
   folderProps: (path: string) => Record<string, unknown>;
   renderLeaf: (item: T, label: string) => ReactNode;
 }) {
+  const tip = useTip();
+
   return (
     <>
       {nodes.map((node) =>
@@ -685,7 +687,7 @@ function RefTree<T>({
           <Fragment key={node.path}>
             <button
               {...folderProps(node.path)}
-              title={node.path}
+              {...tip(node.path)}
               onClick={() => onToggle(node.path)}
             >
               {/* The rail stays empty: it is the keyboard column, and a digit
@@ -822,9 +824,19 @@ function Item({
   onDoubleClick?: () => void;
   onContextMenu?: (event: MouseEvent) => void;
 } & Record<string, unknown>) {
+  const tip = useTip();
+
+  // Some rows describe themselves over more than one line -- a worktree's path
+  // and its state, a submodule's url and whether it is initialized. The first
+  // line is the thing; the rest is about it, which is what the tip's note is
+  // for and what a native title could never lay out.
+  const [head, ...rest_lines] = (title ?? label).split("\n");
+  const note = rest_lines.join("\n");
+
   return (
     <div
       {...rest}
+      {...tip(head ?? label, undefined, note || undefined)}
       className={[
         className ?? "side-item",
         active ? "side-item-active" : "",
@@ -833,7 +845,6 @@ function Item({
       ]
         .filter(Boolean)
         .join(" ")}
-      title={title ?? label}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={

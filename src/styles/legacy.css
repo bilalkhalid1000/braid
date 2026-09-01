@@ -2022,8 +2022,11 @@ kbd.key-live {
 }
 
 .tip-note {
-  flex: none;
   color: var(--text-faint);
+  /* A note is sometimes a list -- the git commands in flight, or a path and
+     the thing that is wrong with it -- and a flex row would otherwise run
+     them together into one line. */
+  white-space: pre-line;
 }
 
 /* Revealed only while the modifier is down, so tabs stay clean until the

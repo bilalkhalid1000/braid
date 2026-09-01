@@ -142,6 +142,7 @@ export default function App() {
   const [cloning, setCloning] = useState<string | null>(null);
   const { settings, keymap, update: updateSettings, loaded: settingsLoaded } = useSettings();
   const { copy } = useCopy();
+  const tipFor = useTip();
 
   /** Numbers jump to a panel. Files and History also switch the main view;
    *  the sidebar panels leave it alone so you can browse branches while still
@@ -2154,7 +2155,13 @@ The stashed changes are discarded.`,
         {gitLog.running.length > 0 && (
           <span
             className="running-git"
-            title={gitLog.running.map(gitCommandLine).join("\n")}
+            {...tipFor(
+              gitLog.running.length === 1
+                ? "1 git command running"
+                : `${gitLog.running.length} git commands running`,
+              undefined,
+              gitLog.running.map(gitCommandLine).join("\n"),
+            )}
           >
             <span className="spinner" />
             {gitCommandLine(gitLog.running[gitLog.running.length - 1]!)}

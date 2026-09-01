@@ -123,10 +123,10 @@ export function FileList({
                   onChange={() => onToggle(entry)}
                   onClick={(e) => e.stopPropagation()}
                 />
-                <span className={`badge badge-${badgeClass(badge)}`} title={meaning}>
+                <span className={`badge badge-${badgeClass(badge)}`} {...tip(meaning)}>
                   {badge}
                 </span>
-                <span className="file-path" title={`${entry.path} — ${meaning}`}>
+                <span className="file-path" {...tip(entry.path, undefined, meaning)}>
                   <PathLabel path={entry.path} />
                 </span>
                 {entry.origPath && <span className="file-orig">was {entry.origPath}</span>}

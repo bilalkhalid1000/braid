@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { headline, type ActivityEntry } from "../lib/useActivity";
+import { useTip } from "./Tip";
 import { commandTime, gitCommandLine, type GitLog } from "../lib/useGitLog";
 
 interface Props {
@@ -20,7 +21,7 @@ const HEAD =
   "text-small font-semibold";
 
 const TAB =
-  "px-2 bg-none border-0 border-b-2 [font:inherit] cursor-pointer";
+  "px-2 bg-transparent border-0 border-b-2 [font:inherit] cursor-pointer";
 
 const META = "font-mono text-micro text-text-faint whitespace-nowrap";
 
@@ -47,6 +48,7 @@ export function ActivityLog({ entries, git, onClear, onClose }: Props) {
   // asked for, and what git was actually run with. Interleaving them would
   // bury one page of "Push" under thirty lines of `rev-parse`.
   const [tab, setTab] = useState<Tab>("activity");
+  const tip = useTip();
 
   const commands = tab === "commands";
   const count = commands ? git.finished.length : entries.length;
@@ -76,8 +78,8 @@ export function ActivityLog({ entries, git, onClear, onClose }: Props) {
           clear
         </button>
         <button
-          className="border-0 bg-none text-lead leading-none text-text-faint cursor-pointer"
-          title="Close"
+          className="border-0 bg-transparent text-lead leading-none text-text-faint cursor-pointer"
+          {...tip("Close the log")}
           onClick={onClose}
         >
           &times;
@@ -140,7 +142,7 @@ function LogRow({ entry }: { entry: ActivityEntry }) {
   return (
     <div className="border-b border-b-border-soft">
       <button
-        className="grid w-full grid-cols-[9px_minmax(0,auto)_minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-3 bg-none border-0 text-small text-left cursor-pointer hover:bg-surface-alt"
+        className="grid w-full grid-cols-[9px_minmax(0,auto)_minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-3 bg-transparent border-0 text-small text-left cursor-pointer hover:bg-surface-alt"
         onClick={() => setOpen((v) => !v)}
       >
         <span className={`size-[7px] rounded-full ${DOT[entry.status]}`} />

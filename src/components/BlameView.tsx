@@ -9,6 +9,7 @@ import { shortcutLabel } from "../lib/shortcutLabel";
 import { Keys } from "./Keys";
 import { Code } from "./Code";
 import { highlightLines, languageOf } from "../lib/highlight";
+import { useTip } from "./Tip";
 
 const ROW_HEIGHT = 19;
 
@@ -40,6 +41,7 @@ interface Props {
  *  file is recent" is answerable from the stripe alone, before a name is read.
  */
 export function BlameView({ repoId, target, keyboardActive, onClose }: Props) {
+  const tip = useTip();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState(0);
   const { keymap } = useSettings();
@@ -198,7 +200,10 @@ export function BlameView({ repoId, target, keyboardActive, onClose }: Props) {
                   aria-hidden
                 />
 
-                <span className="blame-gutter" title={commit ? commitTitle(commit) : undefined}>
+                <span
+                  className="blame-gutter"
+                  {...(commit ? tip(commitTitle(commit)) : {})}
+                >
                   {starts && commit && (
                     <>
                       <span className="blame-oid">

@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { headline, type ActivityEntry } from "../lib/useActivity";
 import { hintFor, type HintAction } from "../lib/gitHints";
+import { useTip } from "./Tip";
 
 interface Props {
   toasts: ActivityEntry[];
@@ -54,6 +55,7 @@ function Toast({
   onAction: (kind: HintAction) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const tip = useTip();
 
   const summary = headline(entry.detail);
   // Only failures get interpreted. A successful command's output is already
@@ -82,8 +84,8 @@ function Toast({
           {entry.durationMs !== undefined && `${entry.durationMs}ms`}
         </span>
         <button
-          className="border-0 bg-none text-lead leading-none text-text-faint cursor-pointer hover:text-text"
-          title="Dismiss"
+          className="border-0 bg-transparent text-lead leading-none text-text-faint cursor-pointer hover:text-text"
+          {...tip("Dismiss")}
           onClick={onDismiss}
         >
           &times;
@@ -127,7 +129,7 @@ function Toast({
 
         {hasMore && (
           <button
-            className="border-0 bg-none pt-1 text-small text-accent cursor-pointer"
+            className="border-0 bg-transparent pt-1 text-small text-accent cursor-pointer"
             onClick={() => setExpanded((v) => !v)}
           >
             {expanded ? "Hide output" : "Show output"}

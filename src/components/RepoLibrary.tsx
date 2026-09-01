@@ -6,6 +6,7 @@ import { useSettings } from "../lib/settings";
 import { shortcutLabel } from "../lib/shortcutLabel";
 import { FilterInput, matchesFilter } from "./FilterInput";
 import { Keys } from "./Keys";
+import { useTip } from "./Tip";
 
 interface Props {
   repos: Bookmark[];
@@ -46,6 +47,7 @@ export function RepoLibrary({
   const [filter, setFilter] = useState("");
   const [cursor, setCursor] = useState(0);
   const { keymap } = useSettings();
+  const tip = useTip();
 
   const shown = useMemo(
     () =>
@@ -146,7 +148,7 @@ export function RepoLibrary({
                   >
                     <span
                       className="library-lane"
-                      title={open ? "Open in a tab" : "Not open"}
+                      {...tip(open ? "Open in a tab" : "Not open")}
                       aria-hidden
                     />
 
@@ -155,7 +157,7 @@ export function RepoLibrary({
                     <button
                       className="library-body"
                       onClick={() => onOpen(repo.path)}
-                      title={open ? "Go to its tab" : "Open in a new tab"}
+                      {...tip(open ? "Go to its tab" : "Open in a new tab")}
                     >
                       <span className="library-name">{displayName(repo)}</span>
                       <span className="library-path">{repo.path}</span>
@@ -166,14 +168,14 @@ export function RepoLibrary({
                     <div className="library-row-actions">
                       <button
                         className="library-action"
-                        title="Change its name or point it at a different folder"
+                        {...tip("Edit", "library.edit", "Its name, or the folder it points at")}
                         onClick={() => onEdit(repo.path)}
                       >
                         Edit
                       </button>
                       <button
                         className="library-action library-action-danger"
-                        title="Take it off this list. The folder itself is left alone."
+                        {...tip("Remove", "library.remove", "Off this list only — the folder is left alone")}
                         onClick={() => onRemove(repo.path)}
                       >
                         Remove

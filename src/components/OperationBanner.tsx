@@ -1,4 +1,5 @@
 import { operationLabel, type RepoState } from "../lib/api";
+import { useTip } from "./Tip";
 
 interface Props {
   state: RepoState;
@@ -32,6 +33,8 @@ export function OperationBanner({
   onContinue,
   onSkip,
 }: Props) {
+  const tip = useTip();
+
   if (state === "clean") return null;
 
   const canSkip = state === "rebasing" || state === "cherryPicking";
@@ -65,7 +68,7 @@ export function OperationBanner({
             // Continuing with files still unmerged only produces another
             // refusal, so the button says so by being unavailable.
             disabled={busy || !resolved}
-            title={resolved ? undefined : "Resolve and stage the conflicts first"}
+            {...tip("Continue", undefined, resolved ? undefined : "Resolve and stage the conflicts first")}
             onClick={onContinue}
           >
             Continue

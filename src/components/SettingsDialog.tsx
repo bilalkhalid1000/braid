@@ -24,6 +24,7 @@ import { useAppVersion } from "../lib/useAppVersion";
 import { channelCaution, channelLabel } from "../lib/version";
 import { FilterInput, matchesFilter } from "./FilterInput";
 import { Keys } from "./Keys";
+import { useTip } from "./Tip";
 
 type Section = "general" | "diff" | "shortcuts" | "updates" | "about";
 
@@ -67,6 +68,7 @@ export function SettingsDialog({
   initialSection?: Section;
 }) {
   const [section, setSection] = useState<Section>(initialSection);
+  const tip = useTip();
   const [cursor, setCursor] = useState(0);
   const frame = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -265,7 +267,7 @@ export function SettingsDialog({
           </SettingsCursor>
         </div>
 
-        <button className="settings-close" title="Close settings" onClick={onClose}>
+        <button className="settings-close" {...tip("Close settings")} onClick={onClose}>
           &times;
         </button>
       </div>
@@ -410,6 +412,7 @@ function DiffSection() {
 
 function ShortcutsSection() {
   const { settings, keymap, update } = useSettings();
+  const tip = useTip();
   const [filter, setFilter] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -467,7 +470,7 @@ function ShortcutsSection() {
         <button
           className="btn"
           disabled={changedCount === 0}
-          title="Put every shortcut back to what it ships with"
+          {...tip("Reset all", undefined, "Every shortcut back to what it ships with")}
           onClick={() => update({ keymap: {} })}
         >
           Reset all{changedCount > 0 && ` (${changedCount})`}
@@ -534,6 +537,7 @@ function ShortcutRow({
   onSet: (bindings: string[]) => void;
   onReset: () => void;
 }) {
+  const tip = useTip();
   const slot = (index: number) => `${command.id}:${index}`;
   const recordingIndex = bindings.findIndex((_, i) => editing === slot(i));
   const addingNew = editing === `${command.id}:new`;
@@ -547,7 +551,9 @@ function ShortcutRow({
     <div className={`shortcut-row ${rivals.length > 0 ? "shortcut-row-conflict" : ""}`}>
       <span className="shortcut-label">
         {command.label}
-        {changed && <span className="shortcut-changed" title="Changed from the default" />}
+        {changed && (
+          <span className="shortcut-changed" {...tip("Changed from the default")} />
+        )}
       </span>
 
       <span className="shortcut-keys">
@@ -575,7 +581,7 @@ function ShortcutRow({
         ) : (
           <button
             className="shortcut-add"
-            title="Add another key for this command"
+            {...tip("Add another key for this command")}
             onClick={() => onEditing(`${command.id}:new`)}
           >
             +
@@ -617,6 +623,7 @@ function KeySlot({
   onSet: (binding: string) => void;
   onRemove: () => void;
 }) {
+  const tip = useTip();
   const recorder = useHotkeyRecorder({
     onRecord: (hotkey) => {
       onSet(hotkey);
@@ -644,12 +651,12 @@ function KeySlot({
     <span className="shortcut-slot">
       <button
         className="shortcut-key"
-        title="Click to record a different key"
+        {...tip("Record a different key")}
         onClick={onStart}
       >
         <kbd>{formatBinding(binding)}</kbd>
       </button>
-      <button className="shortcut-remove hover-only" title="Remove this key" onClick={onRemove}>
+      <button className="shortcut-remove hover-only" {...tip("Remove this key")} onClick={onRemove}>
         &times;
       </button>
     </span>

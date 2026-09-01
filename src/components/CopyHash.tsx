@@ -14,7 +14,7 @@ interface Props {
 
 const BASE = "cursor-pointer font-mono text-left";
 
-const PLAIN = "border-0 bg-none p-0 text-small text-text-dim hover:text-accent";
+const PLAIN = "border-0 bg-transparent p-0 text-small text-text-dim hover:text-accent";
 
 const CHIP =
   "px-2 bg-surface-alt border border-border-soft rounded-sm text-micro text-text-dim " +

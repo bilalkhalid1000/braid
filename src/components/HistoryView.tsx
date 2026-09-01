@@ -10,6 +10,7 @@ import { CommitDetail, type CommitDetailHandle } from "./CommitDetail";
 import { useCommands } from "../lib/useCommands";
 import { useCopy } from "../lib/useCopy";
 import { CopyHash } from "./CopyHash";
+import { useTip } from "./Tip";
 import { useSettings } from "../lib/settings";
 
 const ROW_HEIGHT = 26;
@@ -127,6 +128,7 @@ export function HistoryView({
   const toCommits = () => setPane("commits");
 
   const { copied, copy } = useCopy();
+  const tip = useTip();
 
   useCommands({
     "history.next": () => (pane === "files" ? detailRef.current?.move(1) : move(1)),
@@ -185,7 +187,10 @@ export function HistoryView({
         <header className="history-head">
           <span className="history-graph-head" style={{ width: laneColumns * LANE_WIDTH }}>
             {graph.maxLanes > laneColumns && (
-              <span className="history-lane-more" title={`${graph.maxLanes} lanes — drag to show more`}>
+              <span
+                className="history-lane-more"
+                {...tip(`${graph.maxLanes} lanes`, undefined, "Drag the divider to show more")}
+              >
                 +{graph.maxLanes - laneColumns}
               </span>
             )}
@@ -264,7 +269,7 @@ export function HistoryView({
                   </span>
 
                   <span className="col-date">{formatDate(commit.timestamp)}</span>
-                  <span className="col-author" title={commit.email}>
+                  <span className="col-author" {...tip(commit.author, undefined, commit.email)}>
                     {commit.author}
                   </span>
                   <CopyHash
