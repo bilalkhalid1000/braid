@@ -457,6 +457,26 @@ pub async fn delete_branch(
     session.git.run_reported(&["branch", flag, &name]).await
 }
 
+/// Delete a branch on a remote.
+///
+/// Separate from deleting the local one because they are separate acts with
+/// separate consequences: the local copy is recoverable from the reflog for a
+/// while, and the remote one is gone for everybody at once.
+#[tauri::command]
+pub async fn delete_remote_branch(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    remote: String,
+    branch: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+
+    session
+        .git
+        .run_reported(&["push", &remote, "--delete", &branch])
+        .await
+}
+
 #[tauri::command]
 pub async fn merge_branch(
     registry: State<'_, RepoRegistry>,

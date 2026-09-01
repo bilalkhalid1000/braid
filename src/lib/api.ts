@@ -321,6 +321,8 @@ export const api = {
     contextLines: number,
     ignoreWhitespace: boolean,
   ) => invoke<FileDiff>("file_diff", { id, path, target, contextLines, ignoreWhitespace }),
+  deleteRemoteBranch: (id: string, remote: string, branch: string) =>
+    invoke<string>("delete_remote_branch", { id, remote, branch }),
   publishBranch: (id: string, branch: string, remote: string | null) =>
     invoke<string>("publish_branch", { id, branch, remote }),
   cloneRepo: (url: string, path: string) =>

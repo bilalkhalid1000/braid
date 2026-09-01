@@ -11,6 +11,7 @@ import {
   onRepoChanged,
   type CurrentFlow,
   type BlameTarget,
+  type BranchRef,
   type FlowKind,
   type StatusEntry,
   type RepoInfo,
@@ -31,6 +32,7 @@ import { HistoryView } from "./components/HistoryView";
 import { Dialog, type DialogSpec } from "./components/Dialog";
 import type { ComboOption } from "./components/Combo";
 import { cloneDestination, repoNameFromUrl } from "./lib/cloneTarget";
+import { splitUpstream } from "./lib/upstream";
 import { FlowPlan, type FlowPlanTarget } from "./components/FlowPlan";
 import { BlameView } from "./components/BlameView";
 import { Splash } from "./components/Splash";
@@ -583,18 +585,56 @@ export default function App() {
     });
   };
 
-  const confirmDeleteBranch = (name: string) => {
+  const confirmDeleteBranch = (branch: BranchRef) => {
     if (!id) return;
+
+    const name = branch.name;
+    const up = splitUpstream(branch.upstream);
 
     setDialog({
       title: `Delete branch ${name}`,
-      message:
-        "Git refuses to delete a branch whose work is not merged anywhere. Forcing overrides that check and the commits become unreachable.",
-      checkboxes: [{ key: "force", label: "Force delete even if unmerged" }],
+      message: up
+        ? `${name} also exists on ${up.remote}. Deleting it here leaves the remote copy; deleting it there removes it for everyone.`
+        : "Git refuses to delete a branch whose work is not merged anywhere. Forcing overrides that check and the commits become unreachable.",
+      checkboxes: [
+        { key: "local", label: `Delete the local branch`, value: true },
+        // Only offered where there is one. Both boxes together are lazygit's
+        // "local and remote"; either alone is one of the other two.
+        ...(up
+          ? [{ key: "remote", label: `Delete ${branch.upstream} as well`, value: false }]
+          : []),
+        { key: "force", label: "Force delete even if unmerged", value: false },
+      ],
       confirmLabel: "Delete",
       danger: true,
-      onConfirm: (v) =>
-        act(`Delete branch ${name}`, () => api.deleteBranch(id, name, v.force === "true")),
+      onConfirm: (v) => {
+        const local = v.local === "true";
+        const remote = v.remote === "true" && up !== null;
+
+        if (!local && !remote) {
+          activity.note("Delete branch", "Nothing was selected to delete.", "error");
+          return;
+        }
+
+        void perform(`Delete ${name}`, async () => {
+          const done: string[] = [];
+
+          // Local first, deliberately. It is the one git will refuse if the
+          // work is unmerged, and that refusal should stop the whole thing
+          // rather than arrive after the remote copy is already gone.
+          if (local) {
+            await api.deleteBranch(id, name, v.force === "true");
+            done.push(`Deleted ${name}`);
+          }
+
+          if (remote && up) {
+            await api.deleteRemoteBranch(id, up.remote, up.branch);
+            done.push(`Deleted ${up.remote}/${up.branch}`);
+          }
+
+          return done.join(" · ");
+        });
+      },
     });
   };
 
@@ -971,7 +1011,7 @@ The stashed changes are discarded.`,
       case "branch":
         // The branch you are standing on cannot be deleted, and offering it
         // would only produce git's refusal a dialog later.
-        if (!target.branch.isHead) confirmDeleteBranch(target.branch.name);
+        if (!target.branch.isHead) confirmDeleteBranch(target.branch);
         break;
 
       case "stash":
@@ -1063,7 +1103,7 @@ The stashed changes are discarded.`,
             label: "Delete branch…",
             danger: true,
             disabled: branch.isHead,
-            onClick: () => confirmDeleteBranch(branch.name),
+            onClick: () => confirmDeleteBranch(branch),
           },
         ]);
         break;
