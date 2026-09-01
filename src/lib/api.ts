@@ -314,6 +314,10 @@ export interface TerminalOption {
   label: string;
 }
 
+/** Which refs the history walks. Named the way the control names them, so the
+ *  stored value reads as what the user chose. */
+export type HistoryScope = "all" | "local" | "head";
+
 export interface Session {
   /** Worktree roots, in tab order. */
   repos: string[];
@@ -340,8 +344,8 @@ export const api = {
 
   repoStatus: (id: string) => invoke<RepoStatus>("repo_status", { id }),
   repoRefs: (id: string) => invoke<RefsSnapshot>("repo_refs", { id }),
-  repoLog: (id: string, skip: number, limit: number) =>
-    invoke<LogPage>("repo_log", { id, skip, limit }),
+  repoLog: (id: string, skip: number, limit: number, scope: HistoryScope) =>
+    invoke<LogPage>("repo_log", { id, skip, limit, scope }),
   applyHunk: (
     id: string,
     request: {

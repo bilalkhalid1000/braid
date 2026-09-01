@@ -38,26 +38,51 @@ const RECORD: char = '\x1e';
 
 pub const FORMAT: &str = "--format=%H\x1f%h\x1f%an\x1f%ae\x1f%at\x1f%P\x1f%D\x1f%s\x1e";
 
+/// Which refs the walk starts from.
+///
+/// Walking HEAD alone shows only the branch you are on, so a commit on another
+/// branch -- and any tag that is not an ancestor of HEAD -- is simply absent.
+/// That is the right default for "what am I working on" and the wrong one for
+/// "what is in this repository", which is what a history view is usually
+/// opened to answer.
+pub fn scope_args(scope: &str) -> &'static [&'static str] {
+    match scope {
+        // Local and remote branches, plus tags. What SourceTree calls
+        // "All branches" with remotes shown.
+        "all" => &["--all"],
+        // Everything of your own, without a copy of it per remote.
+        "local" => &["--branches", "--tags"],
+        // The current branch, and whatever it can reach.
+        _ => &[],
+    }
+}
+
 /// Read one window of history.
 ///
 /// Paging rather than reading the whole log is the point: opening a repo with
 /// 200k commits must cost the same as opening one with 20.
-pub async fn log(git: &Git, skip: usize, limit: usize) -> Result<LogPage> {
+pub async fn log(git: &Git, skip: usize, limit: usize, scope: &str) -> Result<LogPage> {
     let started = std::time::Instant::now();
+
+    let skip_arg = format!("--skip={skip}");
+    let limit_arg = format!("--max-count={limit}");
+
+    let mut args = vec![
+        "log",
+        FORMAT,
+        // Guarantees no parent is listed before all of its children. The
+        // graph's lane assignment depends on that ordering, and plain date
+        // order breaks it whenever commit clocks are skewed. Cheaper than
+        // --topo-order, which has to buffer the whole walk.
+        "--date-order",
+        &skip_arg,
+        &limit_arg,
+    ];
+    args.extend_from_slice(scope_args(scope));
 
     let text = git
         .run_str_allowing(
-            &[
-                "log",
-                FORMAT,
-                // Guarantees no parent is listed before all of its children.
-                // The graph's lane assignment depends on that ordering, and
-                // plain date order breaks it whenever commit clocks are skewed.
-                // Cheaper than --topo-order, which has to buffer the whole walk.
-                "--date-order",
-                &format!("--skip={skip}"),
-                &format!("--max-count={limit}"),
-            ],
+            &args,
             // An empty repository has no HEAD to walk, which git calls an error.
             // An empty history is a legitimate state, not a failure.
             &[128],
@@ -147,6 +172,27 @@ mod tests {
     fn root_commit_has_no_parents() {
         let text = record(&["a", "a", "N", "e", "1", "", "", "init"]);
         assert!(parse(&text)[0].parents.is_empty());
+    }
+
+    #[test]
+    fn the_default_walk_is_the_branch_you_are_on() {
+        assert!(scope_args("head").is_empty());
+        assert!(scope_args("").is_empty());
+        assert!(scope_args("something else entirely").is_empty());
+    }
+
+    #[test]
+    fn all_reaches_remotes_and_tags_as_well() {
+        // A tag that is not an ancestor of HEAD is invisible without this, and
+        // a tag you cannot see is one you cannot check you made.
+        assert_eq!(scope_args("all"), ["--all"]);
+    }
+
+    #[test]
+    fn local_leaves_the_remotes_out() {
+        // Every branch duplicated as origin/<name> doubles the lanes for a
+        // repository whose remote is simply up to date.
+        assert_eq!(scope_args("local"), ["--branches", "--tags"]);
     }
 
     #[test]

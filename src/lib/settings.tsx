@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { api } from "./api";
+import { api, type HistoryScope } from "./api";
 import { resolveKeymap, type Keymap } from "./commands";
 
 export type ThemeChoice = "system" | "light" | "dark";
@@ -25,6 +25,8 @@ export interface Settings {
   ignoreWhitespace: boolean;
   /** Commits fetched per page in the history view. */
   historyPageSize: number;
+  /** Which branches the history view walks. */
+  historyScope: HistoryScope;
   /** How long a multi-key sequence waits for its next chord, in ms. */
   sequenceTimeout: number;
   /** Look for a new version shortly after launch. */
@@ -47,6 +49,9 @@ export const DEFAULT_SETTINGS: Settings = {
   diffContextLines: 3,
   ignoreWhitespace: false,
   historyPageSize: 300,
+  // Every branch and tag, which is what a history view is usually opened to
+  // see. Walking HEAD alone hides the other branches entirely.
+  historyScope: "all",
   sequenceTimeout: 700,
   checkForUpdates: true,
   terminal: "auto",

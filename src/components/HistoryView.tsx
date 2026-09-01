@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
-import { api, type Commit } from "../lib/api";
+import { api, type Commit, type HistoryScope } from "../lib/api";
 import { buildGraph } from "../lib/graph";
 import { CommitGraph, LANE_WIDTH } from "./CommitGraph";
 import { Splitter, usePaneSize } from "./Splitter";
@@ -39,13 +39,16 @@ export function HistoryView({ repoId, headOid, keyboardActive, focusOid }: Props
   const [pane, setPane] = useState<"commits" | "files">("commits");
   const [tableHeight, setTableHeight] = usePaneSize("history-table", 420);
   const [graphWidth, setGraphWidth] = usePaneSize("history-graph", DEFAULT_GRAPH_WIDTH);
-  const { settings } = useSettings();
+  const { settings, update } = useSettings();
   const pageSize = settings.historyPageSize;
+  const scope = settings.historyScope;
 
   const log = useInfiniteQuery({
-    queryKey: ["log", repoId, pageSize],
+    // The scope is part of the key: changing it is a different walk, not a
+    // filter over the one already loaded.
+    queryKey: ["log", repoId, pageSize, scope],
     initialPageParam: 0,
-    queryFn: ({ pageParam }) => api.repoLog(repoId, pageParam, pageSize),
+    queryFn: ({ pageParam }) => api.repoLog(repoId, pageParam, pageSize, scope),
     getNextPageParam: (last, pages) =>
       last.hasMore ? pages.length * pageSize : undefined,
     staleTime: Infinity,
@@ -149,6 +152,27 @@ export function HistoryView({ repoId, headOid, keyboardActive, focusOid }: Props
   return (
     <div className="history" style={{ gridTemplateRows: `${tableHeight}px 4px minmax(0, 1fr)` }}>
       <div className="history-table">
+        {/* What is being walked, said out loud. Without it a branch missing
+            from the graph looks like a bug in the graph rather than a choice
+            about which refs it starts from. */}
+        <div className="flex flex-none items-center gap-3 border-b border-b-border-soft bg-surface-alt px-3 py-2">
+          <select
+            className="rounded-sm border border-border bg-surface px-3 py-[1px] text-small"
+            value={scope}
+            aria-label="Which branches to show"
+            onChange={(e) => update({ historyScope: e.target.value as HistoryScope })}
+          >
+            <option value="all">All branches and tags</option>
+            <option value="local">Local branches and tags</option>
+            <option value="head">Current branch</option>
+          </select>
+
+          <span className="text-micro text-text-faint">
+            {commits.length}
+            {log.hasNextPage ? "+" : ""} commits
+          </span>
+        </div>
+
         <header className="history-head">
           <span className="history-graph-head" style={{ width: laneColumns * LANE_WIDTH }}>
             {graph.maxLanes > laneColumns && (

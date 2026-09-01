@@ -766,9 +766,12 @@ kbd.key-live {
   min-height: 0;
 }
 
+/* Three tracks, in order: the scope bar, the column headings, then the rows.
+   Only the last one absorbs what is left -- an implicit track would have given
+   the flexible row to the headings and sized the list to its content. */
 .history-table {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-height: 0;
   outline: none;
 }

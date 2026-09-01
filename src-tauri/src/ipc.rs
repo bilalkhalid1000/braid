@@ -126,9 +126,10 @@ pub async fn repo_log(
     id: String,
     skip: usize,
     limit: usize,
+    scope: Option<String>,
 ) -> Result<LogPage> {
     let session = registry.get(&id)?;
-    git::log(&session.git, skip, limit).await
+    git::log(&session.git, skip, limit, scope.as_deref().unwrap_or("all")).await
 }
 
 #[tauri::command]
