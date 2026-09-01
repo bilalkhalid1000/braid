@@ -3166,12 +3166,13 @@ kbd.key-live {
   width: 100%;
 }
 
+/* Fixed, and rendered into the body rather than into the field. A dialog that
+   scrolls would otherwise clip the list and grow its own scroll height around
+   it, burying whatever comes after the field. Its position is measured from
+   the field each time it opens. */
 .combo-list {
-  position: absolute;
+  position: fixed;
   z-index: 40;
-  top: calc(100% + 2px);
-  left: 0;
-  right: 0;
   max-height: 232px;
   margin: 0;
   padding: var(--s2);
