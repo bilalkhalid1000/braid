@@ -2174,36 +2174,6 @@ kbd.key-live {
 
 /* The diagram in the finish dialog. Chrome is sans and data is mono
    everywhere else in the app, and a branch name is data. */
-.flow-plan {
-  width: 100%;
-  margin: var(--s4) 0 var(--s5);
-}
-.flow-rail {
-  stroke: var(--border);
-  stroke-width: 1.5;
-  fill: none;
-}
-.flow-arrow-head {
-  fill: var(--border);
-}
-.flow-node {
-  fill: var(--surface);
-  stroke: var(--accent);
-  stroke-width: 2;
-}
-.flow-node-source {
-  fill: var(--accent);
-}
-.flow-branch {
-  fill: var(--text);
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-}
-.flow-note {
-  fill: var(--text-faint);
-  font-family: var(--sans);
-  font-size: var(--fs-micro);
-}
 
 /* --- blame ------------------------------------------------------------- */
 

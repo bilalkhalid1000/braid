@@ -913,7 +913,7 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
       ? [
           {
             branch: config?.master ?? "main",
-            note: `tag ${config?.versiontag ?? ""}${current.name}`,
+            tag: `${config?.versiontag ?? ""}${current.name}`,
           },
           { branch: config?.develop ?? "develop" },
         ]
