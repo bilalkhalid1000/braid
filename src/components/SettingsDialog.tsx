@@ -7,6 +7,7 @@ import { nextStop, settingsAction } from "../lib/settingsKeys";
 import {
   SettingsCursor,
   SettingsRows,
+  useSettingsCursor,
   actionRow,
   numberRow,
   selectRow,
@@ -413,6 +414,7 @@ function DiffSection() {
 function ShortcutsSection() {
   const { settings, keymap, update } = useSettings();
   const tip = useTip();
+  const cursor = useSettingsCursor();
   const [filter, setFilter] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
 
@@ -447,6 +449,28 @@ function ShortcutsSection() {
   }
 
   const changedCount = Object.keys(settings.keymap).length;
+
+  // The rows the cursor moves over, in the order they appear. Registered here
+  // rather than rendered by SettingsRows, because this section draws its own
+  // grouped list -- but the keys that drive it are the dialog's, so Shortcuts
+  // answers up and down like every other section instead of needing Tab.
+  const flat = [...groups.values()].flat();
+
+  useEffect(() => {
+    cursor?.register(
+      flat.map((command) => ({
+        key: command.id,
+        label: command.label,
+        control: null,
+        // Enter records another key for the command, which is what the "+"
+        // at the end of the row does.
+        activate: () => setEditing(`${command.id}:new`),
+      })),
+      () => {},
+    );
+  });
+
+  const at = flat[cursor?.index ?? -1];
 
   const setBindings = (id: string, bindings: string[]) =>
     update({ keymap: { ...settings.keymap, [id]: bindings } });
@@ -495,6 +519,7 @@ function ShortcutsSection() {
           {commands.map((command) => (
             <ShortcutRow
               key={command.id}
+              at={command.id === at?.id}
               command={command}
               bindings={keymap[command.id] ?? []}
               changed={command.id in settings.keymap}
@@ -518,6 +543,7 @@ function ShortcutsSection() {
 }
 
 function ShortcutRow({
+  at,
   command,
   bindings,
   changed,
@@ -527,6 +553,8 @@ function ShortcutRow({
   onSet,
   onReset,
 }: {
+  /** The keyboard cursor is on this row. */
+  at: boolean;
   command: CommandDef;
   bindings: string[];
   changed: boolean;
@@ -548,7 +576,20 @@ function ShortcutRow({
   const remove = (index: number) => onSet(bindings.filter((_, i) => i !== index));
 
   return (
-    <div className={`shortcut-row ${rivals.length > 0 ? "shortcut-row-conflict" : ""}`}>
+    <div
+      ref={(node) => {
+        // Follow the cursor. A list this long scrolls well past the pane, and
+        // a selection you cannot see is one you will change by accident.
+        if (at) node?.scrollIntoView({ block: "nearest" });
+      }}
+      className={[
+        "shortcut-row",
+        rivals.length > 0 && "shortcut-row-conflict",
+        at && "bg-select",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <span className="shortcut-label">
         {command.label}
         {changed && (

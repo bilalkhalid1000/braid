@@ -30,6 +30,10 @@ let host: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  // jsdom implements no layout, so it has no scrollIntoView. The components
+  // that follow a cursor call it; stubbing here keeps that out of the code.
+  Element.prototype.scrollIntoView = vi.fn();
+
   saved.length = 0;
   host = document.createElement("div");
   document.body.appendChild(host);
@@ -129,6 +133,29 @@ describe("the settings dialog, by keyboard alone", () => {
 
     expect(theme().value).toBe(before);
     expect(terminal.value).not.toBe("auto");
+  });
+
+  it("moves through the shortcut list, which used to need Tab", async () => {
+    await open();
+
+    press("3");
+    expect(host.querySelectorAll(".shortcut-row").length).toBeGreaterThan(0);
+
+    press("ArrowDown");
+
+    expect(host.querySelector(".shortcut-row.bg-select")).not.toBeNull();
+  });
+
+  it("records a key with Enter on the highlighted command", async () => {
+    await open();
+
+    press("3");
+    press("ArrowDown");
+    press("Enter");
+
+    // The slot goes into recording, which is what the "+" at the end of a row
+    // does with the mouse.
+    expect(host.querySelector(".shortcut-key-recording")).not.toBeNull();
   });
 
   it("toggles a checkbox with Enter once the cursor is on it", async () => {
