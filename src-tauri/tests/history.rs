@@ -13,7 +13,7 @@ async fn a_log_page_reports_commits_newest_first() {
     repo.write("b.txt", "b\n");
     repo.commit_all("Third");
 
-    let page = log(repo.git_api(), 0, 10).await.unwrap();
+    let page = log(repo.git_api(), 0, 10, "head").await.unwrap();
 
     assert_eq!(page.commits.len(), 3);
     assert_eq!(page.commits[0].subject, "Third");
@@ -29,11 +29,11 @@ async fn paging_skips_and_reports_whether_more_remain() {
         repo.commit_all(&format!("Commit {n}"));
     }
 
-    let first = log(repo.git_api(), 0, 2).await.unwrap();
+    let first = log(repo.git_api(), 0, 2, "head").await.unwrap();
     assert_eq!(first.commits.len(), 2);
     assert!(first.has_more, "a full page means there may be more");
 
-    let second = log(repo.git_api(), 2, 2).await.unwrap();
+    let second = log(repo.git_api(), 2, 2, "head").await.unwrap();
     assert_eq!(second.commits[0].subject, "Commit 3");
 
     // The pages must not overlap.
@@ -45,7 +45,7 @@ async fn an_empty_repository_produces_no_commits_rather_than_an_error() {
     let repo = TestRepo::empty();
 
     // `git log` exits 128 with no HEAD; an empty history is a real state.
-    let page = log(repo.git_api(), 0, 10).await.unwrap();
+    let page = log(repo.git_api(), 0, 10, "head").await.unwrap();
     assert!(page.commits.is_empty());
 }
 
@@ -63,7 +63,7 @@ async fn a_merge_commit_reports_both_parents() {
 
     repo.git(&["merge", "--no-ff", "--no-edit", "feature"]);
 
-    let page = log(repo.git_api(), 0, 10).await.unwrap();
+    let page = log(repo.git_api(), 0, 10, "head").await.unwrap();
     let merge = &page.commits[0];
 
     assert_eq!(merge.parents.len(), 2);
@@ -74,7 +74,7 @@ async fn decorations_are_reported_for_the_checked_out_branch() {
     let repo = TestRepo::new();
     repo.git(&["tag", "v1.0"]);
 
-    let page = log(repo.git_api(), 0, 10).await.unwrap();
+    let page = log(repo.git_api(), 0, 10, "head").await.unwrap();
     let refs_on_head = &page.commits[0].refs;
 
     assert!(refs_on_head.iter().any(|r| r.contains("HEAD")));
@@ -88,7 +88,7 @@ async fn a_subject_containing_unusual_characters_survives() {
     repo.git(&["add", "-A"]);
     repo.git(&["commit", "-m", "feat: add | pipes, \"quotes\" and 'apostrophes'"]);
 
-    let page = log(repo.git_api(), 0, 1).await.unwrap();
+    let page = log(repo.git_api(), 0, 1, "head").await.unwrap();
     assert_eq!(
         page.commits[0].subject,
         "feat: add | pipes, \"quotes\" and 'apostrophes'"
