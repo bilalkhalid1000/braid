@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 
 use crate::error::{AppError, Result};
 use crate::git::status::EntryKind;
 use crate::git::{
-    self, Blame, CommitDetail, DiffOptions, DiffTarget, FileDiff, FinishOptions, FlowConfig, FlowKind, FlowStatus, Git,
+    self, Blame, CloneProgress, CommitDetail, DiffOptions, DiffTarget, FileDiff, FinishOptions, FlowConfig, FlowKind, FlowStatus, Git,
     LogPage, RefsSnapshot, RepoStatus, Submodule, Worktree,
 };
 use crate::registry::{RepoInfo, RepoRegistry};
@@ -149,6 +149,28 @@ pub async fn file_diff(
 }
 
 /// Line-by-line authorship for one file, optionally as of some revision.
+/// Clone a repository and open it as a tab.
+///
+/// Progress is pushed to the window as it arrives rather than returned at the
+/// end, because the end can be several minutes away.
+#[tauri::command]
+pub async fn clone_repo(
+    app: AppHandle,
+    registry: State<'_, RepoRegistry>,
+    url: String,
+    path: String,
+) -> Result<RepoInfo> {
+    let dir = PathBuf::from(&path);
+    let progress = app.clone();
+
+    let root = git::clone(&url, &dir, move |update: CloneProgress| {
+        let _ = progress.emit(git::CLONE_PROGRESS_EVENT, update);
+    })
+    .await?;
+
+    registry.open(&app, &root).await
+}
+
 #[tauri::command]
 pub async fn blame_file(
     registry: State<'_, RepoRegistry>,

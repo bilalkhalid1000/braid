@@ -206,6 +206,15 @@ export interface CurrentFlow {
  *  long file is the work of a few dozen commits, and repeating the author and
  *  summary on every line would cost more to send than the blame does to
  *  compute. */
+/** Pushed while a clone runs. `percent` is absent for phases git counts but
+ *  cannot total, like enumerating objects. */
+export interface CloneProgress {
+  phase: string;
+  percent: number | null;
+}
+
+export const CLONE_PROGRESS_EVENT = "clone://progress";
+
 export interface BlameCommit {
   oid: string;
   author: string;
@@ -312,6 +321,8 @@ export const api = {
     contextLines: number,
     ignoreWhitespace: boolean,
   ) => invoke<FileDiff>("file_diff", { id, path, target, contextLines, ignoreWhitespace }),
+  cloneRepo: (url: string, path: string) =>
+    invoke<RepoInfo>("clone_repo", { url, path }),
   blame: (id: string, path: string, rev: string | null) =>
     invoke<Blame>("blame_file", { id, path, rev }),
   commitDetail: (id: string, oid: string) =>
@@ -395,6 +406,10 @@ export const submoduleLabel: Record<SubmoduleState, string> = {
   modified: "Different commit checked out",
   conflicted: "Conflicted",
 };
+
+/** Fires while a clone runs, many times a second on a large repository. */
+export const onCloneProgress = (cb: (progress: CloneProgress) => void) =>
+  listen<CloneProgress>(CLONE_PROGRESS_EVENT, (event) => cb(event.payload));
 
 /** Fires when a repo's on-disk state changed. Payload is the repo id. */
 export const onRepoChanged = (cb: (id: string) => void) =>

@@ -44,6 +44,7 @@ export const COMMANDS: CommandDef[] = [
   // --- Repositories ---
   { id: "repo.open", label: "Open repository", category: "Repository", scope: "global", binding: ["Mod+O"] },
   { id: "repo.create", label: "Create repository", category: "Repository", scope: "global", binding: ["Mod+N"] },
+  { id: "repo.clone", label: "Clone a repository", category: "Repository", scope: "global", binding: ["Mod+Shift+O"] },
   { id: "repo.close", label: "Close repository tab", category: "Repository", scope: "global", binding: ["Mod+W"], needsRepo: true },
   { id: "repo.explorer", label: "Open in file manager", category: "Repository", scope: "global", binding: ["Mod+E"], needsRepo: true },
   { id: "repo.terminal", label: "Open in terminal", category: "Repository", scope: "global", binding: ["Mod+T"], needsRepo: true },

@@ -59,6 +59,7 @@ pub fn run() {
             ipc::repo_log,
             ipc::file_diff,
             ipc::blame_file,
+            ipc::clone_repo,
             ipc::commit_detail,
             ipc::commit_file_diff,
             ipc::apply_hunk,

@@ -1476,6 +1476,16 @@ kbd.key-live {
   background: var(--accent-soft);
 }
 
+/* The phase of a running clone, beside the spinner. Mono because it carries a
+   percentage that changes constantly, and a proportional font makes the whole
+   line twitch as the digits change width. */
+.activity-detail {
+  margin-left: var(--s3);
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+}
+
 .statusbar-spacer {
   margin-left: auto;
 }

@@ -1,4 +1,5 @@
 pub mod blame;
+pub mod clone;
 pub mod cli;
 pub mod commit;
 pub mod diff;
@@ -12,6 +13,7 @@ pub mod submodule;
 pub mod worktree;
 
 pub use blame::{blame, Blame};
+pub use clone::{clone, CloneProgress, CLONE_PROGRESS_EVENT};
 pub use cli::Git;
 pub use commit::CommitDetail;
 pub use diff::{file_diff, DiffOptions, DiffTarget, FileDiff};

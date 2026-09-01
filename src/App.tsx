@@ -7,6 +7,7 @@ import {
   api,
   flowNoun,
   isReleaseKind,
+  onCloneProgress,
   onRepoChanged,
   type CurrentFlow,
   type BlameTarget,
@@ -29,6 +30,7 @@ import { FileStatusView } from "./components/FileStatusView";
 import { HistoryView } from "./components/HistoryView";
 import { Dialog, type DialogSpec } from "./components/Dialog";
 import type { ComboOption } from "./components/Combo";
+import { cloneDestination, repoNameFromUrl } from "./lib/cloneTarget";
 import { FlowPlan, type FlowPlanTarget } from "./components/FlowPlan";
 import { BlameView } from "./components/BlameView";
 import { Splash } from "./components/Splash";
@@ -109,6 +111,8 @@ export default function App() {
    *  session back: forcing that one would let an empty repo list overwrite what
    *  is stored. This only decides whether the splash is still up. */
   const [bootTimedOut, setBootTimedOut] = useState(false);
+  /** What a running clone is doing, or null when none is. */
+  const [cloning, setCloning] = useState<string | null>(null);
   const { settings, keymap, update: updateSettings, loaded: settingsLoaded } = useSettings();
 
   /** Numbers jump to a panel. Files and History also switch the main view;
@@ -128,6 +132,15 @@ export default function App() {
   useEffect(() => {
     const timer = window.setTimeout(() => setBootTimedOut(true), 8000);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  // A clone reports many times a second; this only ever holds the latest, so
+  // the render cost is one short string however large the repository is.
+  useEffect(() => {
+    const stop = onCloneProgress(({ phase, percent }) =>
+      setCloning(percent === null ? phase : `${phase} ${percent}%`),
+    );
+    return () => void stop.then((off) => off());
   }, []);
 
   const themeResolved = useTheme(settings.theme);
@@ -379,6 +392,62 @@ export default function App() {
       },
     });
 
+  const cloneRepo = () =>
+    setDialog({
+      title: "Clone repository",
+      message:
+        "Copies a remote repository into a new folder and opens it as a tab. Private repositories use whatever credential helper git is already configured with — you will not be asked for a password here.",
+      fields: [
+        {
+          key: "url",
+          label: "Repository URL",
+          placeholder: "https://github.com/owner/repo.git",
+        },
+        {
+          key: "parent",
+          label: "Where to put it",
+          browse: true,
+          placeholder: `${activeRepo?.root.replace(/[\/][^\/]*$/, "") ?? "E:/Projects"}`,
+        },
+        {
+          key: "name",
+          label: "Folder name",
+          placeholder: "taken from the URL",
+          optional: true,
+          describe: (value) =>
+            value.trim() === "" ? "Uses the name in the URL, as git would." : undefined,
+        },
+      ],
+      confirmLabel: "Clone",
+      onConfirm: (v) => {
+        // Empty means "whatever git would have called it", which is the same
+        // rule `git clone` follows when given no directory.
+        const name = v.name.trim() || repoNameFromUrl(v.url);
+        if (!name) {
+          activity.note(
+            "Clone",
+            `Could not work out a folder name from ${v.url}. Give one explicitly.`,
+            "error",
+          );
+          return;
+        }
+
+        const path = cloneDestination(v.parent, name);
+
+        void perform(`Clone ${name}`, async () => {
+          try {
+            const repo = await api.cloneRepo(v.url, path);
+            await queryClient.invalidateQueries({ queryKey: ["repos"] });
+            setActiveId(repo.id);
+            return `Cloned into ${repo.root}`;
+          } finally {
+            // Whether it worked or failed, nothing is cloning any more.
+            setCloning(null);
+          }
+        });
+      },
+    });
+
   /** Both ways in, from one place, so the tab strip and the welcome screen
    *  cannot drift apart. */
   const openAddRepoMenu = (event: React.MouseEvent) =>
@@ -392,6 +461,11 @@ export default function App() {
         label: "Create new repository…",
         hint: shortcutLabel(keymap["repo.create"]),
         onClick: createRepo,
+      },
+      {
+        label: "Clone from a URL…",
+        hint: shortcutLabel(keymap["repo.clone"]),
+        onClick: cloneRepo,
       },
     ]);
 
@@ -1180,6 +1254,7 @@ The stashed changes are discarded.`,
 
     "repo.open": () => void openRepo(),
     "repo.create": createRepo,
+    "repo.clone": cloneRepo,
     "repo.close": id ? () => void closeRepo(id) : undefined,
     "repo.explorer": id ? () => act("Open in Explorer", () => api.openInFileManager(id)) : undefined,
     "repo.terminal": id ? () => act("Open in terminal", () => api.openInTerminal(id)) : undefined,
@@ -1513,6 +1588,7 @@ The stashed changes are discarded.`,
           <span className="activity">
             <span className="spinner" />
             {activity.running[0].label}
+            {cloning && <span className="activity-detail">{cloning}</span>}
             {activity.running.length > 1 && ` +${activity.running.length - 1}`}
           </span>
         )}
