@@ -22,6 +22,19 @@ fn beside(repo: &TestRepo, suffix: &str) -> std::path::PathBuf {
     dir.parent().unwrap().join(format!("{name}-{suffix}"))
 }
 
+/// A `file://` URL for a repository on disk.
+///
+/// Cloning a plain path lets git take the local shortcut: it hardlinks the
+/// object store instead of transferring anything, so there is no transfer to
+/// report and `--progress` says nothing. That is correct behaviour and makes a
+/// plain path useless for testing that progress arrives. A file:// URL goes
+/// through the ordinary transport, which counts and sends objects like any
+/// other clone.
+fn file_url(repo: &TestRepo) -> String {
+    let path = repo.path().display().to_string().replace('\\', "/");
+    format!("file:///{}", path.trim_start_matches('/'))
+}
+
 /// Collect whatever progress the clone reports.
 fn recorder() -> (Arc<Mutex<Vec<CloneProgress>>>, impl FnMut(CloneProgress)) {
     let seen = Arc::new(Mutex::new(Vec::new()));
@@ -124,9 +137,7 @@ async fn reports_progress_while_it_works() {
     let into = beside(&source, "progress");
     let (seen, on_progress) = recorder();
 
-    clone(&source.path().display().to_string(), &into, on_progress)
-        .await
-        .unwrap();
+    clone(&file_url(&source), &into, on_progress).await.unwrap();
 
     let updates = seen.lock().unwrap();
     assert!(
