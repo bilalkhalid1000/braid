@@ -23,8 +23,15 @@ const SECTIONS: { id: Section; label: string; blurb: string }[] = [
   { id: "about", label: "About", blurb: "Where things are kept" },
 ];
 
-export function SettingsDialog({ onClose }: { onClose: () => void }) {
-  const [section, setSection] = useState<Section>("general");
+export function SettingsDialog({
+  onClose,
+  initialSection = "general",
+}: {
+  onClose: () => void;
+  /** Which section to open on. "?" asks about keys, so it opens on them. */
+  initialSection?: Section;
+}) {
+  const [section, setSection] = useState<Section>(initialSection);
   const frame = useRef<HTMLDivElement>(null);
 
   // The dialog owns the keyboard while it is open: the app's own commands are

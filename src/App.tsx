@@ -28,8 +28,12 @@ import { ContextMenu, type MenuEntry, type MenuState } from "./components/Contex
 import { FileStatusView } from "./components/FileStatusView";
 import { HistoryView } from "./components/HistoryView";
 import { Dialog, type DialogSpec } from "./components/Dialog";
+import type { ComboOption } from "./components/Combo";
 import { FlowPlan, type FlowPlanTarget } from "./components/FlowPlan";
 import { BlameView } from "./components/BlameView";
+import { Splash } from "./components/Splash";
+import { IconSettings } from "./components/icons";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Toaster } from "./components/Toaster";
 import { ActivityLog } from "./components/ActivityLog";
 import { OperationBanner } from "./components/OperationBanner";
@@ -90,11 +94,21 @@ export default function App() {
   // rather than becoming a third workspace view, so the number keys and
   // the sidebar keep meaning exactly what they meant before.
   const [blameTarget, setBlameTarget] = useState<BlameTarget | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  /** What the sidebar's keyboard cursor is on, so Merge can act on it. */
+  const [sidebarCursor, setSidebarCursor] = useState<MenuTarget | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState<false | "general" | "shortcuts">(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Nothing may be written back until the restore has finished, or the first
   // save would overwrite the stored session with an empty list.
   const [restored, setRestored] = useState(false);
+  /** How many tabs the restore is reopening, so the wait can say so. */
+  const [restoring, setRestoring] = useState(0);
+  /** Reveal the app even if the restore never finishes.
+   *
+   *  Deliberately a separate flag from `restored`, which also gates writing the
+   *  session back: forcing that one would let an empty repo list overwrite what
+   *  is stored. This only decides whether the splash is still up. */
+  const [bootTimedOut, setBootTimedOut] = useState(false);
   const { settings, keymap, update: updateSettings, loaded: settingsLoaded } = useSettings();
 
   /** Numbers jump to a panel. Files and History also switch the main view;
@@ -108,7 +122,33 @@ export default function App() {
     if (panel === "files" || panel === "history") setBlameTarget(null);
     setFocusedPanel(panel);
   };
+  // A hung IPC call must not strand the window on a splash. The shell appears
+  // regardless after this; the restore keeps running and tabs arrive when they
+  // do. The backend shows the window on a similar backstop for the same reason.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setBootTimedOut(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const themeResolved = useTheme(settings.theme);
+
+  /** Re-read everything for the open repository.
+   *
+   *  The app is event driven and should not need this -- a watcher pushes
+   *  changes as they happen. It exists because something done outside the app
+   *  can still be missed, and because a user who does not trust a view wants a
+   *  way to insist rather than a promise that it is fine. */
+  const refreshAll = async () => {
+    await queryClient.invalidateQueries();
+    activity.note("Refreshed", "Re-read the repository from disk.", "success");
+  };
+
+  /** Close the window.
+   *
+   *  Single-key commands never fire while a text field has focus, so this
+   *  cannot interrupt a commit message being typed. Tabs come back on the next
+   *  launch; anything typed into the message box does not. */
+  const quit = () => getCurrentWindow().close();
 
   const cycleTheme = () => {
     const order = ["system", "light", "dark"] as const;
@@ -192,19 +232,29 @@ export default function App() {
         if (!settings.restoreTabs) return;
 
         const stored = await api.loadSession();
-        const opened: string[] = [];
-        const missing: string[] = [];
+        if (cancelled) return;
 
-        for (const path of stored.repos) {
-          try {
-            const repo = await api.openRepo(path);
-            opened.push(repo.id);
-          } catch {
-            missing.push(path);
-          }
-        }
+        setRestoring(stored.repos.length);
+
+        // Opened together rather than one after another. Each one discovers the
+        // repository and starts a filesystem watcher, and in series the wait was
+        // the sum of all of them -- which is the wait the window sits through.
+        // Promise.all keeps the input order, so the first stored tab is still
+        // the one selected.
+        const results = await Promise.all(
+          stored.repos.map(async (path) => {
+            try {
+              return { path, id: (await api.openRepo(path)).id };
+            } catch {
+              return { path, id: null };
+            }
+          }),
+        );
 
         if (cancelled) return;
+
+        const opened = results.flatMap((r) => (r.id ? [r.id] : []));
+        const missing = results.flatMap((r) => (r.id ? [] : [r.path]));
 
         await queryClient.invalidateQueries({ queryKey: ["repos"] });
 
@@ -631,13 +681,60 @@ export default function App() {
         act(`Create branch ${v.name}`, () => api.createBranch(id!, v.name, true)),
     });
 
-  const openMerge = () =>
+  /** Everything that can be merged, local first. */
+  const mergeSources = (): ComboOption[] => [
+    ...(refs.data?.branches ?? [])
+      .filter((branch) => !branch.isHead)
+      .map((branch) => ({ value: branch.name })),
+    ...(refs.data?.remotes ?? []).flatMap((remote) =>
+      remote.branches.map((branch) => ({
+        value: `${remote.name}/${branch}`,
+        note: remote.name,
+      })),
+    ),
+    ...(refs.data?.tags ?? []).map((tag) => ({ value: tag, note: "tag" })),
+  ];
+
+  /** The branch the sidebar cursor is on, if it is on one.
+   *
+   *  Merge is a global key, so it fires wherever you are. Having walked to a
+   *  branch and pressed it, the branch you are looking at is the one you mean —
+   *  opening an empty box and asking would be the app pretending not to know. */
+  const cursorRef = () => {
+    if (!isSidebarPanel(focusedPanel) || !sidebarCursor) return "";
+
+    switch (sidebarCursor.kind) {
+      case "branch":
+        return sidebarCursor.branch.isHead ? "" : sidebarCursor.branch.name;
+      case "remote":
+        return `${sidebarCursor.remote}/${sidebarCursor.branch}`;
+      case "tag":
+        return sidebarCursor.tag;
+      default:
+        return "";
+    }
+  };
+
+  const openMerge = () => {
+    const current = head?.head ?? "HEAD";
+
     setDialog({
-      title: `Merge into ${head?.head ?? "HEAD"}`,
-      fields: [{ key: "name", label: "Branch to merge", placeholder: "main" }],
+      title: `Merge into ${current}`,
+      fields: [
+        {
+          key: "name",
+          label: "Branch to merge",
+          value: cursorRef(),
+          placeholder: "main",
+          options: mergeSources(),
+          describe: (value) =>
+            value.trim() === "" ? undefined : `Merges ${value.trim()} into ${current}.`,
+        },
+      ],
       confirmLabel: "Merge",
       onConfirm: (v) => act(`Merge ${v.name}`, () => api.mergeBranch(id!, v.name)),
     });
+  };
 
   /** Everything a discard would throw away. */
   const discardablePaths = () =>
@@ -708,6 +805,23 @@ export default function App() {
     });
   };
 
+  /** Dropping a stash cannot be undone in any way a user would find, and the
+   *  keyboard path is a single keystroke. The menu entry stays direct: getting
+   *  there is already two deliberate steps. */
+  const confirmDropStash = (selector: string, message: string) => {
+    if (!id) return;
+
+    setDialog({
+      title: `Drop ${selector}`,
+      message: `${message}
+
+The stashed changes are discarded.`,
+      confirmLabel: "Drop",
+      danger: true,
+      onConfirm: () => act(`Drop ${selector}`, () => api.stashDrop(id, selector)),
+    });
+  };
+
   const confirmRemoveWorktree = (path: string) => {
     if (!id) return;
 
@@ -769,6 +883,36 @@ export default function App() {
         onClick: () => confirmDiscard([entry.path]),
       },
     ]);
+  };
+
+  /** Delete whatever the sidebar cursor is on.
+   *
+   *  Every one of these already had a menu entry; this is the same action
+   *  reached by a key. All of them confirm first -- the key is one press, and
+   *  none of these are things to lose by leaning on D. */
+  const onSidebarDelete = (target: MenuTarget) => {
+    if (!id) return;
+
+    switch (target.kind) {
+      case "branch":
+        // The branch you are standing on cannot be deleted, and offering it
+        // would only produce git's refusal a dialog later.
+        if (!target.branch.isHead) confirmDeleteBranch(target.branch.name);
+        break;
+
+      case "stash":
+        confirmDropStash(target.stash.selector, target.stash.message);
+        break;
+
+      case "worktree":
+        if (!target.worktree.isMain) confirmRemoveWorktree(target.worktree.path);
+        break;
+
+      // A remote branch, a tag and a submodule each need their own operation,
+      // and none of them exist yet. Doing nothing beats guessing.
+      default:
+        break;
+    }
   };
 
   /** Menus for the sidebar. The sidebar reports what was clicked; the git
@@ -944,7 +1088,7 @@ export default function App() {
         [
           {
             key: "branch",
-            commandId: "git.branch",
+            commandId: "git.new",
             label: "Branch",
             icon: <IconBranch />,
             onClick: openNewBranch,
@@ -989,6 +1133,7 @@ export default function App() {
             label: "Worktree",
             icon: <IconWorktree />,
             badge: (worktrees.data?.length ?? 0) > 1 ? worktrees.data?.length : undefined,
+            commandId: "git.worktree",
             onClick: openAddWorktree,
           },
           {
@@ -1026,7 +1171,10 @@ export default function App() {
    *  shows only what can actually run right now. */
   const handlers: Record<string, (() => void) | undefined> = {
     "app.palette": () => setPaletteOpen(true),
-    "app.settings": () => setSettingsOpen(true),
+    "app.settings": () => setSettingsOpen("general"),
+    "app.keys": () => setSettingsOpen("shortcuts"),
+    "app.refresh": () => void refreshAll(),
+    "app.quit": () => void quit(),
     "app.activityLog": () => setLogOpen((v) => !v),
     "app.theme": cycleTheme,
 
@@ -1066,10 +1214,15 @@ export default function App() {
           setTimeout(() => commitRef.current?.focus(), 0);
         }
       : undefined,
-    "git.branch": id ? openNewBranch : undefined,
+    // Reads the focused panel rather than binding the key twice: a global
+    // command and a sidebar one would both claim N and both fire.
+    "git.new": id
+      ? () => (focusedPanel === "worktrees" ? openAddWorktree() : openNewBranch())
+      : undefined,
     "git.merge": id ? openMerge : undefined,
     "git.stash": id ? openStash : undefined,
     "git.discardAll": id ? () => confirmDiscard(discardablePaths()) : undefined,
+    "git.worktree": id ? openAddWorktree : undefined,
     "git.flow": id ? () => openFlowMenu(...menuAnchor()) : undefined,
   };
 
@@ -1078,46 +1231,76 @@ export default function App() {
   const inputOpen = settingsOpen || paletteOpen || dialog !== null || menu !== null;
   useCommands(handlers, !inputOpen);
 
+  // Nothing here is usable until the session is known, and an empty tab strip
+  // above an empty panel is not a window worth showing. Held whole, then
+  // handed over in one go.
+  if (!restored && !bootTimedOut) {
+    return (
+      <Splash
+        channel={app.channel}
+        status={
+          restoring > 0
+            ? `Reopening ${restoring} ${restoring === 1 ? "repository" : "repositories"}…`
+            : "Starting…"
+        }
+      />
+    );
+  }
+
   return (
     <div className="app">
       <header className="tabs">
-        {repos.data.map((repo, index) => (
-          <div
-            key={repo.id}
-            className={`tab ${repo.id === activeId ? "tab-active" : ""}`}
-            onClick={() => setActiveId(repo.id)}
-            {...tip(
-              repo.root,
-              index < 8
-                ? `tab.${index + 1}`
-                : index === repos.data.length - 1
-                  ? "tab.last"
-                  : undefined,
-            )}
-          >
-            {modHeld && tabDigit(index) !== null && (
-              <kbd className="tab-key">{tabDigit(index)}</kbd>
-            )}
-            <span className="tab-name">{repo.name}</span>
-            <span
-              className="tab-close"
-              title="Close repository"
-              onClick={(e) => {
-                e.stopPropagation();
-                void closeRepo(repo.id);
-              }}
+        <div className="tab-strip">
+          {repos.data.map((repo, index) => (
+            <div
+              key={repo.id}
+              className={`tab ${repo.id === activeId ? "tab-active" : ""}`}
+              onClick={() => setActiveId(repo.id)}
+              {...tip(
+                repo.root,
+                index < 8
+                  ? `tab.${index + 1}`
+                  : index === repos.data.length - 1
+                    ? "tab.last"
+                    : undefined,
+              )}
             >
-              &times;
-            </span>
+              {modHeld && tabDigit(index) !== null && (
+                <kbd className="tab-key">{tabDigit(index)}</kbd>
+              )}
+              <span className="tab-name">{repo.name}</span>
+              <span
+                className="tab-close"
+                {...tip("Close repository", "repo.close")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void closeRepo(repo.id);
+                }}
+              >
+                &times;
+              </span>
           </div>
         ))}
 
+          <button
+            className="tab tab-add"
+            {...tip("Open or create a repository", "repo.open")}
+            onClick={openAddRepoMenu}
+          >
+            +
+          </button>
+        </div>
+
+        {/* Outside the scrolling strip on purpose: with a dozen repositories
+            open it would otherwise scroll off the end, and settings belong to
+            the app rather than to whichever tab happens to be last. */}
         <button
-          className="tab tab-add"
-          {...tip("Open or create a repository", "repo.open")}
-          onClick={openAddRepoMenu}
+          className="tab-settings"
+          {...tip("Settings and keyboard shortcuts", "app.settings")}
+          onClick={() => setSettingsOpen("general")}
+          aria-label="Settings"
         >
-          +
+          <IconSettings />
         </button>
       </header>
 
@@ -1187,6 +1370,7 @@ export default function App() {
               // Worktrees and submodules are separate repositories, so opening
               // one is the same operation as opening any other repo: a new tab.
               onOpenPath={(path) => void addRepo(absolute(path, activeRepo?.root))}
+              onNewBranch={openNewBranch}
               onAddWorktree={openAddWorktree}
               onPruneWorktrees={() => act("Prune worktrees", () => api.pruneWorktrees(id))}
               onRemoveWorktree={confirmRemoveWorktree}
@@ -1195,6 +1379,8 @@ export default function App() {
               }
               onUpdateAllSubmodules={openUpdateSubmodules}
               onMenu={onSidebarMenu}
+              onCursor={setSidebarCursor}
+              onDelete={onSidebarDelete}
             />
 
             <Splitter
@@ -1343,7 +1529,10 @@ export default function App() {
         <span className="statusbar-spacer" />
 
         {head && (
-          <span className="timing" title="Time the last git status call took">
+          <span
+            className="timing"
+            {...tip("Time the last git status call took")}
+          >
             status {head.durationMs}ms
           </span>
         )}
@@ -1368,13 +1557,6 @@ export default function App() {
           {settings.theme === "system" && ` (${themeResolved})`}
         </button>
 
-        <button
-          className="statusbar-button"
-          {...tip("Settings and keyboard shortcuts", "app.settings")}
-          onClick={() => setSettingsOpen(true)}
-        >
-          Settings
-        </button>
       </footer>
 
       <Toaster
@@ -1385,7 +1567,12 @@ export default function App() {
 
       {dialog && <Dialog spec={dialog} onClose={() => setDialog(null)} />}
       {menu && <ContextMenu state={menu} onClose={() => setMenu(null)} />}
-      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <SettingsDialog
+          initialSection={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
       {paletteOpen && (
         <CommandPalette handlers={handlers} onClose={() => setPaletteOpen(false)} />
       )}

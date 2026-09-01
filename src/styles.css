@@ -202,14 +202,48 @@ kbd.key-live {
 
 /* --- repo tabs --------------------------------------------------------- */
 
+/* The bar itself does not scroll -- only the strip of tabs inside it does. That
+   is what keeps Settings anchored at the right instead of sliding away once a
+   dozen repositories are open. */
 .tabs {
   display: flex;
   align-items: stretch;
   height: 30px;
-  overflow-x: auto;
   background: var(--chrome-alt);
   border-bottom: 1px solid var(--border);
+}
+
+.tab-strip {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
   scrollbar-width: none;
+}
+
+.tab-settings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.tab-settings:hover {
+  background: var(--chrome);
+  color: var(--text);
+}
+/* The set is drawn at 20px; this sits in a 30px bar and has to come down to
+   match the tab text beside it. */
+.tab-settings svg {
+  width: 15px;
+  height: 15px;
 }
 
 .tab {
@@ -1073,6 +1107,14 @@ kbd.key-live {
   border-left-color: var(--accent);
 }
 
+/* Two lists on screen, one keyboard. The ring marks whichever of them the keys
+   are actually driving; the other keeps its selection, quietly, so you can see
+   what it will go back to. */
+.history-row-cursor,
+.commit-file-cursor {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
 /* The lane graph. Rows draw only their own cell, which is what keeps the
    history list virtualized while still reading as continuous lines. */
 .graph {
@@ -1886,6 +1928,13 @@ kbd.key-live {
   display: grid;
   place-items: center;
   background: rgb(10 14 20 / 42%);
+}
+
+/* The frame takes focus when there is no field to take it, purely so the key
+   handling has somewhere to land. It should not draw a ring around the whole
+   panel for that -- the scrim already says which surface has the keyboard. */
+.dialog:focus {
+  outline: none;
 }
 
 .dialog {
@@ -3211,4 +3260,192 @@ kbd.key-live {
 .token.property,
 .token.key {
   color: var(--syn-type);
+}
+
+/* --- grouped refs ------------------------------------------------------ */
+
+/* A folder inside Branches or Tags. Quieter than a section header — a section
+   is a part of the app, a folder is just a shared prefix — and it lines its
+   chevron up with the rail so the column of controls stays a column. */
+/* Deliberately the same box as .side-item, down to the padding: a folder and a
+   branch are the same kind of row and sit on the same left edge. */
+.side-folder {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  height: var(--row);
+  padding: 0 var(--s4) 0 var(--s2);
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: var(--fs-body);
+  text-align: left;
+  cursor: default;
+}
+.side-folder:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+/* The keyboard cursor, drawn exactly as it is on a branch. Landing on a folder
+   and landing on a name are the same act, so they cannot look like two. */
+.side-folder-cursor {
+  background: var(--surface-alt);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  color: var(--text);
+}
+.side-folder-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The disclosure column. Reserved on every row of a grouped list and left
+   blank on the ones that are not folders, which is what keeps a folder's name
+   on the same left edge as the branches around it. Kept out of the rail on
+   purpose: that column is for keyboard shortcuts, and a mark there should
+   always mean a key. */
+.side-twisty {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  width: 14px;
+  color: var(--text-faint);
+}
+
+/* Indentation by nesting rather than by a computed depth, so a folder five
+   levels down needs no arithmetic and every row keeps the same markup it has
+   in a flat section. One twisty's worth per level: enough to read as a step,
+   little enough that a long branch name still has room in a 232px column. */
+.side-nest {
+  padding-left: 14px;
+}
+
+/* --- splash ------------------------------------------------------------ */
+
+/* Same surface the app itself uses, so the hand-over is a change of content
+   rather than a flash of a different window. */
+.splash {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--s5);
+  height: 100%;
+  background: var(--surface);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.splash-block {
+  display: grid;
+  justify-items: center;
+  gap: var(--s4);
+  text-align: center;
+}
+
+.splash-mark {
+  width: 88px;
+  height: 88px;
+}
+
+.splash-name {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  margin: 0;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.splash-status {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--fs-small);
+}
+
+/* The mark draws itself, then holds, then starts again. Written in fractions
+   of each path -- the paths carry pathLength="1" -- because the trunk and the
+   lane are not the same length and a shared pixel dasharray would run them at
+   different speeds. */
+.splash-trunk,
+.splash-lane {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+.splash-trunk {
+  animation: splash-draw 2.4s ease-in-out infinite;
+}
+.splash-lane {
+  animation: splash-draw 2.4s ease-in-out 0.28s infinite;
+}
+
+@keyframes splash-draw {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  /* Drawn by 45%, then held: a loop with no pause reads as a machine rather
+     than as something completing. */
+  45%,
+  82% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+.splash-dot {
+  opacity: 0;
+  animation: splash-dot 2.4s ease-in-out infinite;
+}
+/* Each commit lands as the line reaches it. */
+.splash-dot-1 {
+  animation-delay: 0.35s;
+}
+.splash-dot-2 {
+  animation-delay: 0.75s;
+}
+.splash-dot-3 {
+  animation-delay: 1.05s;
+}
+
+@keyframes splash-dot {
+  0%,
+  6% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  18%,
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  90%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+/* Scaling a circle needs its own centre, not the corner of the viewBox. */
+.splash-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Motion here is decoration on top of a message that already says everything.
+   Without it the mark simply sits there, complete. */
+@media (prefers-reduced-motion: reduce) {
+  .splash-trunk,
+  .splash-lane,
+  .splash-dot {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
 }

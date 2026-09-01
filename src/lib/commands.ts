@@ -35,8 +35,11 @@ export const COMMANDS: CommandDef[] = [
   // --- Application ---
   { id: "app.palette", label: "Command palette", category: "Application", scope: "global", binding: ["Mod+P"] },
   { id: "app.settings", label: "Settings", category: "Application", scope: "global", binding: ["Mod+,"] },
-  { id: "app.activityLog", label: "Toggle activity log", category: "Application", scope: "global", binding: ["Mod+L"] },
+  { id: "app.activityLog", label: "Toggle activity log", category: "Application", scope: "global", binding: ["@", "Mod+L"] },
   { id: "app.theme", label: "Cycle theme", category: "Application", scope: "global", binding: ["Mod+Shift+T"] },
+  { id: "app.keys", label: "Keyboard shortcuts", category: "Application", scope: "global", binding: ["?"] },
+  { id: "app.refresh", label: "Refresh", category: "Application", scope: "global", binding: ["Shift+R"], needsRepo: true },
+  { id: "app.quit", label: "Quit", category: "Application", scope: "global", binding: ["Q"] },
 
   // --- Repositories ---
   { id: "repo.open", label: "Open repository", category: "Repository", scope: "global", binding: ["Mod+O"] },
@@ -50,8 +53,8 @@ export const COMMANDS: CommandDef[] = [
   // Ctrl+1..8 select a tab and Ctrl+9 selects the last one, the way browsers
   // do it: with two or three repositories open, "the last one" is reachable
   // far more often than a literal ninth tab would be.
-  { id: "tab.next", label: "Next repository", category: "Repository", scope: "global", binding: ["Mod+Tab", "Mod+PageDown"], needsRepo: true },
-  { id: "tab.previous", label: "Previous repository", category: "Repository", scope: "global", binding: ["Mod+Shift+Tab", "Mod+PageUp"], needsRepo: true },
+  { id: "tab.next", label: "Next repository", category: "Repository", scope: "global", binding: ["]", "Mod+Tab", "Mod+PageDown"], needsRepo: true },
+  { id: "tab.previous", label: "Previous repository", category: "Repository", scope: "global", binding: ["[", "Mod+Shift+Tab", "Mod+PageUp"], needsRepo: true },
   { id: "tab.1", label: "Go to repository 1", category: "Repository", scope: "global", binding: ["Mod+1"], needsRepo: true },
   { id: "tab.2", label: "Go to repository 2", category: "Repository", scope: "global", binding: ["Mod+2"], needsRepo: true },
   { id: "tab.3", label: "Go to repository 3", category: "Repository", scope: "global", binding: ["Mod+3"], needsRepo: true },
@@ -73,13 +76,14 @@ export const COMMANDS: CommandDef[] = [
   { id: "panel.stashes", label: "Stashes", category: "Panels", scope: "global", binding: ["5"], needsRepo: true },
   { id: "panel.worktrees", label: "Worktrees", category: "Panels", scope: "global", binding: ["6"], needsRepo: true },
   { id: "panel.submodules", label: "Submodules", category: "Panels", scope: "global", binding: ["7"], needsRepo: true },
-  { id: "view.filter", label: "Focus the filter box", category: "Panels", scope: "global", binding: ["Mod+F"] },
+  { id: "view.filter", label: "Focus the filter box", category: "Panels", scope: "global", binding: ["/", "Mod+F"] },
 
   // --- Sidebar, live only while a sidebar panel has focus ---
   { id: "sidebar.next", label: "Next item", category: "Sidebar", scope: "sidebar", binding: ["J", "ArrowDown"] },
   { id: "sidebar.previous", label: "Previous item", category: "Sidebar", scope: "sidebar", binding: ["K", "ArrowUp"] },
-  { id: "sidebar.activate", label: "Use the selected item", category: "Sidebar", scope: "sidebar", binding: ["Enter"] },
+  { id: "sidebar.activate", label: "Use the selected item", category: "Sidebar", scope: "sidebar", binding: ["Space", "Enter"] },
   { id: "sidebar.menu", label: "Open the item's menu", category: "Sidebar", scope: "sidebar", binding: ["Shift+Enter"] },
+  { id: "sidebar.delete", label: "Delete the selected item", category: "Sidebar", scope: "sidebar", binding: ["D"] },
   { id: "sidebar.leave", label: "Return to the main panel", category: "Sidebar", scope: "sidebar", binding: ["Escape"] },
 
   // --- Menus, live only while one is open. A menu takes the keyboard from
@@ -100,10 +104,13 @@ export const COMMANDS: CommandDef[] = [
   { id: "git.pull", label: "Pull", category: "Git", scope: "global", binding: ["P"], needsRepo: true },
   { id: "git.push", label: "Push", category: "Git", scope: "global", binding: ["Shift+P"], needsRepo: true },
   { id: "git.commit", label: "Write a commit message", category: "Git", scope: "global", binding: ["C"], needsRepo: true },
-  { id: "git.branch", label: "New branch", category: "Git", scope: "global", binding: ["B"], needsRepo: true },
-  { id: "git.merge", label: "Merge a branch", category: "Git", scope: "global", binding: ["M"], needsRepo: true },
+  // One key, whose meaning follows the panel you are in -- which is how the
+  // same key behaves in lazygit, where every context binds it separately.
+  { id: "git.new", label: "New branch, or worktree in that panel", category: "Git", scope: "global", binding: ["N"], needsRepo: true },
+  { id: "git.merge", label: "Merge a branch", category: "Git", scope: "global", binding: ["Shift+M"], needsRepo: true },
   { id: "git.stash", label: "Stash changes", category: "Git", scope: "global", binding: ["S"], needsRepo: true },
   { id: "git.discardAll", label: "Discard all changes", category: "Git", scope: "global", binding: ["Shift+D"], needsRepo: true },
+  { id: "git.worktree", label: "Add a worktree", category: "Git", scope: "global", binding: ["Shift+W"], needsRepo: true },
   { id: "git.flow", label: "Git flow", category: "Git", scope: "global", binding: ["G F"], needsRepo: true },
 
   // --- File Status ---
@@ -112,13 +119,15 @@ export const COMMANDS: CommandDef[] = [
   { id: "status.toggle", label: "Stage or unstage the selected file", category: "File Status", scope: "status", binding: ["Space"] },
   { id: "status.stageAll", label: "Stage everything", category: "File Status", scope: "status", binding: ["A"] },
   { id: "status.unstageAll", label: "Unstage everything", category: "File Status", scope: "status", binding: ["Shift+A"] },
-  { id: "status.discard", label: "Discard the selected file", category: "File Status", scope: "status", binding: ["Delete"] },
+  { id: "status.discard", label: "Discard the selected file", category: "File Status", scope: "status", binding: ["D", "Delete"] },
   { id: "status.commit", label: "Commit", category: "File Status", scope: "status", binding: ["Mod+Enter"] },
   { id: "status.blame", label: "Blame the selected file", category: "File Status", scope: "status", binding: ["Shift+B"] },
 
   // --- History ---
   { id: "history.next", label: "Next commit", category: "History", scope: "history", binding: ["J", "ArrowDown"] },
   { id: "history.previous", label: "Previous commit", category: "History", scope: "history", binding: ["K", "ArrowUp"] },
+  { id: "history.files", label: "Go to the commit's files", category: "History", scope: "history", binding: ["Enter"] },
+  { id: "history.back", label: "Back to the commit list", category: "History", scope: "history", binding: ["Escape"] },
   { id: "history.top", label: "Jump to the newest commit", category: "History", scope: "history", binding: ["G G"] },
 ];
 

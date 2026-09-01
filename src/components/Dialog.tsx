@@ -50,10 +50,63 @@ export function Dialog({ spec, onClose }: { spec: DialogSpec; onClose: () => voi
   });
 
   const firstInput = useRef<HTMLInputElement>(null);
+  const frame = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     firstInput.current?.select();
+
+    // A dialog with no text field has nothing that autofocuses, and the key
+    // handling below lives on this element -- without focus inside it, Escape
+    // and Enter never arrive and the dialog can only be finished with a mouse.
+    if (!firstInput.current) frame.current?.focus();
   }, []);
+
+  /** Everything inside that can hold focus, in tab order. */
+  const focusable = () =>
+    Array.from(
+      frame.current?.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    );
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      onClose();
+      return;
+    }
+
+    // Tab cycles within the dialog. Without this it walks straight out into the
+    // window behind the scrim, where the highlight vanishes and every key does
+    // something to a repository the user cannot see.
+    if (e.key === "Tab") {
+      const stops = focusable();
+      if (stops.length === 0) return;
+
+      const first = stops[0]!;
+      const last = stops[stops.length - 1]!;
+      const here = document.activeElement;
+
+      if (e.shiftKey && (here === first || here === frame.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && here === last) {
+        e.preventDefault();
+        first.focus();
+      }
+      return;
+    }
+
+    if (e.key === "Enter") {
+      // A focused button already acts on Enter. Confirming here as well would
+      // run Cancel and the confirm from one keystroke -- on a delete dialog,
+      // pressing Enter on Cancel would delete the branch.
+      if (e.target instanceof HTMLButtonElement) return;
+
+      e.preventDefault();
+      confirm();
+    }
+  };
 
   const missing = (spec.fields ?? []).some(
     (field) => !field.optional && values[field.key]?.trim() === "",
@@ -80,11 +133,13 @@ export function Dialog({ spec, onClose }: { spec: DialogSpec; onClose: () => voi
     <div className="scrim" onMouseDown={onClose}>
       <div
         className="dialog"
+        ref={frame}
+        role="dialog"
+        aria-modal="true"
+        aria-label={spec.title}
+        tabIndex={-1}
         onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-          if (e.key === "Enter") confirm();
-        }}
+        onKeyDown={onKeyDown}
       >
         <h2 className="dialog-title">{spec.title}</h2>
         {spec.message && <p className="dialog-message">{spec.message}</p>}

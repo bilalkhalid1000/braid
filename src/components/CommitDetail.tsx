@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
@@ -13,6 +20,23 @@ const ROW_HEIGHT = 22;
 interface Props {
   repoId: string;
   oid: string;
+  /** True while the file list holds the keyboard rather than the commit list
+   *  above it, so the cursor can look like a cursor rather than a leftover. */
+  focused?: boolean;
+}
+
+/** Driving the file list from the view that owns the keyboard.
+ *
+ *  Exposed as a handle rather than lifting the selection out, because the
+ *  selection is only ever read here -- it decides which diff is shown -- and
+ *  moving it upward would put a piece of this component's state in another
+ *  file for no one else's benefit. */
+export interface CommitDetailHandle {
+  /** Move the cursor, selecting the first file if nothing is selected yet. */
+  move: (delta: number) => void;
+  /** How many files this commit touched, so a caller can decide not to enter
+   *  an empty list. */
+  count: () => number;
 }
 
 /** What one commit did.
@@ -23,7 +47,10 @@ interface Props {
  *  a 300-line one look nearly the same. Reading the numbers instead means the
  *  layout can use the width it actually has, and the bars can be true to scale.
  */
-export function CommitDetail({ repoId, oid }: Props) {
+export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function CommitDetail(
+  { repoId, oid, focused }: Props,
+  ref,
+) {
   const { settings } = useSettings();
   const [selected, setSelected] = useState<string | null>(null);
   const [listWidth, setListWidth] = usePaneSize("commit-files", 380);
@@ -49,6 +76,28 @@ export function CommitDetail({ repoId, oid }: Props) {
   // A different commit is a different set of files; keeping the old selection
   // would show a diff belonging to nothing on screen.
   useEffect(() => setSelected(null), [oid]);
+
+  useImperativeHandle(ref, () => ({
+    count: () => files.length,
+    move: (delta: number) => {
+      if (files.length === 0) return;
+
+      const at = files.findIndex((file) => file.path === selected);
+      // Nothing selected yet: down starts at the top, up at the bottom.
+      const next =
+        at === -1
+          ? delta > 0
+            ? 0
+            : files.length - 1
+          : Math.min(Math.max(at + delta, 0), files.length - 1);
+
+      const file = files[next];
+      if (!file) return;
+
+      setSelected(file.path);
+      virtualizer.scrollToIndex(next, { align: "auto" });
+    },
+  }));
 
   const virtualizer = useVirtualizer({
     count: files.length,
@@ -130,7 +179,13 @@ export function CommitDetail({ repoId, oid }: Props) {
               return (
                 <div
                   key={item.key}
-                  className={`commit-file ${file.path === selected ? "commit-file-selected" : ""}`}
+                  className={[
+                    "commit-file",
+                    file.path === selected && "commit-file-selected",
+                    file.path === selected && focused && "commit-file-cursor",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   style={{ height: item.size, transform: `translateY(${item.start}px)` }}
                   onMouseDown={() => setSelected(file.path)}
                   {...tip(
@@ -162,7 +217,7 @@ export function CommitDetail({ repoId, oid }: Props) {
       </div>
     </div>
   );
-}
+});
 
 /** Additions and deletions as one bar, scaled against the biggest file here.
  *

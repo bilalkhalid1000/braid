@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 
 import { IconChevron } from "./icons";
 import { FilterInput, matchesFilter } from "./FilterInput";
 import { useCommands } from "../lib/useCommands";
 import { useSettings } from "../lib/settings";
 import { shortcutLabel } from "../lib/shortcutLabel";
+import { groupRefs, hasFolders, visibleNodes, type RefNode } from "../lib/refTree";
 import { Keys } from "./Keys";
+import { useTip } from "./Tip";
 import {
   submoduleLabel,
   type BranchRef,
@@ -74,12 +76,19 @@ interface Props {
   onCheckout: (name: string) => void;
   onStash: (selector: string, action: "apply" | "pop" | "drop") => void;
   onOpenPath: (path: string) => void;
+  onNewBranch: () => void;
   onAddWorktree: () => void;
   onRemoveWorktree: (path: string) => void;
   onPruneWorktrees: () => void;
   onUpdateSubmodule: (path: string) => void;
   onUpdateAllSubmodules: () => void;
   onMenu: (target: MenuTarget, at: Point) => void;
+  /** What the keyboard cursor is on, so a command outside the sidebar can
+   *  act on it instead of opening an empty prompt. */
+  onCursor?: (target: MenuTarget | null) => void;
+  /** Delete whatever the cursor is on. Which things can be deleted, and what
+   *  deleting one means, is decided where the git actions live. */
+  onDelete: (target: MenuTarget) => void;
 }
 
 /** One row the keyboard can land on. */
@@ -87,6 +96,9 @@ interface Row {
   key: string;
   activate: () => void;
   menu: (at: Point) => void;
+  /** What this row points at, for commands that act on the cursor rather than
+   *  asking. A folder points at nothing. */
+  target?: MenuTarget;
 }
 
 export function Sidebar({
@@ -101,17 +113,32 @@ export function Sidebar({
   onCheckout,
   onStash,
   onOpenPath,
+  onNewBranch,
   onAddWorktree,
   onRemoveWorktree,
   onPruneWorktrees,
   onUpdateSubmodule,
   onUpdateAllSubmodules,
   onMenu,
+  onCursor,
+  onDelete,
 }: Props) {
   const { keymap } = useSettings();
   const [filter, setFilter] = useState("");
   const [index, setIndex] = useState(0);
   const open = filter !== "";
+
+  /** Folders the user has closed, keyed by section so "feature" under branches
+   *  and "feature" under tags are not the same fold. */
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const isCollapsed = (key: string) => collapsed.has(key);
+  const toggleFolder = (key: string) =>
+    setCollapsed((current) => {
+      const next = new Set(current);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
 
   const focused = isSidebarPanel(focusedPanel) ? focusedPanel : null;
 
@@ -144,14 +171,49 @@ export function Sidebar({
     return { branches, tags, stashes, remotes, count };
   }, [refs, filter]);
 
+  // Git puts the structure in the name; this reads it back out, so forty
+  // feature branches are one row until you want them.
+  const branchTree = useMemo(
+    () => groupRefs(shown.branches, (branch) => branch.name),
+    [shown.branches],
+  );
+  const tagTree = useMemo(() => groupRefs(shown.tags, (tag) => tag), [shown.tags]);
+
+  /** The disclosure column costs every row in the section 20px of indent, so it
+   *  is only reserved where something is actually grouped. A repository with no
+   *  slashes in its branch names looks exactly as it did before. */
+  const twisty = (present: boolean) =>
+    present ? <span className="side-twisty" /> : undefined;
+
+  const branchesGrouped = hasFolders(branchTree);
+  const tagsGrouped = hasFolders(tagTree);
+
+  // A filter opens every folder: a match hidden inside a closed one reads as no
+  // match at all.
+  const folded = (section: string) => (path: string) =>
+    !open && isCollapsed(`${section}:${path}`);
+
   /** The rows of whichever panel currently has focus, in display order. */
   const rows: Row[] = useMemo(() => {
     if (focused === "branches") {
-      return shown.branches.map((branch) => ({
-        key: `branch:${branch.name}`,
-        activate: () => !branch.isHead && onCheckout(branch.name),
-        menu: (at: Point) => onMenu({ kind: "branch", branch }, at),
-      }));
+      // What is on screen, not every branch. A name inside a closed folder is
+      // not a stop -- the cursor would move to nothing -- and the folders
+      // themselves are stops, or a closed one could never be opened without
+      // reaching for the mouse.
+      return visibleNodes(branchTree, folded("branch")).map<Row>((node) =>
+        node.kind === "folder"
+          ? {
+              key: `branch-folder:${node.path}`,
+              activate: () => toggleFolder(`branch:${node.path}`),
+              menu: () => {},
+            }
+          : {
+              key: `branch:${node.item.name}`,
+              activate: () => !node.item.isHead && onCheckout(node.item.name),
+              menu: (at: Point) => onMenu({ kind: "branch", branch: node.item }, at),
+              target: { kind: "branch", branch: node.item },
+            },
+      );
     }
 
     if (focused === "remotes") {
@@ -160,6 +222,7 @@ export function Sidebar({
           key: `remote:${remote.name}/${branch}`,
           activate: () => onCheckout(branch),
           menu: (at: Point) => onMenu({ kind: "remote", remote: remote.name, branch }, at),
+          target: { kind: "remote", remote: remote.name, branch },
         })),
       );
     }
@@ -177,6 +240,7 @@ export function Sidebar({
         key: `worktree:${worktree.path}`,
         activate: () => onOpenPath(worktree.path),
         menu: (at: Point) => onMenu({ kind: "worktree", worktree }, at),
+        target: { kind: "worktree", worktree },
       }));
     }
 
@@ -188,12 +252,16 @@ export function Sidebar({
             ? onUpdateSubmodule(submodule.path)
             : onOpenPath(submodule.path),
         menu: (at: Point) => onMenu({ kind: "submodule", submodule }, at),
+        target: { kind: "submodule", submodule },
       }));
     }
 
     return [];
+    // `branchTree` and `collapsed` are here because folding a group changes
+    // which rows exist. Without them the cursor keeps walking a list from
+    // before the fold and lands on branches that are no longer on screen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focused, shown, worktrees, submodules]);
+  }, [focused, shown, worktrees, submodules, branchTree, collapsed, open]);
 
   // Landing on a panel starts at the top, and a list that shrank under the
   // cursor pulls it back into range rather than leaving nothing selected.
@@ -203,6 +271,12 @@ export function Sidebar({
   }, [rows.length]);
 
   const selectedKey = focused ? rows[index]?.key : undefined;
+
+  // Reported upward so a command bound outside the sidebar can act on what the
+  // cursor is on. Null while no sidebar panel has focus, so those commands fall
+  // back to asking rather than acting on a stale highlight.
+  const cursorTarget = (focused ? rows[index]?.target : undefined) ?? null;
+  useEffect(() => onCursor?.(cursorTarget), [cursorTarget, onCursor]);
 
   useEffect(() => {
     if (!selectedKey) return;
@@ -227,6 +301,13 @@ export function Sidebar({
         const row = rows[index];
         if (row) row.menu(anchorOf(row.key));
       },
+      // Nothing happens on a row with nothing to delete -- a folder, a
+      // submodule -- rather than a confirmation for an action that does not
+      // exist.
+      "sidebar.delete": () => {
+        const target = rows[index]?.target;
+        if (target) onDelete(target);
+      },
       "sidebar.leave": () => onFocusPanel(view === "history" ? "history" : "files"),
     },
     // Escape belongs to whatever is on top: without this the sidebar would
@@ -237,6 +318,13 @@ export function Sidebar({
   const rowProps = (key: string) => ({
     "data-row": key,
     className: selectedKey === key ? "side-item side-item-cursor" : "side-item",
+  });
+
+  /** The same, for a folder row. It carries `data-row` for the same reason a
+   *  branch does: the cursor scrolls itself into view by querying for it. */
+  const folderProps = (key: string) => ({
+    "data-row": key,
+    className: selectedKey === key ? "side-folder side-folder-cursor" : "side-folder",
   });
 
   return (
@@ -273,12 +361,24 @@ export function Sidebar({
         forceOpen={open || focused === "branches"}
         number={panelNumber("branches")}
         focused={focused === "branches"}
+        action={{
+          label: "new",
+          title: "New branch",
+          command: "git.new",
+          onClick: onNewBranch,
+        }}
       >
-        {shown.branches.map((branch) => (
+        <RefTree
+          nodes={branchTree}
+          isFolded={folded("branch")}
+          onToggle={(path) => toggleFolder(`branch:${path}`)}
+          folderProps={(path) => folderProps(`branch-folder:${path}`)}
+          renderLeaf={(branch, label) => (
           <Item
             key={branch.name}
             {...rowProps(`branch:${branch.name}`)}
-            label={branch.name}
+            leading={twisty(branchesGrouped)}
+            label={label}
             active={branch.isHead}
             bold={branch.isHead}
             title={
@@ -302,17 +402,26 @@ export function Sidebar({
               </>
             }
           />
-        ))}
+          )}
+        />
       </Section>
 
       <Section title="Tags" count={shown.tags.length} forceOpen={open}>
-        {shown.tags.map((tag) => (
-          <Item
-            key={tag}
-            label={tag}
-            onContextMenu={(e) => onMenu({ kind: "tag", tag }, { x: e.clientX, y: e.clientY })}
-          />
-        ))}
+        <RefTree
+          nodes={tagTree}
+          isFolded={folded("tag")}
+          onToggle={(path) => toggleFolder(`tag:${path}`)}
+          folderProps={(path) => folderProps(`tag-folder:${path}`)}
+          renderLeaf={(tag, label) => (
+            <Item
+              key={tag}
+              leading={twisty(tagsGrouped)}
+              label={label}
+              title={tag}
+              onContextMenu={(e) => onMenu({ kind: "tag", tag }, { x: e.clientX, y: e.clientY })}
+            />
+          )}
+        />
       </Section>
 
       <Section
@@ -399,7 +508,12 @@ export function Sidebar({
         forceOpen={focused === "worktrees"}
         number={panelNumber("worktrees")}
         focused={focused === "worktrees"}
-        action={{ label: "add", title: "Add a worktree", onClick: onAddWorktree }}
+        action={{
+          label: "add",
+          title: "Add a worktree",
+          command: "git.worktree",
+          onClick: onAddWorktree,
+        }}
       >
         {worktrees?.length === 0 && <Empty>No worktrees</Empty>}
         {worktrees?.map((worktree) => (
@@ -506,6 +620,10 @@ export function Sidebar({
           </Keys>{" "}
           ·{" "}
           <Keys>
+            <kbd>{shortcutLabel(keymap["sidebar.delete"])}</kbd> delete
+          </Keys>{" "}
+          ·{" "}
+          <Keys>
             <kbd>{shortcutLabel(keymap["sidebar.leave"])}</kbd> back
           </Keys>
         </p>
@@ -525,6 +643,67 @@ function worktreeSubtitle(worktree: Worktree) {
 function leaf(path: string) {
   const parts = path.replace(/\/+$/, "").split("/");
   return parts[parts.length - 1] || path;
+}
+
+/** Renders a grouped ref list: folders you can close, names you cannot.
+ *
+ *  Indentation comes from nesting the container rather than from a depth
+ *  counter on each row, so a folder five deep needs no arithmetic and the rows
+ *  themselves stay the same rows as in a flat section. */
+function RefTree<T>({
+  nodes,
+  isFolded,
+  onToggle,
+  folderProps,
+  renderLeaf,
+}: {
+  nodes: RefNode<T>[];
+  isFolded: (path: string) => boolean;
+  onToggle: (path: string) => void;
+  /** Marks the folder row for the keyboard cursor. */
+  folderProps: (path: string) => Record<string, unknown>;
+  renderLeaf: (item: T, label: string) => ReactNode;
+}) {
+  return (
+    <>
+      {nodes.map((node) =>
+        node.kind === "leaf" ? (
+          <Fragment key={node.path}>{renderLeaf(node.item, node.label)}</Fragment>
+        ) : (
+          <Fragment key={node.path}>
+            <button
+              {...folderProps(node.path)}
+              title={node.path}
+              onClick={() => onToggle(node.path)}
+            >
+              {/* The rail stays empty: it is the keyboard column, and a digit
+                  there is always a key. The chevron gets a column of its own,
+                  which every row in a grouped list reserves -- blank on a
+                  branch, filled on a folder -- so a folder's name sits on the
+                  same left edge as the branches beside it. */}
+              <span className="side-rail" />
+              <span className="side-twisty">
+                <IconChevron open={!isFolded(node.path)} />
+              </span>
+              <span className="side-folder-label">{node.label}</span>
+            </button>
+
+            {!isFolded(node.path) && (
+              <div className="side-nest">
+                <RefTree
+                  nodes={node.children}
+                  isFolded={isFolded}
+                  onToggle={onToggle}
+                  folderProps={folderProps}
+                  renderLeaf={renderLeaf}
+                />
+              </div>
+            )}
+          </Fragment>
+        ),
+      )}
+    </>
+  );
 }
 
 function Section({
@@ -549,7 +728,7 @@ function Section({
   /** The digit that jumps here. Shown because it is the actual key. */
   number?: number;
   focused?: boolean;
-  action?: { label: string; title: string; onClick: () => void };
+  action?: { label: string; title: string; command?: string; onClick: () => void };
 }) {
   const [expanded, setExpanded] = useState(defaultOpen);
   const open = forceOpen || expanded;
@@ -583,6 +762,7 @@ function Section({
           <LinkAction
             label={action.label}
             title={action.title}
+            command={action.command}
             hoverOnly
             onClick={action.onClick}
           />
@@ -670,18 +850,25 @@ function Item({
 function LinkAction({
   label,
   title,
+  command,
   hoverOnly,
   onClick,
 }: {
   label: string;
   title: string;
+  /** The command this runs, so the tip can show its key. */
+  command?: string;
   hoverOnly?: boolean;
   onClick: () => void;
 }) {
+  // The app's own tip, not the native one: these are controls, and a control
+  // should say what key runs it. A `title` cannot draw a key cap.
+  const tip = useTip();
+
   return (
     <button
       className={`link-button ${hoverOnly ? "hover-only" : ""}`}
-      title={title}
+      {...tip(title, command)}
       onClick={(e) => {
         e.stopPropagation();
         onClick();

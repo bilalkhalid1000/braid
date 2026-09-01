@@ -6,7 +6,7 @@ import { api, type Commit } from "../lib/api";
 import { buildGraph } from "../lib/graph";
 import { CommitGraph, LANE_WIDTH } from "./CommitGraph";
 import { Splitter, usePaneSize } from "./Splitter";
-import { CommitDetail } from "./CommitDetail";
+import { CommitDetail, type CommitDetailHandle } from "./CommitDetail";
 import { useCommands } from "../lib/useCommands";
 import { useSettings } from "../lib/settings";
 
@@ -27,6 +27,10 @@ interface Props {
 export function HistoryView({ repoId, headOid, keyboardActive }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<Commit | null>(null);
+  const detailRef = useRef<CommitDetailHandle>(null);
+  /** Which half of this view the keyboard is driving: the commits, or the files
+   *  of the one selected. Two lists on screen, one cursor between them. */
+  const [pane, setPane] = useState<"commits" | "files">("commits");
   const [tableHeight, setTableHeight] = usePaneSize("history-table", 420);
   const { settings } = useSettings();
   const pageSize = settings.historyPageSize;
@@ -79,16 +83,34 @@ export function HistoryView({ repoId, headOid, keyboardActive }: Props) {
     }
   };
 
+  // Picking a different commit puts the keyboard back on the commit list: the
+  // file list under it has just been replaced by another commit's.
+  useEffect(() => setPane("commits"), [selected?.oid]);
+
+  const toCommits = () => setPane("commits");
+
   useCommands({
-    "history.next": () => move(1),
-    "history.previous": () => move(-1),
+    "history.next": () => (pane === "files" ? detailRef.current?.move(1) : move(1)),
+    "history.previous": () =>
+      pane === "files" ? detailRef.current?.move(-1) : move(-1),
     "history.top": () => {
       const first = commits[0];
       if (first) {
+        toCommits();
         setSelected(first);
         virtualizer.scrollToIndex(0, { align: "start" });
       }
     },
+    // Enter descends into the commit's files; an empty commit has nothing to
+    // descend into, so it stays put rather than moving the cursor nowhere.
+    "history.files": () => {
+      if (pane === "files" || !selected) return;
+      if ((detailRef.current?.count() ?? 0) === 0) return;
+
+      setPane("files");
+      detailRef.current?.move(1);
+    },
+    "history.back": toCommits,
   }, keyboardActive);
 
   return (
@@ -112,9 +134,20 @@ export function HistoryView({ repoId, headOid, keyboardActive }: Props) {
               return (
                 <div
                   key={item.key}
-                  className={`history-row ${commit.oid === selected?.oid ? "history-row-selected" : ""}`}
+                  className={[
+                    "history-row",
+                    commit.oid === selected?.oid && "history-row-selected",
+                    commit.oid === selected?.oid &&
+                      pane === "commits" &&
+                      "history-row-cursor",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   style={{ height: item.size, transform: `translateY(${item.start}px)` }}
-                  onMouseDown={() => setSelected(commit)}
+                  onMouseDown={() => {
+                    toCommits();
+                    setSelected(commit);
+                  }}
                 >
                   <CommitGraph
                     row={row}
@@ -160,7 +193,12 @@ export function HistoryView({ repoId, headOid, keyboardActive }: Props) {
 
       <div className="history-detail">
         {selected ? (
-          <CommitDetail repoId={repoId} oid={selected.oid} />
+          <CommitDetail
+            ref={detailRef}
+            repoId={repoId}
+            oid={selected.oid}
+            focused={pane === "files"}
+          />
         ) : (
           <div className="pane-empty">Select a commit to see what it changed</div>
         )}

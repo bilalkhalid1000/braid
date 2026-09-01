@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { validateHotkey } from "@tanstack/react-hotkeys";
 
 import {
   COMMANDS,
@@ -193,6 +194,33 @@ describe("findConflicts", () => {
   it("keeps every catalog command resolvable by id", () => {
     for (const command of COMMANDS) {
       expect(COMMANDS_BY_ID[command.id]).toBe(command);
+    }
+  });
+});
+
+describe("every default binding is a hotkey the library accepts", () => {
+  // useCommands skips a binding it cannot validate, silently: the key simply
+  // does nothing and nothing says why. A typo in the catalog would ship as a
+  // dead key, so the catalog is checked here instead of at runtime.
+  it("validates every chord of every command", () => {
+    const bad: string[] = [];
+
+    for (const command of COMMANDS) {
+      for (const binding of command.binding) {
+        for (const chord of chordsOf(binding)) {
+          if (!validateHotkey(chord).valid) bad.push(`${command.id}: ${chord}`);
+        }
+      }
+    }
+
+    expect(bad).toEqual([]);
+  });
+
+  it("leaves no command unbound by accident", () => {
+    // An empty array is how a user unbinds something. A default should never
+    // ship that way.
+    for (const command of COMMANDS) {
+      expect(command.binding.length, command.id).toBeGreaterThan(0);
     }
   });
 });
