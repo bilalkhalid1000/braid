@@ -1,3 +1,11 @@
+//! Line-by-line authorship for one file.
+//!
+//! Parsed from `git blame --porcelain`, which states a commit's details once
+//! and then refers back to it by hash. That shape is worth preserving all the
+//! way to the UI: a long file is usually the work of a few dozen commits, and
+//! repeating the author, date and summary on all of ten thousand lines would
+//! cost far more to serialize than the blame itself does to compute.
+
 use std::collections::HashMap;
 
 use serde::Serialize;
@@ -5,13 +13,6 @@ use serde::Serialize;
 use super::cli::Git;
 use crate::error::Result;
 
-/// Line-by-line authorship for one file.
-///
-/// Parsed from `git blame --porcelain`, which states a commit's details once
-/// and then refers back to it by hash. That shape is worth preserving all the
-/// way to the UI: a long file is usually the work of a few dozen commits, and
-/// repeating the author, date and summary on all of ten thousand lines would
-/// cost far more to serialize than the blame itself does to compute.
 
 /// A file blamed while it had uncommitted changes reports those lines against
 /// the all-zero hash.

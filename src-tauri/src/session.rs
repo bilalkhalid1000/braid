@@ -62,3 +62,49 @@ pub async fn save(app: &AppHandle, session: &Session) -> Result<()> {
     tokio::fs::write(&path, text).await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn read(text: &str) -> Session {
+        serde_json::from_str(text).unwrap_or_default()
+    }
+
+    #[test]
+    fn keeps_the_order_tabs_were_shown_in() {
+        // The order is the arrangement, not an accident of how they were
+        // opened, and restoring it is how the strip comes back the same.
+        let back = read(r#"{"repos":["c","a","b"],"active":"a"}"#);
+
+        assert_eq!(back.repos, ["c", "a", "b"]);
+        assert_eq!(back.active.as_deref(), Some("a"));
+    }
+
+    #[test]
+    fn a_session_with_no_active_tab_is_fine() {
+        let back = read(r#"{"repos":["a"],"active":null}"#);
+
+        assert_eq!(back.repos.len(), 1);
+        assert!(back.active.is_none());
+    }
+
+    #[test]
+    fn a_corrupt_session_starts_empty_rather_than_failing() {
+        assert!(read("{{{").repos.is_empty());
+        assert!(read("").repos.is_empty());
+    }
+
+    #[test]
+    fn round_trips() {
+        let session = Session {
+            repos: vec!["E:/a".into(), "E:/b".into()],
+            active: Some("E:/b".into()),
+        };
+
+        let back = read(&serde_json::to_string(&session).unwrap());
+
+        assert_eq!(back.repos, session.repos);
+        assert_eq!(back.active, session.active);
+    }
+}

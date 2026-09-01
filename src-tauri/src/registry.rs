@@ -108,3 +108,61 @@ fn repo_id(root: &Path) -> String {
         s
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    /// A path with the platform's own separator, built rather than written.
+    fn path(text: &str) -> PathBuf {
+        PathBuf::from(text.replace('/', std::path::MAIN_SEPARATOR_STR))
+    }
+
+    #[test]
+    fn the_same_repository_gets_the_same_id_whatever_the_separators() {
+        // Opening a repository twice must resolve to one session, or the
+        // second open starts a second filesystem watcher on the same tree.
+        let a = repo_id(&PathBuf::from("E:/Projects/api"));
+        let b = repo_id(&PathBuf::from("E:\\Projects\\api"));
+
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn different_repositories_keep_different_ids() {
+        assert_ne!(
+            repo_id(&PathBuf::from("E:/Projects/api")),
+            repo_id(&PathBuf::from("E:/Projects/api2")),
+        );
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn case_is_ignored_where_the_filesystem_ignores_it() {
+        // The frontend's own path comparison lowercases too. If these two
+        // disagree, one repository ends up with two entries in the list.
+        assert_eq!(
+            repo_id(&PathBuf::from("E:/Projects/API")),
+            repo_id(&PathBuf::from("e:/projects/api")),
+        );
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn case_is_kept_where_the_filesystem_keeps_it() {
+        assert_ne!(
+            repo_id(&PathBuf::from("/srv/API")),
+            repo_id(&PathBuf::from("/srv/api")),
+        );
+    }
+
+    #[test]
+    fn an_id_never_contains_a_backslash() {
+        // It travels to the frontend and back as a string, and is compared
+        // there against paths written with forward slashes.
+        let id = repo_id(&path("E:/Projects/api"));
+
+        assert!(!id.contains('\\'), "got {id}");
+    }
+}

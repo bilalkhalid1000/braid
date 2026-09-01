@@ -1,16 +1,17 @@
+//! Every git process the app starts, reported as it starts and as it ends.
+//!
+//! The point is not debugging. This client is a face over the user's own git,
+//! and a face is exactly the kind of thing that can quietly do something other
+//! than what it said. Showing the argv is how someone checks — and how anyone
+//! who knows git can work out what went wrong without our error text having to
+//! anticipate it.
+
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 
 use serde::Serialize;
 use tokio::sync::mpsc::UnboundedSender;
 
-/// Every git process the app starts, reported as it starts and as it ends.
-///
-/// The point is not debugging. This client is a face over the user's own git,
-/// and a face is exactly the kind of thing that can quietly do something other
-/// than what it said. Showing the argv is how someone checks — and how anyone
-/// who knows git can work out what went wrong without our error text having to
-/// anticipate it.
 
 pub const GIT_COMMAND_EVENT: &str = "git://command";
 
