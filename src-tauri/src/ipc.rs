@@ -426,21 +426,31 @@ pub async fn checkout(
 }
 
 #[tauri::command]
+/// Create a branch, optionally from somewhere other than HEAD.
+///
+/// An absent or empty `base` is left off the command entirely, which is how
+/// git already spells "from where I am".
 pub async fn create_branch(
     registry: State<'_, RepoRegistry>,
     id: String,
     name: String,
     checkout_after: bool,
+    base: Option<String>,
 ) -> Result<String> {
     let session = registry.get(&id)?;
+    let base = base.filter(|b| !b.trim().is_empty());
 
-    let args: &[&str] = if checkout_after {
-        &["checkout", "-b", &name]
+    let mut args: Vec<&str> = if checkout_after {
+        vec!["checkout", "-b", &name]
     } else {
-        &["branch", &name]
+        vec!["branch", &name]
     };
 
-    session.git.run_reported(args).await
+    if let Some(base) = base.as_deref() {
+        args.push(base);
+    }
+
+    session.git.run_reported(&args).await
 }
 
 #[tauri::command]

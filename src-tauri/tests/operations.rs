@@ -209,6 +209,39 @@ async fn a_submodule_is_listed_with_its_url() {
     assert!(modules[0].url.is_some(), "the URL comes from .gitmodules");
 }
 
+// --- branching -------------------------------------------------------------
+
+#[tokio::test]
+async fn a_branch_starts_from_head_when_no_base_is_given() {
+    let repo = TestRepo::new();
+    repo.write("a.txt", "a
+");
+    repo.commit_all("On main");
+    let tip = repo.head();
+
+    repo.git(&["branch", "from-head"]);
+
+    assert_eq!(repo.git(&["rev-parse", "from-head"]).trim(), tip);
+}
+
+#[tokio::test]
+async fn a_branch_can_start_somewhere_other_than_head() {
+    // The point of naming a base: the new branch must sit on the commit that
+    // was asked for, not on wherever HEAD happens to be.
+    let repo = TestRepo::new();
+    let first = repo.head();
+
+    repo.write("a.txt", "a
+");
+    repo.commit_all("A second commit");
+    assert_ne!(repo.head(), first);
+
+    repo.git(&["branch", "from-first", &first]);
+
+    assert_eq!(repo.git(&["rev-parse", "from-first"]).trim(), first);
+    assert_ne!(repo.git(&["rev-parse", "from-first"]).trim(), repo.head());
+}
+
 // --- publishing ------------------------------------------------------------
 
 #[tokio::test]

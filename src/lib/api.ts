@@ -357,8 +357,12 @@ export const api = {
   push: (id: string) => invoke<string>("push", { id }),
 
   checkout: (id: string, name: string) => invoke<string>("checkout", { id, name }),
-  createBranch: (id: string, name: string, checkoutAfter: boolean) =>
-    invoke<string>("create_branch", { id, name, checkoutAfter }),
+  createBranch: (
+    id: string,
+    name: string,
+    checkoutAfter: boolean,
+    base: string | null,
+  ) => invoke<string>("create_branch", { id, name, checkoutAfter, base }),
   deleteBranch: (id: string, name: string, force: boolean) =>
     invoke<string>("delete_branch", { id, name, force }),
   mergeBranch: (id: string, name: string) => invoke<string>("merge_branch", { id, name }),

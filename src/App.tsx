@@ -786,20 +786,15 @@ export default function App() {
     openMenuAt(x, y, entries);
   };
 
-  const openNewBranch = () =>
-    setDialog({
-      title: "New branch",
-      fields: [{ key: "name", label: "Branch name", placeholder: "feature/thing" }],
-      confirmLabel: "Create branch",
-      onConfirm: (v) =>
-        act(`Create branch ${v.name}`, () => api.createBranch(id!, v.name, true)),
-    });
-
-  /** Everything that can be merged, local first. */
-  const mergeSources = (): ComboOption[] => [
+  /** Every ref you could name: local branches first, then remote-tracking
+   *  branches, then tags. Used wherever the answer is "a place in history". */
+  const refOptions = ({ includeCurrent = true } = {}): ComboOption[] => [
     ...(refs.data?.branches ?? [])
-      .filter((branch) => !branch.isHead)
-      .map((branch) => ({ value: branch.name })),
+      .filter((branch) => includeCurrent || !branch.isHead)
+      .map((branch) => ({
+        value: branch.name,
+        note: branch.isHead ? "current" : undefined,
+      })),
     ...(refs.data?.remotes ?? []).flatMap((remote) =>
       remote.branches.map((branch) => ({
         value: `${remote.name}/${branch}`,
@@ -808,6 +803,42 @@ export default function App() {
     ),
     ...(refs.data?.tags ?? []).map((tag) => ({ value: tag, note: "tag" })),
   ];
+
+  const openNewBranch = () => {
+    const current = head?.head ?? "HEAD";
+
+    setDialog({
+      title: "New branch",
+      fields: [
+        { key: "name", label: "Branch name", placeholder: "feature/thing" },
+        {
+          key: "base",
+          label: "Starting from",
+          // Defaults to where you are, which is what git does when no start
+          // point is given -- and what you want often enough that the field is
+          // there to be ignored as much as used.
+          value: current,
+          placeholder: current,
+          optional: true,
+          options: refOptions(),
+          describe: (value) => {
+            const base = value.trim();
+            if (base === "" || base === current) return undefined;
+
+            // Worth saying: branching from somewhere you are not is the case
+            // where the result surprises people.
+            return `Branches from ${base}, not from ${current}.`;
+          },
+        },
+      ],
+      checkboxes: [{ key: "checkout", label: "Check it out afterwards", value: true }],
+      confirmLabel: "Create branch",
+      onConfirm: (v) =>
+        act(`Create branch ${v.name}`, () =>
+          api.createBranch(id!, v.name, v.checkout === "true", v.base || null),
+        ),
+    });
+  };
 
   /** The branch the sidebar cursor is on, if it is on one.
    *
@@ -840,7 +871,7 @@ export default function App() {
           label: "Branch to merge",
           value: cursorRef(),
           placeholder: "main",
-          options: mergeSources(),
+          options: refOptions({ includeCurrent: false }),
           describe: (value) =>
             value.trim() === "" ? undefined : `Merges ${value.trim()} into ${current}.`,
         },
