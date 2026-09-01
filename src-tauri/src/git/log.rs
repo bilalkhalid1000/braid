@@ -47,11 +47,18 @@ pub const FORMAT: &str = "--format=%H\x1f%h\x1f%an\x1f%ae\x1f%at\x1f%P\x1f%D\x1f
 /// opened to answer.
 pub fn scope_args(scope: &str) -> &'static [&'static str] {
     match scope {
-        // Local and remote branches, plus tags. What SourceTree calls
-        // "All branches" with remotes shown.
-        "all" => &["--all"],
+        // Branches, remote branches and tags -- and deliberately not --all.
+        //
+        // --all means every ref under refs/, which includes namespaces nobody
+        // asked to see: refs/stash, refs/notes, and whatever tooling has put
+        // there. An agent that writes a checkpoint ref per turn buried this
+        // repository's own history under a hundred of them.
+        //
+        // HEAD is named so a detached checkout still appears; it is not a
+        // branch, so the branch flags alone would leave it out.
+        "all" => &["--branches", "--tags", "--remotes", "HEAD"],
         // Everything of your own, without a copy of it per remote.
-        "local" => &["--branches", "--tags"],
+        "local" => &["--branches", "--tags", "HEAD"],
         // The current branch, and whatever it can reach.
         _ => &[],
     }
@@ -185,14 +192,38 @@ mod tests {
     fn all_reaches_remotes_and_tags_as_well() {
         // A tag that is not an ancestor of HEAD is invisible without this, and
         // a tag you cannot see is one you cannot check you made.
-        assert_eq!(scope_args("all"), ["--all"]);
+        let args = scope_args("all");
+
+        assert!(args.contains(&"--branches"));
+        assert!(args.contains(&"--tags"));
+        assert!(args.contains(&"--remotes"));
+    }
+
+    #[test]
+    fn all_is_not_every_ref_in_the_repository() {
+        // --all sweeps up refs/stash, refs/notes and any namespace tooling has
+        // written. A checkpoint ref per turn is enough to bury the history the
+        // view exists to show.
+        assert!(!scope_args("all").contains(&"--all"));
+        assert!(!scope_args("local").contains(&"--all"));
+    }
+
+    #[test]
+    fn a_detached_head_is_still_somewhere_in_the_walk() {
+        // It is not a branch, so naming the branches is not enough to include
+        // the commit actually checked out.
+        assert!(scope_args("all").contains(&"HEAD"));
     }
 
     #[test]
     fn local_leaves_the_remotes_out() {
         // Every branch duplicated as origin/<name> doubles the lanes for a
         // repository whose remote is simply up to date.
-        assert_eq!(scope_args("local"), ["--branches", "--tags"]);
+        let args = scope_args("local");
+
+        assert!(args.contains(&"--branches"));
+        assert!(args.contains(&"--tags"));
+        assert!(!args.contains(&"--remotes"));
     }
 
     #[test]
