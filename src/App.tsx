@@ -266,6 +266,16 @@ export default function App() {
   // failing the whole restore, and reported once at the end instead of as one
   // error per repository.
   useEffect(() => {
+    // Not until the stored preference is actually known.
+    //
+    // settingsLoaded is a dependency, so this effect ran twice: once against
+    // the defaults and again once the file had been read. The first run opened
+    // every repository in the session and was then cancelled mid-flight by the
+    // second, which left them open in the backend but absent from the window --
+    // an empty tab strip that a reload appeared to fix, because by then the
+    // repositories really were open and the list query simply found them.
+    if (!settingsLoaded) return;
+
     let cancelled = false;
 
     void (async () => {
