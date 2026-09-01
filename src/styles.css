@@ -3605,3 +3605,26 @@ kbd.key-live {
   flex: none;
   margin-left: auto;
 }
+
+/* A toolbar button whose operation is running.
+ *
+ * The spinner sits in the icon's box at the icon's size, so the label below it
+ * does not move and the bar does not reflow the moment you press something. */
+.toolbar-button-busy .toolbar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+.toolbar-button-busy .spinner {
+  width: 14px;
+  height: 14px;
+}
+
+/* It is disabled while it runs, but it is not unavailable — it is working, and
+   the flat grey of a genuinely disabled button would say the wrong thing. */
+.toolbar-button-busy:disabled {
+  opacity: 1;
+  color: var(--text-dim);
+}

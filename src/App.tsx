@@ -336,8 +336,12 @@ export default function App() {
    *  The label is what the user sees in the toast, the status bar and the
    *  activity log, so it is written as the thing they asked for rather than
    *  the command that implements it. */
-  const perform = async (label: string, action: () => Promise<unknown>) => {
-    const ok = await activity.run(label, action);
+  const perform = async (
+    label: string,
+    action: () => Promise<unknown>,
+    source?: string,
+  ) => {
+    const ok = await activity.run(label, action, source);
 
     // Refresh straight away rather than waiting on the filesystem watcher.
     // Some operations (fetch, in particular) change refs without touching
@@ -351,9 +355,14 @@ export default function App() {
     return ok;
   };
 
-  const act = (label: string, action: () => Promise<unknown>) => {
-    void perform(label, action);
+  const act = (label: string, action: () => Promise<unknown>, source?: string) => {
+    void perform(label, action, source);
   };
+
+  /** Toolbar buttons whose operation is running right now. */
+  const workingOn = new Set(
+    activity.running.map((entry) => entry.source).filter(Boolean),
+  );
 
   const addRepo = (path: string) =>
     perform(`Open ${path}`, async () => {
@@ -1303,7 +1312,8 @@ The stashed changes are discarded.`,
             label: "Pull",
             icon: <IconPull />,
             badge: head?.behind || undefined,
-            onClick: () => act("Pull", () => api.pull(id)),
+            onClick: () => act("Pull", () => api.pull(id), "pull"),
+            busy: workingOn.has("pull"),
           },
           {
             key: "push",
@@ -1311,14 +1321,16 @@ The stashed changes are discarded.`,
             label: "Push",
             icon: <IconPush />,
             badge: head?.ahead || undefined,
-            onClick: () => act("Push", () => api.push(id)),
+            onClick: () => act("Push", () => api.push(id), "push"),
+            busy: workingOn.has("push"),
           },
           {
             key: "fetch",
             commandId: "git.fetch",
             label: "Fetch",
             icon: <IconFetch />,
-            onClick: () => act("Fetch", () => api.fetch(id)),
+            onClick: () => act("Fetch", () => api.fetch(id), "fetch"),
+            busy: workingOn.has("fetch"),
           },
         ],
         [
@@ -1442,9 +1454,9 @@ The stashed changes are discarded.`,
       ]),
     ),
 
-    "git.fetch": id ? () => act("Fetch", () => api.fetch(id)) : undefined,
-    "git.pull": id ? () => act("Pull", () => api.pull(id)) : undefined,
-    "git.push": id ? () => act("Push", () => api.push(id)) : undefined,
+    "git.fetch": id ? () => act("Fetch", () => api.fetch(id), "fetch") : undefined,
+    "git.pull": id ? () => act("Pull", () => api.pull(id), "pull") : undefined,
+    "git.push": id ? () => act("Push", () => api.push(id), "push") : undefined,
     "git.commit": id
       ? () => {
           setView("status");

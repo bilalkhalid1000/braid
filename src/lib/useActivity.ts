@@ -10,6 +10,9 @@ export interface ActivityEntry {
   detail: string;
   startedAt: number;
   durationMs?: number;
+  /** Which control started this, so that control can show it is working.
+   *  Absent for anything not launched from a button. */
+  source?: string;
 }
 
 const MAX_ENTRIES = 200;
@@ -36,12 +39,19 @@ export function useActivity() {
   }, []);
 
   const run = useCallback(
-    async (label: string, action: () => Promise<unknown>): Promise<boolean> => {
+    async (
+      label: string,
+      action: () => Promise<unknown>,
+      source?: string,
+    ): Promise<boolean> => {
       const id = nextId.current++;
       const startedAt = Date.now();
 
       setEntries((prev) =>
-        [{ id, label, status: "running" as const, detail: "", startedAt }, ...prev].slice(
+        [
+          { id, label, status: "running" as const, detail: "", startedAt, source },
+          ...prev,
+        ].slice(
           0,
           MAX_ENTRIES,
         ),
