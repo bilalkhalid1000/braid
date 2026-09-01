@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { formatForDisplay } from "@tanstack/react-hotkeys";
+
 import { formatBinding, shortcutLabel } from "./shortcutLabel";
 
 describe("formatBinding", () => {
@@ -17,13 +19,20 @@ describe("formatBinding", () => {
   });
 
   it("leaves modifier combinations alone", () => {
-    expect(formatBinding("Mod+P")).toMatch(/\+P$/);
-    expect(formatBinding("Mod+Shift+T")).toContain("Shift");
+    // Compared against the library rather than against a string: how a
+    // modifier is drawn is the platform's business -- "Ctrl+P" on Windows and
+    // Linux, "⌘ P" on a Mac. The rule here only promises not to touch it, and
+    // spelling out one platform's answer made this pass on Windows and fail on
+    // the Mac runner.
+    for (const chord of ["Mod+P", "Mod+Shift+T", "Mod+Shift+PageUp", "Alt+Enter"]) {
+      expect(formatBinding(chord)).toBe(formatForDisplay(chord));
+    }
   });
 
   it("leaves named keys alone", () => {
-    expect(formatBinding("Escape")).toBe("Esc");
-    expect(formatBinding("Space")).toBe("␣");
+    for (const key of ["Escape", "Space", "ArrowDown", "Delete"]) {
+      expect(formatBinding(key)).toBe(formatForDisplay(key));
+    }
   });
 
   it("keeps a sequence as separate chords", () => {
