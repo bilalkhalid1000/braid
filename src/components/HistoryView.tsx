@@ -11,7 +11,9 @@ import { useCommands } from "../lib/useCommands";
 import { useSettings } from "../lib/settings";
 
 const ROW_HEIGHT = 26;
-const MAX_GRAPH_LANES = 10;
+
+/** Enough for a trunk and a couple of branches; the rest is a drag away. */
+const DEFAULT_GRAPH_WIDTH = 130;
 
 interface Props {
   repoId: string;
@@ -32,6 +34,7 @@ export function HistoryView({ repoId, headOid, keyboardActive }: Props) {
    *  of the one selected. Two lists on screen, one cursor between them. */
   const [pane, setPane] = useState<"commits" | "files">("commits");
   const [tableHeight, setTableHeight] = usePaneSize("history-table", 420);
+  const [graphWidth, setGraphWidth] = usePaneSize("history-graph", DEFAULT_GRAPH_WIDTH);
   const { settings } = useSettings();
   const pageSize = settings.historyPageSize;
 
@@ -52,7 +55,11 @@ export function HistoryView({ repoId, headOid, keyboardActive }: Props) {
   // Lane assignment depends on every commit before it, so the whole loaded
   // prefix is laid out at once and reused until another page arrives.
   const graph = useMemo(() => buildGraph(commits), [commits]);
-  const laneColumns = Math.min(graph.maxLanes, MAX_GRAPH_LANES);
+
+  // How many lanes the column has room for. Lanes past this are clamped onto
+  // the last one, which is why the column is draggable: widening it is how you
+  // see what was folded into that edge.
+  const laneColumns = Math.max(1, Math.floor(graphWidth / LANE_WIDTH));
 
   const virtualizer = useVirtualizer({
     count: commits.length,
@@ -117,7 +124,24 @@ export function HistoryView({ repoId, headOid, keyboardActive }: Props) {
     <div className="history" style={{ gridTemplateRows: `${tableHeight}px 4px minmax(0, 1fr)` }}>
       <div className="history-table">
         <header className="history-head">
-          <span style={{ width: laneColumns * LANE_WIDTH }} />
+          <span className="history-graph-head" style={{ width: laneColumns * LANE_WIDTH }}>
+            {graph.maxLanes > laneColumns && (
+              <span className="history-lane-more" title={`${graph.maxLanes} lanes — drag to show more`}>
+                +{graph.maxLanes - laneColumns}
+              </span>
+            )}
+          </span>
+
+          {/* Sits in the header but sizes the whole column: every row's graph
+              is drawn to the same width, so dragging here moves them all. */}
+          <Splitter
+            axis="x"
+            value={graphWidth}
+            onChange={setGraphWidth}
+            min={LANE_WIDTH}
+            max={520}
+          />
+
           <span>Description</span>
           <span>Date</span>
           <span>Author</span>
@@ -155,6 +179,11 @@ export function HistoryView({ repoId, headOid, keyboardActive }: Props) {
                     height={ROW_HEIGHT}
                     isHead={commit.oid === headOid}
                   />
+
+                  {/* The column the splitter occupies in the header. Rows have
+                      to reserve it too, or every heading sits four pixels off
+                      the values under it. */}
+                  <span />
 
                   <span className="col-subject">
                     {commit.refs.map((ref) => (

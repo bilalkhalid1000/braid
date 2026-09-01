@@ -1,24 +1,37 @@
 import { memo } from "react";
 
 import type { GraphLink, GraphRow } from "../lib/graph";
+import { laneX, linkPath } from "../lib/graphPath";
 
 export const LANE_WIDTH = 13;
 const NODE_RADIUS = 3.5;
 
-/** Lane colors.
+/** Lane colours.
  *
- *  Eight hues at even spacing and matched chroma, so no lane reads as more
- *  important than another. Deliberately avoids the red and green the diff view
- *  uses for deletions and additions: a lane is a place, not a verdict. */
+ *  Checked with a palette validator rather than chosen by eye, because the
+ *  question "can these eight be told apart" is answerable and guessing at it
+ *  produced a palette where violet and blue sat at ΔE 11 — below the threshold
+ *  at which full-colour vision separates them, and ΔE 0.9 under deuteranopia,
+ *  which is to say identical.
+ *
+ *  Lightness alternates rather than staying matched. Constant lightness cannot
+ *  reach the separation floor at eight hues, and it is lightness that survives
+ *  colour blindness: the deutan worst case here is ΔE 13 against a floor of 8.
+ *  The order matters as much as the values — cyan and magenta collapse into
+ *  each other for a deutan reader, so they are not neighbours.
+ *
+ *  Still deliberately away from the red and green the diff view uses for
+ *  deletions and additions: a lane is a place, not a verdict.
+ */
 const LANE_COLORS = [
-  "#3d7dfa",
-  "#8b5cf6",
-  "#d946a6",
-  "#e08a1e",
-  "#1aa06d",
-  "#0f9bb5",
-  "#5b6ee8",
-  "#c2536b",
+  "#4d97de",
+  "#a74541",
+  "#54a863",
+  "#7555a8",
+  "#ca7e31",
+  "#00a6c0",
+  "#637200",
+  "#ab61a5",
 ];
 
 export const laneColor = (index: number) => LANE_COLORS[index % LANE_COLORS.length];
@@ -40,29 +53,35 @@ interface Props {
 export const CommitGraph = memo(function CommitGraph({ row, lanes, height, isHead }: Props) {
   const width = Math.max(lanes, 1) * LANE_WIDTH;
   const middle = height / 2;
-  const x = (lane: number) => lane * LANE_WIDTH + LANE_WIDTH / 2;
+  const x = (lane: number) => laneX(lane, lanes, LANE_WIDTH);
+
+  /** Lanes that carry straight through first, then the ones that move.
+   *
+   *  A link that changes lane crosses every lane between, and drawing it last
+   *  puts it in front: its casing cuts a gap in each line it passes, which is
+   *  the only cue saying which of two crossing lines is which. Drawn the other
+   *  way round the connectors would be the ones chopped up, and a merge would
+   *  appear to stop halfway. */
+  const ordered = (links: GraphLink[]) =>
+    [...links].sort(
+      (a, b) => Number(a.from !== a.to) - Number(b.from !== b.to),
+    );
+
+  const draw = (link: GraphLink, key: string, y1: number, y2: number) => {
+    const d = linkPath(x(link.from), y1, x(link.to), y2);
+
+    return (
+      <g key={key}>
+        <path className="graph-casing" d={d} fill="none" strokeWidth={4.5} />
+        <path d={d} stroke={laneColor(link.color)} fill="none" strokeWidth={1.5} />
+      </g>
+    );
+  };
 
   return (
     <svg className="graph" width={width} height={height} aria-hidden="true">
-      {row.up.map((link, i) => (
-        <path
-          key={`u${i}`}
-          d={curve(x(link.from), 0, x(link.to), middle)}
-          stroke={laneColor(link.color)}
-          fill="none"
-          strokeWidth={1.5}
-        />
-      ))}
-
-      {row.down.map((link, i) => (
-        <path
-          key={`d${i}`}
-          d={curve(x(link.from), middle, x(link.to), height)}
-          stroke={laneColor(link.color)}
-          fill="none"
-          strokeWidth={1.5}
-        />
-      ))}
+      {ordered(row.up).map((link, i) => draw(link, `u${i}`, 0, middle))}
+      {ordered(row.down).map((link, i) => draw(link, `d${i}`, middle, height))}
 
       <circle
         cx={x(row.lane)}
@@ -76,15 +95,5 @@ export const CommitGraph = memo(function CommitGraph({ row, lanes, height, isHea
     </svg>
   );
 });
-
-/** Straight where it can be, eased where it has to move. A cubic with its
- *  control points on the vertical keeps the join to the next row tangent, so
- *  a branch reads as one continuous line down the column. */
-function curve(x1: number, y1: number, x2: number, y2: number) {
-  if (x1 === x2) return `M ${x1} ${y1} L ${x2} ${y2}`;
-
-  const midY = (y1 + y2) / 2;
-  return `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
-}
 
 export type { GraphLink };

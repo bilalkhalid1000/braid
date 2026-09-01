@@ -1062,13 +1062,41 @@ kbd.key-live {
   outline: none;
 }
 
+/* The 4px column is the graph's resize handle, which lives in the header but
+   is reserved on every row so the headings stay over their values. */
 .history-head,
 .history-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 92px 148px 74px;
+  grid-template-columns: auto 4px minmax(0, 1fr) 92px 148px 74px;
   align-items: center;
   gap: var(--s4);
   padding-right: var(--s5);
+}
+
+/* The graph resizer. It lives in a 24px header, so the visible line stays a
+   hairline while the grab area is widened either side of it -- a four-pixel
+   target in a strip that short is a target people miss. */
+.history-head .splitter-x {
+  align-self: stretch;
+}
+.history-head .splitter-x::after {
+  content: "";
+  position: absolute;
+  inset: 0 -5px;
+}
+
+/* How many lanes are folded onto the last column, so the pile-up at the edge
+   is labelled rather than just dense. */
+.history-graph-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+.history-lane-more {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
 }
 
 .history-head {
@@ -1097,6 +1125,20 @@ kbd.key-live {
   cursor: default;
 }
 
+/* The gap a crossing line cuts in the one it passes. It has to be the row's
+   own background, not a fixed colour, or the gap shows up as a bright dash the
+   moment a row is selected or hovered. */
+.graph-casing {
+  stroke: var(--surface);
+}
+.history-row:hover .graph-casing {
+  stroke: var(--surface-alt);
+}
+.history-row-selected .graph-casing,
+.history-row-selected:hover .graph-casing {
+  stroke: var(--select);
+}
+
 .history-row:hover {
   background: var(--surface-alt);
 }
@@ -1117,9 +1159,12 @@ kbd.key-live {
 
 /* The lane graph. Rows draw only their own cell, which is what keeps the
    history list virtualized while still reading as continuous lines. */
+/* Clipped, not visible. Lanes past the cap are already clamped to the last
+   column, and this is the backstop that keeps a stroke's width from bleeding
+   over the commit subject beside it. */
 .graph {
   display: block;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .col-subject,
