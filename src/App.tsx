@@ -60,6 +60,8 @@ import { useTip } from "./components/Tip";
 import type { CommitBoxHandle } from "./components/CommitBox";
 import { useTheme } from "./lib/useTheme";
 import { useSettings } from "./lib/settings";
+import { everHadTabs, mayWriteSession } from "./lib/session";
+import { useCopy } from "./lib/useCopy";
 import { useCommands } from "./lib/useCommands";
 import { shortcutLabel } from "./lib/shortcutLabel";
 import { useActivity } from "./lib/useActivity";
@@ -399,12 +401,26 @@ export default function App() {
    *  is no repository open at all — an empty app has nothing else to show. */
   const showLibrary = activeId === LIBRARY_TAB || repoTabs.length === 0;
 
+  /** Whether the strip on screen is this window's own state yet.
+   *
+   *  Latched, because the session file is the only record of what was open and
+   *  writing it from a window that has not established its tabs erases that
+   *  record rather than saving nothing. Turning "reopen repositories" off used
+   *  to do exactly that: the restore was skipped, startup was marked finished
+   *  regardless, and the first write emptied the file.
+   */
+  const [hadTabs, setHadTabs] = useState(false);
+
+  useEffect(() => {
+    setHadTabs((already) => everHadTabs(already, repoTabs.length));
+  }, [repoTabs.length]);
+
   // A string rather than the array, so a refetch that returns an identical list
   // does not rewrite the file.
   const sessionKey = JSON.stringify([repoTabs.map((r) => r.root), activeId]);
 
   useEffect(() => {
-    if (!restored) return;
+    if (!mayWriteSession({ settled: restored, hadTabs })) return;
 
     void api.saveSession({
       repos: repoTabs.map((r) => r.root),
@@ -412,7 +428,7 @@ export default function App() {
     });
     // sessionKey is the value that decides whether a write is needed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restored, sessionKey]);
+  }, [restored, hadTabs, sessionKey]);
 
   const activeRepo = tabs.find((r) => r.id === activeId && r.id !== LIBRARY_TAB);
   const head = status.data;
