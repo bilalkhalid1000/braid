@@ -370,6 +370,21 @@ export default function App() {
     [repoTabs, libraryOpen],
   );
 
+  /** Something in front whenever there is something to be in front of.
+   *
+   *  Tabs can outlive the selection. The backend keeps repositories open across
+   *  a frontend reload, and a launch with "reopen repositories" turned off
+   *  never picks one, so the strip ends up full of tabs with none of them
+   *  current -- and the window shows the repository list instead, which reads
+   *  as the tabs having stopped working rather than as nothing being selected.
+   */
+  useEffect(() => {
+    if (activeId !== null) return;
+
+    const first = repoTabs[0];
+    if (first) setActiveId(first.id);
+  }, [activeId, repoTabs]);
+
   /** The list is the whole window when it is the tab in front, and when there
    *  is no repository open at all — an empty app has nothing else to show. */
   const showLibrary = activeId === LIBRARY_TAB || repoTabs.length === 0;
