@@ -297,7 +297,7 @@ dependencies = [
 
 [[package]]
 name = "braid"
-version = "0.1.0-alpha.4"
+version = "0.1.0-alpha.5"
 dependencies = [
  "dashmap",
  "notify",
