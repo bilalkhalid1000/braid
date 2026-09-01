@@ -150,7 +150,7 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
               chip
               short={commit.short}
               copied={copied === commit.oid}
-              onCopy={() => void copy(commit.oid, commit.oid)}
+              onCopy={() => void copy(commit.oid, commit.oid, commit.short)}
             />
             <span>{commit.author}</span>
             <span {...tip(new Date(commit.timestamp * 1000).toLocaleString())}>

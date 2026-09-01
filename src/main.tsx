@@ -6,6 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import App from "./App";
 import { SettingsProvider } from "./lib/settings";
 import { TipProvider } from "./components/Tip";
+import { NoticeProvider } from "./lib/notice";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,7 +24,9 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
         <TipProvider>
-          <App />
+          <NoticeProvider>
+            <App />
+          </NoticeProvider>
         </TipProvider>
       </SettingsProvider>
     </QueryClientProvider>

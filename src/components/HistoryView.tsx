@@ -141,7 +141,7 @@ export function HistoryView({ repoId, headOid, keyboardActive, focusOid }: Props
     // reading, and pasting one into a command is how you learn it was
     // ambiguous.
     "history.copyHash": () => {
-      if (selected) void copy(selected.oid, selected.oid);
+      if (selected) void copy(selected.oid, selected.oid, selected.short);
     },
     "history.back": toCommits,
   }, keyboardActive);
@@ -229,7 +229,7 @@ export function HistoryView({ repoId, headOid, keyboardActive, focusOid }: Props
                   <CopyHash
                     short={commit.short}
                     copied={copied === commit.oid}
-                    onCopy={() => void copy(commit.oid, commit.oid)}
+                    onCopy={() => void copy(commit.oid, commit.oid, commit.short)}
                   />
                 </div>
               );
