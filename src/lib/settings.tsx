@@ -29,6 +29,12 @@ export interface Settings {
   sequenceTimeout: number;
   /** Look for a new version shortly after launch. */
   checkForUpdates: boolean;
+  /** Which terminal "Open in terminal" starts. An id from the backend's list,
+   *  or "auto" to let it pick. */
+  terminal: string;
+  /** The command line to run when terminal is "custom". {path} is replaced
+   *  with the repository's folder. */
+  terminalCommand: string;
   /** Only the commands the user has actually rebound. Values are lists, so a
    *  command can answer to several keys. */
   keymap: Keymap;
@@ -43,6 +49,8 @@ export const DEFAULT_SETTINGS: Settings = {
   historyPageSize: 300,
   sequenceTimeout: 700,
   checkForUpdates: true,
+  terminal: "auto",
+  terminalCommand: "",
   keymap: {},
 };
 

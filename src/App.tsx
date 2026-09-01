@@ -1603,7 +1603,10 @@ The stashed changes are discarded.`,
             commandId: "repo.terminal",
             label: "Terminal",
             icon: <IconTerminal />,
-            onClick: () => act("Open in terminal", () => api.openInTerminal(id)),
+            onClick: () =>
+              act("Open in terminal", () =>
+                api.openInTerminal(id, settings.terminal, settings.terminalCommand),
+              ),
           },
         ],
       ]
@@ -1653,7 +1656,9 @@ The stashed changes are discarded.`,
     // a tab too, and it was the one case this could not close.
     "repo.close": activeId ? () => void closeRepo(activeId) : undefined,
     "repo.explorer": id ? () => act("Open in Explorer", () => api.openInFileManager(id)) : undefined,
-    "repo.terminal": id ? () => act("Open in terminal", () => api.openInTerminal(id)) : undefined,
+    "repo.terminal": id
+      ? () => act("Open in terminal", () => api.openInTerminal(id, settings.terminal, settings.terminalCommand))
+      : undefined,
 
     // A tab shortcut only exists while that tab does, so the palette never
     // lists a repository you do not have open.

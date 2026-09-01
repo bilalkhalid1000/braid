@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useHotkeyRecorder } from "@tanstack/react-hotkeys";
+import { useQuery } from "@tanstack/react-query";
+
+import { api } from "../lib/api";
 
 import { COMMANDS, COMMANDS_BY_ID, findConflicts, type CommandDef } from "../lib/commands";
 import { formatBinding } from "../lib/shortcutLabel";
@@ -158,6 +161,8 @@ function GeneralSection() {
         onChange={(confirmDiscard) => update({ confirmDiscard })}
       />
 
+      <TerminalField />
+
       <Field label="History page size" hint="Commits loaded at a time as you scroll.">
         <input
           type="number"
@@ -182,6 +187,67 @@ function GeneralSection() {
           onChange={(e) => update({ sequenceTimeout: clamp(Number(e.target.value), 200, 3000) })}
         />
       </Field>
+    </>
+  );
+}
+
+/** Which terminal the toolbar button and Mod+T open.
+ *
+ *  The choices come from the backend rather than being listed here, because the
+ *  backend is what knows how to start each one -- an option the UI offers and
+ *  nothing can launch is a button that silently does nothing. */
+function TerminalField() {
+  const { settings, update } = useSettings();
+
+  const options = useQuery({
+    queryKey: ["terminalOptions"],
+    queryFn: api.terminalOptions,
+    staleTime: Infinity,
+  });
+
+  const available = options.data ?? [];
+
+  // A settings file carried from another machine can name a terminal this one
+  // has never heard of. Showing it keeps the select honest about what is
+  // stored, rather than silently displaying the first entry instead.
+  const unknown =
+    settings.terminal !== "" && !available.some((option) => option.id === settings.terminal);
+
+  return (
+    <>
+      <Field
+        label="Terminal"
+        hint="What “Open in terminal” starts. Choosing automatically tries the ones this system usually has."
+      >
+        <select
+          value={settings.terminal}
+          onChange={(e) => update({ terminal: e.target.value })}
+        >
+          {available.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+          {unknown && (
+            <option value={settings.terminal}>{settings.terminal} (not on this system)</option>
+          )}
+        </select>
+      </Field>
+
+      {settings.terminal === "custom" && (
+        <Field
+          label="Terminal command"
+          hint="{path} becomes the repository's folder. Quote anything containing spaces. This is not a shell — pipes, redirects and chained commands are treated as ordinary arguments."
+        >
+          <input
+            type="text"
+            spellCheck={false}
+            placeholder="alacritty --working-directory {path}"
+            value={settings.terminalCommand}
+            onChange={(e) => update({ terminalCommand: e.target.value })}
+          />
+        </Field>
+      )}
     </>
   );
 }

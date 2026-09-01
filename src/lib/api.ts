@@ -307,6 +307,13 @@ export const flowNoun: Record<FlowKind, string> = {
   support: "support branch",
 };
 
+/** A terminal offered in settings. The backend names them, because it is what
+ *  knows how to start them. */
+export interface TerminalOption {
+  id: string;
+  label: string;
+}
+
 export interface Session {
   /** Worktree roots, in tab order. */
   repos: string[];
@@ -441,7 +448,12 @@ export const api = {
   skipOperation: (id: string) => invoke<string>("skip_operation", { id }),
 
   openInFileManager: (id: string) => invoke<string>("open_in_file_manager", { id }),
-  openInTerminal: (id: string) => invoke<string>("open_in_terminal", { id }),
+  openInTerminal: (id: string, terminal: string, command: string) =>
+    invoke<string>("open_in_terminal", { id, terminal, command }),
+  /** What this platform can offer in the terminal picker. Asked of the
+   *  backend rather than listed here, so the choices and the launcher cannot
+   *  disagree about what exists. */
+  terminalOptions: () => invoke<TerminalOption[]>("terminal_options"),
 
   fsmonitorState: (id: string) => invoke<string>("fsmonitor_state", { id }),
 };

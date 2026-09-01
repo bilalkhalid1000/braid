@@ -761,9 +761,25 @@ pub async fn open_in_file_manager(
 }
 
 #[tauri::command]
-pub async fn open_in_terminal(registry: State<'_, RepoRegistry>, id: String) -> Result<String> {
+pub async fn open_in_terminal(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    terminal: Option<String>,
+    command: Option<String>,
+) -> Result<String> {
     let session = registry.get(&id)?;
-    system::open_terminal(&session.info.root).await
+    system::open_terminal(
+        &session.info.root,
+        terminal.as_deref().unwrap_or("auto"),
+        command.as_deref().unwrap_or_default(),
+    )
+    .await
+}
+
+/// The terminals this platform can offer, for the settings picker.
+#[tauri::command]
+pub fn terminal_options() -> Vec<system::TerminalOption> {
+    system::terminal_options()
 }
 
 // --- diagnostics ----------------------------------------------------------

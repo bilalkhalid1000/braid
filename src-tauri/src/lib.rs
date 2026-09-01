@@ -115,6 +115,7 @@ pub fn run() {
             ipc::skip_operation,
             ipc::open_in_file_manager,
             ipc::open_in_terminal,
+            ipc::terminal_options,
             ipc::fsmonitor_state,
         ])
         .run(tauri::generate_context!())
