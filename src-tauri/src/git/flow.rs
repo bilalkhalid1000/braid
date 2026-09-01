@@ -112,11 +112,28 @@ pub struct FlowStatus {
     pub master_exists: bool,
 }
 
+/// Tagging is the default for a release or hotfix: it is the point of
+/// finishing one, and a settings file written before the option existed still
+/// means "tag it".
+fn yes() -> bool {
+    true
+}
+
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FinishOptions {
     pub delete_branch: bool,
+    /// Delete even if git thinks the branch is not fully merged. The ordinary
+    /// delete refuses in that case, which is usually right and occasionally
+    /// just in the way.
+    #[serde(default)]
+    pub force_delete: bool,
     pub push: bool,
+    /// Whether to tag at all. A release or hotfix is tagged by default because
+    /// that is the point of finishing one, but git flow can skip it and so can
+    /// this.
+    #[serde(default = "yes")]
+    pub tag: bool,
     /// Used as the annotated tag message on a release or hotfix. Falls back to
     /// the version when empty.
     pub tag_message: String,
@@ -323,6 +340,8 @@ pub async fn finish(
 
     // A release or hotfix lands on production first, gets tagged there, and is
     // then merged back so develop keeps the fix.
+    let tagging = kind.is_release() && options.tag;
+
     if kind.is_release() {
         run_step(git, &["checkout", &config.master], &format!("Check out {}", config.master), &mut log).await?;
         run_step(
@@ -333,14 +352,18 @@ pub async fn finish(
         )
         .await?;
 
-        let tag = format!("{}{}", config.versiontag, name);
-        let message = if options.tag_message.is_empty() {
-            tag.clone()
-        } else {
-            options.tag_message.clone()
-        };
+        if tagging {
+            let tag = format!("{}{}", config.versiontag, name);
+            let message = if options.tag_message.is_empty() {
+                tag.clone()
+            } else {
+                options.tag_message.clone()
+            };
 
-        run_step(git, &["tag", "-a", &tag, "-m", &message], &format!("Tag {tag}"), &mut log).await?;
+            run_step(git, &["tag", "-a", &tag, "-m", &message], &format!("Tag {tag}"), &mut log)
+                .await?;
+        }
+
         pushed.push(config.master.clone());
     }
 
@@ -356,8 +379,10 @@ pub async fn finish(
 
     if options.delete_branch {
         // `-d` refuses if anything is unmerged, which after the merges above
-        // can only mean something went wrong. Let it refuse.
-        run_step(git, &["branch", "-d", &branch], &format!("Delete {branch}"), &mut log).await?;
+        // can only mean something went wrong. Let it refuse, unless the user
+        // has said otherwise.
+        let flag = if options.force_delete { "-D" } else { "-d" };
+        run_step(git, &["branch", flag, &branch], &format!("Delete {branch}"), &mut log).await?;
     }
 
     if options.push {
@@ -365,7 +390,7 @@ pub async fn finish(
         args.extend(pushed.iter().map(String::as_str));
 
         let tag = format!("{}{}", config.versiontag, name);
-        if kind.is_release() {
+        if tagging {
             args.push(&tag);
         }
 

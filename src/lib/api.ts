@@ -291,7 +291,12 @@ export interface FlowStatus {
 
 export interface FlowFinishOptions {
   deleteBranch: boolean;
+  /** Delete even where git says the branch is not fully merged. */
+  forceDelete: boolean;
   push: boolean;
+  /** Whether to tag at all. Release and hotfix only; ignored for a feature,
+   *  which git flow never tags. */
+  tag: boolean;
   tagMessage: string;
 }
 

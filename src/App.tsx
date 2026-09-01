@@ -973,7 +973,7 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
       fields: versioned
         ? [
             {
-              key: "tag",
+              key: "tagMessage",
               label: "Tag message",
               placeholder: `${config?.versiontag ?? ""}${current.name}`,
               optional: true,
@@ -981,7 +981,21 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
           ]
         : undefined,
       checkboxes: [
+        // Only where there is a tag to skip: git flow never tags a feature.
+        ...(versioned
+          ? [
+              {
+                key: "tag",
+                label: `Tag ${config?.versiontag ?? ""}${current.name}`,
+                value: true,
+              },
+            ]
+          : []),
         { key: "delete", label: `Delete ${current.branch} afterwards`, value: true },
+        // git refuses to delete a branch it thinks is unmerged, which after
+        // the merges above should not happen -- and occasionally does, when
+        // the merge was resolved in a way git cannot see as containing it.
+        { key: "force", label: "Delete it even if git says it is unmerged" },
         { key: "push", label: "Push the result to origin" },
       ],
       confirmLabel: "Finish",
@@ -989,8 +1003,11 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
         act(`Finish ${flowNoun[current.kind]} ${current.name}`, () =>
           api.flowFinish(id, current.kind, current.name, {
             deleteBranch: v.delete === "true",
+            forceDelete: v.force === "true",
             push: v.push === "true",
-            tagMessage: v.tag ?? "",
+            // A feature has no tag box, and git flow would not tag it anyway.
+            tag: !versioned || v.tag === "true",
+            tagMessage: v.tagMessage ?? "",
           }),
         ),
     });

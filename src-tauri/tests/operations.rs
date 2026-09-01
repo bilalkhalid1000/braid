@@ -359,7 +359,9 @@ async fn finishing_a_feature_merges_it_into_develop_and_deletes_it() {
         "login",
         &FinishOptions {
             delete_branch: true,
+            force_delete: false,
             push: false,
+            tag: true,
             tag_message: String::new(),
         },
     )
@@ -388,7 +390,9 @@ async fn finishing_a_release_tags_it_and_lands_on_both_branches() {
         "1.0.0",
         &FinishOptions {
             delete_branch: true,
+            force_delete: false,
             push: false,
+            tag: true,
             tag_message: "Release 1.0.0".into(),
         },
     )
@@ -430,7 +434,9 @@ async fn finishing_a_hotfix_without_deleting_keeps_the_branch() {
         "1.0.1",
         &FinishOptions {
             delete_branch: false,
+            force_delete: false,
             push: false,
+            tag: true,
             tag_message: String::new(),
         },
     )
@@ -460,7 +466,9 @@ async fn finishing_a_feature_without_deleting_keeps_the_branch() {
         "login",
         &FinishOptions {
             delete_branch: false,
+            force_delete: false,
             push: false,
+            tag: true,
             tag_message: String::new(),
         },
     )
@@ -484,7 +492,9 @@ async fn a_support_branch_cannot_be_finished() {
         "1.x",
         &FinishOptions {
             delete_branch: true,
+            force_delete: false,
             push: false,
+            tag: true,
             tag_message: String::new(),
         },
     )
@@ -499,4 +509,63 @@ async fn starting_a_flow_branch_before_setup_is_refused() {
 
     let result = flow::start(repo.git_api(), FlowKind::Feature, "login").await;
     assert!(result.is_err());
+}
+
+/* --- finishing a flow, with the options SourceTree offers ---------------- */
+
+#[tokio::test]
+async fn finishing_a_hotfix_without_tagging_leaves_no_tag() {
+    // git flow can finish without tagging, and so can this. The merges still
+    // happen -- it is only the tag that is skipped.
+    let repo = TestRepo::new();
+    flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
+
+    flow::start(repo.git_api(), FlowKind::Hotfix, "1.0.1").await.unwrap();
+    repo.write("fix.txt", "fixed\n");
+    repo.commit_all("Fix it");
+
+    flow::finish(
+        repo.git_api(),
+        FlowKind::Hotfix,
+        "1.0.1",
+        &FinishOptions {
+            delete_branch: true,
+            force_delete: false,
+            push: false,
+            tag: false,
+            tag_message: String::new(),
+        },
+    )
+    .await
+    .unwrap();
+
+    assert!(repo.git(&["tag", "--list"]).trim().is_empty(), "nothing asked for a tag");
+    assert!(repo.git(&["log", "main", "--format=%s"]).contains("Fix it"));
+}
+
+#[tokio::test]
+async fn finishing_a_hotfix_tags_it_by_default() {
+    let repo = TestRepo::new();
+    flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
+
+    flow::start(repo.git_api(), FlowKind::Hotfix, "1.0.2").await.unwrap();
+    repo.write("fix.txt", "fixed\n");
+    repo.commit_all("Fix it");
+
+    flow::finish(
+        repo.git_api(),
+        FlowKind::Hotfix,
+        "1.0.2",
+        &FinishOptions {
+            delete_branch: true,
+            force_delete: false,
+            push: false,
+            tag: true,
+            tag_message: String::new(),
+        },
+    )
+    .await
+    .unwrap();
+
+    assert!(repo.git(&["tag", "--list"]).contains("1.0.2"));
 }
