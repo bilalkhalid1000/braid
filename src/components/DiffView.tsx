@@ -38,6 +38,50 @@ interface Props {
  *  A generated file can produce hundreds of thousands of diff lines. Rendering
  *  only the visible ones is what keeps selecting such a file from freezing the
  *  window. */
+const FRAME =
+  "grid grid-rows-[auto_minmax(0,1fr)_auto] h-full min-h-0 flex-1 basis-auto";
+
+const HEADER =
+  "flex h-13 items-center gap-6 px-6 bg-surface-alt border-b border-b-border-soft text-small";
+
+const PATH = "overflow-hidden text-ellipsis whitespace-nowrap font-mono";
+const STAT = "flex gap-4 font-mono [&_.added]:text-added [&_.removed]:text-removed";
+
+const NOTICE =
+  "px-6 py-3 bg-surface-alt border-t border-t-border-soft text-small text-text-dim";
+
+/* Absolutely placed: the lines are virtualized. `pre` because a diff is
+   whitespace, and losing it changes what the line says. */
+const LINE =
+  "absolute top-0 left-0 flex min-w-full items-center font-mono text-body " +
+  "leading-[18px] whitespace-pre";
+
+/** Built from the line's kind, so every value it can take is spelled out --
+ *  a class assembled at runtime is one Tailwind's scanner cannot see. */
+const KIND: Record<string, string> = {
+  added: "bg-added-bg text-added",
+  removed: "bg-removed-bg text-removed",
+  meta: "text-text-faint",
+  context: "",
+};
+
+const GUTTER = "w-22 flex-none pr-4 text-right text-text-faint select-none";
+
+/* Lit when the line is picked, which the line above it announces with a class
+   the marker can look up at. */
+const MARKER =
+  "w-8 flex-none text-center select-none " +
+  "group-[.is-picked]:bg-accent group-[.is-picked]:font-bold group-[.is-picked]:text-white";
+
+/* Sticky, so the buttons stay reachable on a hunk wider than the pane. */
+const HUNK_ACTIONS =
+  "sticky right-4 ml-auto flex items-center gap-3 pr-4 opacity-0 " +
+  "group-hover:opacity-100 focus-within:opacity-100";
+
+const HUNK_BUTTON =
+  "px-3 py-px bg-surface border border-border rounded-sm font-sans text-micro " +
+  "leading-[15px] text-text-dim cursor-pointer";
+
 export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { settings } = useSettings();
@@ -107,28 +151,28 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
   };
 
   return (
-    <div className="diff">
-      <header className="diff-header">
+    <div className={FRAME}>
+      <header className={HEADER}>
         {diff ? (
           <>
-            <span className="diff-path" {...tip(diff.path)}>
+            <span className={PATH} {...tip(diff.path)}>
               {diff.path}
             </span>
-            <span className="diff-stat">
+            <span className={STAT}>
               <span className="added">+{diff.added}</span>
               <span className="removed">&minus;{diff.removed}</span>
             </span>
-            <span className="diff-timing">{diff.durationMs}ms</span>
+            <span className="ml-auto font-mono text-text-faint">{diff.durationMs}ms</span>
           </>
         ) : (
-          <span className="diff-path muted">{loading ? "Loading…" : emptyMessage}</span>
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap font-sans text-text-faint">{loading ? "Loading…" : emptyMessage}</span>
         )}
       </header>
 
       {diff?.binary ? (
-        <div className="diff-notice">Binary file &mdash; no textual diff.</div>
+        <div className={NOTICE}>Binary file &mdash; no textual diff.</div>
       ) : (
-        <div className="diff-body" ref={scrollRef}>
+        <div className="overflow-auto bg-surface" ref={scrollRef}>
           <div className="virtual-canvas" style={{ height: virtualizer.getTotalSize() }}>
             {virtualizer.getVirtualItems().map((item) => {
               const row = rows[item.index];
@@ -143,21 +187,21 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
                 const count = pickedIn(row.hunk).length;
 
                 return (
-                  <div key={item.key} className="diff-line diff-hunk" style={style}>
-                    <span className="gutter" />
-                    <span className="gutter" />
-                    <span className="diff-text">{row.header}</span>
+                  <div key={item.key} className={`${LINE} group bg-hunk-bg text-text-dim`} style={style}>
+                    <span className={GUTTER} />
+                    <span className={GUTTER} />
+                    <span className="pr-8">{row.header}</span>
 
                     {canApply && (
-                      <span className="hunk-actions">
+                      <span className={HUNK_ACTIONS}>
                         {count > 0 && (
-                          <span className="hunk-count">
+                          <span className="font-sans text-micro text-accent">
                             {count} {count === 1 ? "line" : "lines"}
                           </span>
                         )}
 
                         <button
-                          className="hunk-button"
+                          className={`${HUNK_BUTTON} hover:border-accent hover:text-accent`}
                           onClick={() => run(row.hunk, staged ? "unstage" : "stage")}
                         >
                           {staged ? "Unstage" : "Stage"}
@@ -165,7 +209,7 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
 
                         {!staged && (
                           <button
-                            className="hunk-button hunk-button-danger"
+                            className={`${HUNK_BUTTON} hover:border-removed hover:text-removed`}
                             onClick={() => run(row.hunk, "discard")}
                           >
                             Discard
@@ -186,20 +230,21 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
                 <div
                   key={item.key}
                   className={[
-                    "diff-line",
-                    `diff-${line.kind}`,
-                    selectable ? "diff-line-selectable" : "",
-                    isPicked ? "diff-line-picked" : "",
+                    LINE,
+                    "group",
+                    KIND[line.kind],
+                    selectable ? "cursor-pointer" : "",
+                    isPicked ? "shadow-[inset_2px_0_0_var(--color-accent)] is-picked" : "",
                   ]
                     .filter(Boolean)
                     .join(" ")}
                   style={style}
                   onMouseDown={() => toggleLine(row.hunk, row.index, line)}
                 >
-                  <span className="gutter">{line.oldLine ?? ""}</span>
-                  <span className="gutter">{line.newLine ?? ""}</span>
-                  <span className="diff-marker">{markerFor(line.kind)}</span>
-                  <span className="diff-text">
+                  <span className={GUTTER}>{line.oldLine ?? ""}</span>
+                  <span className={GUTTER}>{line.newLine ?? ""}</span>
+                  <span className={MARKER}>{markerFor(line.kind)}</span>
+                  <span className="pr-8">
                     <Code
                       tokens={highlighted?.[row.hunk]?.[row.index]}
                       text={line.content}
@@ -213,14 +258,14 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
       )}
 
       {diff && onHunk && settings.ignoreWhitespace && (
-        <div className="diff-notice">
+        <div className={NOTICE}>
           Staging part of a file needs the real diff. Turn off &ldquo;ignore
           whitespace&rdquo; in Settings to stage by hunk or line.
         </div>
       )}
 
       {diff?.truncated && (
-        <div className="diff-notice">
+        <div className={NOTICE}>
           Diff truncated &mdash; file is too large to render in full.
         </div>
       )}

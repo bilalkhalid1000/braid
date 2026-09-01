@@ -49,6 +49,45 @@ export interface CommitDetailHandle {
  *  a 300-line one look nearly the same. Reading the numbers instead means the
  *  layout can use the width it actually has, and the bars can be true to scale.
  */
+const FRAME = "grid h-full min-h-0";
+
+/* Capped at half the pane: a long commit message must not push the file list
+   off the bottom of the thing it is describing. */
+const HEAD =
+  "flex min-h-0 max-h-1/2 shrink basis-auto flex-col gap-2 px-6 py-4 " +
+  "border-b border-b-border-soft";
+
+const SUBJECT = "m-0 flex-none text-lead font-semibold tracking-[-0.01em] leading-[1.35]";
+const META = "m-0 flex flex-none items-center gap-4 text-small text-text-dim";
+const MERGE_CHIP = "px-3 rounded-full bg-accent-soft text-micro text-accent";
+
+const BODY =
+  "min-h-0 flex-1 basis-auto mt-2 mb-0 overflow-y-auto font-mono text-body " +
+  "leading-[1.55] whitespace-pre-wrap [overflow-wrap:anywhere] text-text-dim";
+
+const SUMMARY =
+  "flex h-12 flex-none items-center gap-6 px-6 bg-surface-alt " +
+  "border-b border-b-border-soft text-small text-text-dim " +
+  "[&_.added]:font-mono [&_.added]:font-semibold [&_.removed]:font-mono [&_.removed]:font-semibold";
+
+/* Absolutely placed: the list is virtualized. */
+const FILE_ROW =
+  "absolute top-0 left-0 flex w-full items-center gap-4 px-6 border-l-2 cursor-default";
+
+const FILE_PATH =
+  "flex min-w-0 flex-1 items-baseline font-mono text-small whitespace-nowrap";
+
+/* The directory is what gets cut; the filename is the part being named. */
+const PATH_DIR =
+  "min-w-0 shrink basis-auto overflow-hidden text-ellipsis [unicode-bidi:plaintext] text-text-dim";
+
+/* A fixed width so the meters line up as a column rather than stepping in and
+   out with the size of the numbers beside them. */
+const COUNTS = "flex min-w-[76px] justify-end gap-3 font-mono text-micro";
+
+const METER =
+  "flex h-3 w-32 gap-[2px] overflow-hidden rounded-sm bg-border-soft";
+
 export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function CommitDetail(
   { repoId, oid, focused }: Props,
   ref,
@@ -138,14 +177,14 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
 
   return (
     <div
-      className="commit"
+      className={FRAME}
       style={{ gridTemplateColumns: `${listWidth}px 4px minmax(0, 1fr)` }}
     >
-      <div className="commit-left">
-        <header className="commit-head">
-          <h2 className="commit-subject">{commit.subject}</h2>
+      <div className="flex min-h-0 flex-col border-r border-r-border">
+        <header className={HEAD}>
+          <h2 className={SUBJECT}>{commit.subject}</h2>
 
-          <p className="commit-meta">
+          <p className={META}>
             <CopyHash
               chip
               short={commit.short}
@@ -156,15 +195,15 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
             <span {...tip(new Date(commit.timestamp * 1000).toLocaleString())}>
               {relativeTime(commit.timestamp)}
             </span>
-            {commit.parents.length > 1 && <span className="commit-merge">merge</span>}
+            {commit.parents.length > 1 && <span className={MERGE_CHIP}>merge</span>}
           </p>
 
-          {commit.body && <p className="commit-body">{commit.body}</p>}
+          {commit.body && <p className={BODY}>{commit.body}</p>}
         </header>
 
         {/* Doubles as the legend: it names both quantities in their own colours,
             right above the bars that use them. */}
-        <div className="commit-summary">
+        <div className={SUMMARY}>
           <span>
             {files.length} {files.length === 1 ? "file" : "files"}
           </span>
@@ -172,7 +211,7 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
           <span className="removed">&minus;{commit.deletions.toLocaleString()}</span>
         </div>
 
-        <div className="commit-files" ref={scrollRef}>
+        <div className="relative min-h-0 flex-1 basis-auto overflow-y-auto bg-surface" ref={scrollRef}>
           <div className="virtual-canvas" style={{ height: virtualizer.getTotalSize() }}>
             {virtualizer.getVirtualItems().map((item) => {
               const file = files[item.index];
@@ -182,9 +221,13 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
                 <div
                   key={item.key}
                   className={[
-                    "commit-file",
-                    file.path === selected && "commit-file-selected",
-                    file.path === selected && focused && "commit-file-cursor",
+                    FILE_ROW,
+                    file.path === selected
+                      ? "bg-select border-l-accent"
+                      : "border-l-transparent hover:bg-surface-alt",
+                    file.path === selected &&
+                      focused &&
+                      "shadow-[inset_0_0_0_1px_var(--color-accent)]",
                   ]
                     .filter(Boolean)
                     .join(" ")}
@@ -194,7 +237,7 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
                     file.oldPath ? `${file.oldPath} → ${file.path}` : file.path,
                   )}
                 >
-                  <span className="commit-file-path">
+                  <span className={FILE_PATH}>
                     <PathLabel path={file.path} />
                   </span>
 
@@ -210,7 +253,7 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
 
       <Splitter axis="x" value={listWidth} onChange={setListWidth} min={260} max={640} />
 
-      <div className="commit-right">
+      <div className="min-w-0 min-h-0">
         <DiffView
           diff={diff.data}
           loading={diff.isFetching}
@@ -229,8 +272,8 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
 function FileMeter({ file, largest }: { file: FileStat; largest: number }) {
   if (file.binary) {
     return (
-      <span className="commit-file-stat">
-        <span className="commit-file-binary">binary</span>
+      <span className="flex flex-none items-center gap-3">
+        <span className="min-w-[76px] text-right text-micro text-text-faint">binary</span>
       </span>
     );
   }
@@ -238,15 +281,15 @@ function FileMeter({ file, largest }: { file: FileStat; largest: number }) {
   const scale = largest > 0 ? 100 / largest : 0;
 
   return (
-    <span className="commit-file-stat">
-      <span className="commit-file-counts">
+    <span className="flex flex-none items-center gap-3">
+      <span className={COUNTS}>
         {file.additions > 0 && <span className="added">+{file.additions}</span>}
         {file.deletions > 0 && <span className="removed">&minus;{file.deletions}</span>}
       </span>
 
-      <span className="meter" aria-hidden="true">
-        <span className="meter-add" style={{ width: `${file.additions * scale}%` }} />
-        <span className="meter-del" style={{ width: `${file.deletions * scale}%` }} />
+      <span className={METER} aria-hidden="true">
+        <span className="h-full rounded-sm bg-added" style={{ width: `${file.additions * scale}%` }} />
+        <span className="h-full rounded-sm bg-removed" style={{ width: `${file.deletions * scale}%` }} />
       </span>
     </span>
   );
@@ -260,14 +303,14 @@ function FileMeter({ file, largest }: { file: FileStat; largest: number }) {
  *  `…/dist/gui/`. */
 function PathLabel({ path }: { path: string }) {
   const cut = path.lastIndexOf("/");
-  if (cut === -1) return <span className="path-name">{path}</span>;
+  if (cut === -1) return <span className="flex-none">{path}</span>;
 
   return (
     <>
-      <span className="path-dir" dir="rtl">
+      <span className={PATH_DIR} dir="rtl">
         {path.slice(0, cut + 1)}
       </span>
-      <span className="path-name">{path.slice(cut + 1)}</span>
+      <span className="flex-none">{path.slice(cut + 1)}</span>
     </>
   );
 }

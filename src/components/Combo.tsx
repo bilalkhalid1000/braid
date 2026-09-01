@@ -5,6 +5,14 @@ import { matchesFilter } from "./FilterInput";
 
 /* Matches the plain field in a dialog: this one is a box you type into that
    happens to offer suggestions, not a different kind of control. */
+const LIST =
+  "fixed z-40 m-0 max-h-[232px] list-none overflow-y-auto p-2 bg-chrome " +
+  "border border-border rounded-lg shadow-pop-lg";
+
+const OPTION =
+  "flex w-full items-center gap-4 px-3 py-1 bg-transparent border-0 rounded-sm " +
+  "font-mono text-small text-text text-left cursor-pointer";
+
 const FIELD =
   "w-full px-3 py-[5px] bg-surface border border-border rounded-sm " +
   "font-mono text-body focus:border-accent focus:outline-none";
@@ -188,12 +196,12 @@ export function Combo({
         box &&
         shown.matched.length > 0 &&
         createPortal(
-          <ul className="combo-list" role="listbox" style={box}>
+          <ul className={LIST} role="listbox" style={box}>
             {shown.matched.map((option, index) => (
               <li key={option.value}>
                 <button
                   type="button"
-                  className={`combo-option ${index === cursor ? "combo-option-cursor" : ""}`}
+                  className={`${OPTION} ${index === cursor ? "bg-accent text-white" : ""}`}
                   role="option"
                   aria-selected={index === cursor}
                   tabIndex={-1}
@@ -203,14 +211,14 @@ export function Combo({
                     pick(option);
                   }}
                 >
-                  <span className="combo-value">{option.value}</span>
-                  {option.note && <span className="combo-note">{option.note}</span>}
+                  <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{option.value}</span>
+                  {option.note && <span className="flex-none font-sans text-micro opacity-75">{option.note}</span>}
                 </button>
               </li>
             ))}
 
             {shown.total > shown.matched.length && (
-              <li className="combo-more">
+              <li className="px-3 py-1 text-micro text-text-faint">
                 {shown.total - shown.matched.length} more — keep typing
               </li>
             )}

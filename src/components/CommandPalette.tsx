@@ -16,6 +16,23 @@ interface Props {
  *  Doubles as the way to discover shortcuts: the palette is where you find out
  *  a command exists, and the key next to it is how you stop needing the
  *  palette. */
+const FRAME =
+  "grid grid-rows-[auto_minmax(0,1fr)] w-[min(620px,92vw)] max-h-[60vh] overflow-hidden " +
+  "bg-chrome border border-border rounded-lg shadow-pop-lg";
+
+const INPUT =
+  "p-6 bg-transparent border-0 border-b border-b-border text-lead outline-none";
+
+const ROW =
+  "grid grid-cols-[96px_minmax(0,1fr)_auto] items-center gap-4 px-4 py-3 " +
+  "rounded-sm cursor-default";
+
+/* Uppercased and spaced out: it is a label on the row rather than part of what
+   the row says. */
+const CATEGORY =
+  "overflow-hidden text-ellipsis whitespace-nowrap uppercase tracking-[0.06em] " +
+  "text-micro text-text-faint";
+
 export function CommandPalette({ handlers, onClose }: Props) {
   const { keymap } = useSettings();
   const [query, setQuery] = useState("");
@@ -54,9 +71,9 @@ export function CommandPalette({ handlers, onClose }: Props) {
 
   return (
     <div className={SCRIM_TOP} onMouseDown={onClose}>
-      <div className="palette" onMouseDown={(e) => e.stopPropagation()}>
+      <div className={FRAME} onMouseDown={(e) => e.stopPropagation()}>
         <input
-          className="palette-input"
+          className={INPUT}
           autoFocus
           value={query}
           placeholder="Type a command"
@@ -82,7 +99,7 @@ export function CommandPalette({ handlers, onClose }: Props) {
           }}
         />
 
-        <div className="palette-list" ref={listRef}>
+        <div className="overflow-y-auto p-2" ref={listRef}>
           {matches.map((command, index) => {
             const bindings = keymap[command.id] ?? [];
 
@@ -90,14 +107,14 @@ export function CommandPalette({ handlers, onClose }: Props) {
               <div
                 key={command.id}
                 data-index={index}
-                className={`palette-row ${index === selected ? "palette-row-selected" : ""}`}
+                className={`${ROW} ${index === selected ? "bg-select" : ""}`}
                 onMouseMove={() => setSelected(index)}
                 onMouseDown={() => run(command)}
               >
-                <span className="palette-category">{command.category}</span>
-                <span className="palette-label">{command.label}</span>
+                <span className={CATEGORY}>{command.category}</span>
+                <span className="overflow-hidden text-ellipsis whitespace-nowrap">{command.label}</span>
 
-                <span className="palette-keys">
+                <span className="flex gap-2">
                   {bindings.map((binding) => (
                     <kbd key={binding}>{formatBinding(binding)}</kbd>
                   ))}
@@ -107,7 +124,7 @@ export function CommandPalette({ handlers, onClose }: Props) {
           })}
 
           {matches.length === 0 && (
-            <div className="palette-empty">
+            <div className="p-8 text-center text-text-faint">
               {available.length === 0
                 ? "Open a repository to get started."
                 : "No command matches that."}

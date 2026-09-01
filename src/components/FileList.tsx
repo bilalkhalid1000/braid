@@ -167,12 +167,12 @@ function badgeClass(badge: string) {
 /** Dim the directory so the filename is what the eye lands on. */
 function PathLabel({ path }: { path: string }) {
   const cut = path.lastIndexOf("/");
-  if (cut === -1) return <span className="path-name">{path}</span>;
+  if (cut === -1) return <span>{path}</span>;
 
   return (
     <>
       <span className="text-text-dim">{path.slice(0, cut + 1)}</span>
-      <span className="path-name">{path.slice(cut + 1)}</span>
+      <span>{path.slice(cut + 1)}</span>
     </>
   );
 }

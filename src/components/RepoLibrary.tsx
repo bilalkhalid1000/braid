@@ -33,6 +33,41 @@ interface Props {
  *  one thing about a row that is not already written across it, which is why
  *  there is no "open" label as well.
  */
+const FRAME = "flex min-h-0 flex-1 flex-col bg-surface outline-none";
+
+/* Capped and centred: a list of five paths across a 2500px window is a line of
+   text with a screen of nothing beside it. */
+const COLUMN =
+  "mx-auto flex min-h-0 w-full max-w-[880px] flex-1 flex-col px-8 pt-12";
+
+const EMPTY =
+  "mx-auto grid max-w-[44ch] place-content-center justify-items-center gap-3 text-center";
+
+const LIST = "mt-6 mb-0 min-h-0 flex-1 list-none overflow-y-auto p-0";
+
+/* `group` so the row can light its own actions and the name inside it. */
+const ROW =
+  "group flex items-stretch gap-4 border-b border-b-border-soft hover:bg-surface-alt";
+
+/** The lane the app is named for, lit where a tab is open on the repository.
+ *  It says the one thing about a row that is not already written across it. */
+const LANE = "my-3 w-[3px] flex-none rounded-[2px]";
+
+const BODY =
+  "grid min-w-0 flex-1 gap-px py-4 bg-transparent border-0 [font:inherit] " +
+  "text-left cursor-pointer";
+
+const NAME =
+  "overflow-hidden text-ellipsis whitespace-nowrap font-medium text-text " +
+  "group-hover:text-accent";
+
+const PATH =
+  "overflow-hidden text-ellipsis whitespace-nowrap font-mono text-micro text-text-faint";
+
+const ACTION =
+  "p-0 bg-transparent border-0 [font:inherit] text-small text-text-faint cursor-pointer " +
+  "group-hover:text-text-dim hover:underline";
+
 export function RepoLibrary({
   repos,
   openPaths,
@@ -88,13 +123,13 @@ export function RepoLibrary({
   );
 
   return (
-    <div className="library">
-      <div className="library-column">
-        <header className="library-head">
-          <h1 className="library-title">Repositories</h1>
-          {repos.length > 0 && <span className="library-count">{repos.length}</span>}
+    <div className={FRAME}>
+      <div className={COLUMN}>
+        <header className="flex flex-none items-baseline gap-4">
+          <h1 className="m-0 text-[17px] font-semibold tracking-[0.01em]">Repositories</h1>
+          {repos.length > 0 && <span className="font-mono text-small text-text-faint">{repos.length}</span>}
 
-          <div className="library-actions">
+          <div className="ml-auto flex gap-3">
             <button className="btn" onClick={onClone}>
               Clone
             </button>
@@ -108,9 +143,9 @@ export function RepoLibrary({
         </header>
 
         {repos.length === 0 ? (
-          <div className="library-empty">
-            <p className="library-empty-lead">Nothing on the shelf yet.</p>
-            <p className="library-empty-hint">
+          <div className={EMPTY}>
+            <p className="m-0 text-lead text-text">Nothing on the shelf yet.</p>
+            <p className="m-0 text-small text-text-faint">
               Open a folder you already have, clone one from a URL, or create one from
               scratch. Everything you add stays here, so closing a tab never loses it.
             </p>
@@ -118,7 +153,7 @@ export function RepoLibrary({
         ) : (
           <>
             {repos.length > 6 && (
-              <div className="library-filter">
+              <div className="mt-8 mb-3 max-w-[320px] flex-none">
                 <FilterInput
                   value={filter}
                   onChange={setFilter}
@@ -129,7 +164,7 @@ export function RepoLibrary({
               </div>
             )}
 
-            <ul className="library-list">
+            <ul className={LIST}>
               {shown.map((repo, index) => {
                 const open = openPaths.some((path) => samePath(path, repo.path));
 
@@ -138,16 +173,16 @@ export function RepoLibrary({
                     key={repo.path}
                     data-repo={repo.path}
                     className={[
-                      "library-row",
-                      open && "library-row-open",
-                      index === cursor && "library-row-cursor",
+                      ROW,
+                      index === cursor &&
+                        "bg-surface-alt shadow-[inset_0_0_0_1px_var(--color-accent)]",
                     ]
                       .filter(Boolean)
                       .join(" ")}
                     onMouseEnter={() => setCursor(index)}
                   >
                     <span
-                      className="library-lane"
+                      className={`${LANE} ${open ? "bg-accent" : "bg-border"}`}
                       {...tip(open ? "Open in a tab" : "Not open")}
                       aria-hidden
                     />
@@ -155,26 +190,26 @@ export function RepoLibrary({
                     {/* The whole row opens it. Two lines rather than one, so a
                         long path never crowds the name out of its own row. */}
                     <button
-                      className="library-body"
+                      className={BODY}
                       onClick={() => onOpen(repo.path)}
                       {...tip(open ? "Go to its tab" : "Open in a new tab")}
                     >
-                      <span className="library-name">{displayName(repo)}</span>
-                      <span className="library-path">{repo.path}</span>
+                      <span className={NAME}>{displayName(repo)}</span>
+                      <span className={PATH}>{repo.path}</span>
                     </button>
 
                     {/* Shown at rest. Hiding these meant the two things this
                         screen exists for could only be found by accident. */}
-                    <div className="library-row-actions">
+                    <div className="flex flex-none items-center gap-6 pr-4">
                       <button
-                        className="library-action"
+                        className={`${ACTION} hover:text-accent`}
                         {...tip("Edit", "library.edit", "Its name, or the folder it points at")}
                         onClick={() => onEdit(repo.path)}
                       >
                         Edit
                       </button>
                       <button
-                        className="library-action library-action-danger"
+                        className={`${ACTION} hover:text-removed`}
                         {...tip("Remove", "library.remove", "Off this list only — the folder is left alone")}
                         onClick={() => onRemove(repo.path)}
                       >
@@ -186,7 +221,7 @@ export function RepoLibrary({
               })}
 
               {shown.length === 0 && (
-                <li className="library-none">Nothing matches “{filter}”.</li>
+                <li className="py-6 text-text-faint">Nothing matches “{filter}”.</li>
               )}
             </ul>
           </>

@@ -86,17 +86,17 @@ kbd.key-live {
   outline: none;
 }
 
+/* The library carries its own now; these two are still waiting their turn. */
+.app > .body,
+.app > .welcome {
+  flex: 1;
+  min-height: 0;
+}
+
 /* Chrome keeps its own height; only the body absorbs what is left over. */
 .app > .tabs,
 .app > .statusbar {
   flex: none;
-}
-
-.app > .body,
-.app > .welcome,
-.app > .library {
-  flex: 1;
-  min-height: 0;
 }
 
 /* --- repo tabs --------------------------------------------------------- */
@@ -448,121 +448,6 @@ kbd.key-live {
 
 /* --- diff -------------------------------------------------------------- */
 
-.diff {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  height: 100%;
-  min-height: 0;
-}
-
-.diff-header {
-  display: flex;
-  align-items: center;
-  gap: var(--s5);
-  height: 26px;
-  padding: 0 var(--s5);
-  background: var(--surface-alt);
-  border-bottom: 1px solid var(--border-soft);
-  font-size: var(--fs-small);
-}
-
-.diff-path {
-  overflow: hidden;
-  font-family: var(--mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.diff-path.muted {
-  color: var(--text-faint);
-  font-family: var(--sans);
-}
-
-.diff-stat {
-  display: flex;
-  gap: var(--s4);
-  font-family: var(--mono);
-}
-
-.diff-stat .added {
-  color: var(--added);
-}
-
-.diff-stat .removed {
-  color: var(--removed);
-}
-
-.diff-timing {
-  margin-left: auto;
-  color: var(--text-faint);
-  font-family: var(--mono);
-}
-
-.diff-body {
-  overflow: auto;
-  background: var(--surface);
-}
-
-.diff-line {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: flex;
-  align-items: center;
-  min-width: 100%;
-  font-family: var(--mono);
-  font-size: var(--fs-body);
-  line-height: 18px;
-  white-space: pre;
-}
-
-.gutter {
-  flex: none;
-  width: 44px;
-  padding-right: var(--s4);
-  color: var(--text-faint);
-  text-align: right;
-  user-select: none;
-}
-
-.diff-marker {
-  flex: none;
-  width: 16px;
-  text-align: center;
-  user-select: none;
-}
-
-.diff-text {
-  padding-right: var(--s6);
-}
-
-.diff-added {
-  background: var(--added-bg);
-  color: var(--added);
-}
-
-.diff-removed {
-  background: var(--removed-bg);
-  color: var(--removed);
-}
-
-.diff-meta {
-  color: var(--text-faint);
-}
-
-.diff-hunk {
-  background: var(--hunk-bg);
-  color: var(--text-dim);
-}
-
-.diff-notice {
-  padding: var(--s3) var(--s5);
-  background: var(--surface-alt);
-  border-top: 1px solid var(--border-soft);
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-}
-
 /* --- history ----------------------------------------------------------- */
 
 /* Three tracks, in order: the scope bar, the column headings, then the rows.
@@ -629,209 +514,27 @@ kbd.key-live {
   color: var(--added);
 }
 
-.commit-file-cursor {
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
 /* --- commit detail ------------------------------------------------------ */
 
 /* Same shape as the File Status view — list on the left, diff on the right —
    so the two places you read a change work the same way. */
-.commit {
-  display: grid;
-  height: 100%;
-  min-height: 0;
-}
-
-.commit-left {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-right: 1px solid var(--border);
-}
-
-.commit-right {
-  min-width: 0;
-  min-height: 0;
-}
 
 /* Capped at half the pane so a long message can never squeeze the file list
    out of existence, and scrolls inside that cap rather than being clipped. */
-.commit-head {
-  display: flex;
-  flex: 0 1 auto;
-  flex-direction: column;
-  gap: var(--s2);
-  min-height: 0;
-  max-height: 50%;
-  padding: var(--s4) var(--s5);
-  border-bottom: 1px solid var(--border-soft);
-}
 
 /* The subject and the hash stay put; only the message body moves, so you never
    lose track of which commit you are reading. */
-.commit-subject,
-.commit-meta {
-  flex: none;
-}
-
-.commit-subject {
-  margin: 0;
-  font-size: var(--fs-lead);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.35;
-}
-
-.commit-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-  margin: 0;
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-}
-
-.commit-merge {
-  padding: 0 var(--s3);
-  background: var(--accent-soft);
-  border-radius: 999px;
-  color: var(--accent);
-  font-size: var(--fs-micro);
-}
-
-.commit-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  margin: var(--s2) 0 0;
-  overflow-y: auto;
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: var(--fs-body);
-  line-height: 1.55;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.commit-summary {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--s5);
-  height: 24px;
-  padding: 0 var(--s5);
-  background: var(--surface-alt);
-  border-bottom: 1px solid var(--border-soft);
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-}
-
-.commit-summary .added,
-.commit-summary .removed {
-  font-family: var(--mono);
-  font-weight: 600;
-}
-
-.commit-files {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  background: var(--surface);
-}
-
-.commit-file {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-  width: 100%;
-  padding: 0 var(--s5);
-  border-left: 2px solid transparent;
-  cursor: default;
-}
-
-.commit-file:hover {
-  background: var(--surface-alt);
-}
-
-.commit-file-selected,
-.commit-file-selected:hover {
-  background: var(--select);
-  border-left-color: var(--accent);
-}
 
 /* Two parts, laid out left to right in path order. Only the directory shrinks;
    the filename keeps its full width because it is what names the row. */
-.commit-file-path {
-  display: flex;
-  flex: 1;
-  align-items: baseline;
-  min-width: 0;
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-  white-space: nowrap;
-}
 
 /* `dir="rtl"` on this span alone moves its ellipsis to the front, so a long
    directory loses its root rather than the folder next to the file.
    `unicode-bidi: plaintext` keeps the text itself in reading order — without
    it the segments themselves would reverse. */
 
-.commit-file-path .path-name {
-  flex: none;
-}
-
-.commit-file-stat {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-}
-
-.commit-file-counts {
-  display: flex;
-  gap: var(--s3);
-  justify-content: flex-end;
-  min-width: 76px;
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-}
-
-.commit-file-binary {
-  min-width: 76px;
-  color: var(--text-faint);
-  font-size: var(--fs-micro);
-  text-align: right;
-}
-
 /* The meter. Additions then deletions, always in that order, with the counts
    beside it — red and green alone would not be readable to everyone. */
-.meter {
-  display: flex;
-  gap: 2px;
-  width: 64px;
-  height: 6px;
-  background: var(--border-soft);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.meter-add,
-.meter-del {
-  height: 100%;
-  border-radius: 3px;
-}
-
-.meter-add {
-  background: var(--added);
-}
-
-.meter-del {
-  background: var(--removed);
-}
 
 /* --- welcome ----------------------------------------------------------- */
 
@@ -1352,73 +1055,6 @@ kbd.key-live {
 
 /* --- command palette --------------------------------------------------- */
 
-.palette {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  width: min(620px, 92vw);
-  max-height: 60vh;
-  overflow: hidden;
-  background: var(--chrome);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-pop-lg);
-}
-
-.palette-input {
-  padding: var(--s5);
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  font-size: var(--fs-lead);
-  outline: none;
-}
-
-.palette-list {
-  overflow-y: auto;
-  padding: var(--s2);
-}
-
-.palette-row {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--s4);
-  padding: var(--s3) var(--s4);
-  border-radius: var(--radius);
-  cursor: default;
-}
-
-.palette-row-selected {
-  background: var(--select);
-}
-
-.palette-category {
-  overflow: hidden;
-  color: var(--text-faint);
-  font-size: var(--fs-micro);
-  letter-spacing: 0.06em;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.palette-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.palette-keys {
-  display: flex;
-  gap: var(--s2);
-}
-
-.palette-empty {
-  padding: var(--s6);
-  color: var(--text-faint);
-  text-align: center;
-}
-
 /* A menu entry names its key on the right, so the menu teaches the keyboard
    rather than competing with it. */
 
@@ -1573,66 +1209,11 @@ kbd.key-live {
 
 /* Actions sit on the hunk header, where the thing they act on begins. They
    appear on hover so a diff stays a diff until you reach for them. */
-.hunk-actions {
-  position: sticky;
-  right: var(--s4);
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  margin-left: auto;
-  padding-right: var(--s4);
-  opacity: 0;
-}
-
-.diff-hunk:hover .hunk-actions,
-.hunk-actions:focus-within {
-  opacity: 1;
-}
-
-.hunk-count {
-  color: var(--accent);
-  font-family: var(--sans);
-  font-size: var(--fs-micro);
-}
-
-.hunk-button {
-  padding: 1px var(--s3);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-dim);
-  font-family: var(--sans);
-  font-size: var(--fs-micro);
-  line-height: 15px;
-  cursor: pointer;
-}
-
-.hunk-button:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.hunk-button-danger:hover {
-  border-color: var(--removed);
-  color: var(--removed);
-}
 
 /* Only a changed line can be picked; context has nothing to stage. */
-.diff-line-selectable {
-  cursor: pointer;
-}
 
 /* The marker column carries the selection, so the line's own added/removed
    colour is left alone — one signal per channel. */
-.diff-line-picked .diff-marker {
-  background: var(--accent);
-  color: #fff;
-  font-weight: 700;
-}
-
-.diff-line-picked {
-  box-shadow: inset 2px 0 0 var(--accent);
-}
 
 /* --- conflicts ---------------------------------------------------------- */
 
@@ -1692,194 +1273,23 @@ kbd.key-live {
 
 /* --- blame ------------------------------------------------------------- */
 
-.blame {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  background: var(--surface);
-}
-
-.blame-header {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-  flex: none;
-  padding: var(--s3) var(--s4);
-  background: var(--chrome);
-  border-bottom: 1px solid var(--border);
-}
-.blame-path {
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-}
-.blame-rev,
-.blame-count {
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-}
-.blame-spacer {
-  flex: 1;
-}
-
 /* The commit under the cursor. A fixed strip rather than something that
    appears on hover: it is the answer to the question the view exists for, and
    it should not move or vanish while being read. */
-.blame-focus {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s5);
-  flex: none;
-  padding: var(--s3) var(--s4);
-  background: var(--surface-alt);
-  border-bottom: 1px solid var(--border-soft);
-  font-size: var(--fs-small);
-}
-.blame-focus-oid {
-  flex: none;
-  color: var(--accent);
-  font-family: var(--mono);
-}
-.blame-focus-author {
-  flex: none;
-  color: var(--text);
-}
-.blame-focus-date {
-  flex: none;
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-}
-.blame-focus-summary {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-dim);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.blame-focus-uncommitted .blame-focus-summary {
-  color: var(--accent);
-}
-
-.blame-body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
-.blame-row {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: flex;
-  align-items: center;
-  min-width: 100%;
-  font-family: var(--mono);
-  font-size: var(--fs-body);
-  line-height: 19px;
-  white-space: pre;
-  cursor: default;
-}
 /* Where one commit's run gives way to the next. Most of the gutter is blank by
    design, so without this a block of forty lines has no visible bottom. */
-.blame-row-start {
-  box-shadow: inset 0 1px 0 var(--border-soft);
-}
 /* Every line of the commit under the cursor, not just the one the cursor is
    on. Kept far weaker than the cursor itself so the two never compete. */
-.blame-row-kin {
-  background: var(--surface-alt);
-}
-.blame-row-selected {
-  background: var(--accent-soft);
-}
 
 /* The age spine: one hue, stepped by opacity so it holds up in both themes
    without a second set of tokens. Never the only signal — the date is right
    beside it — so it can afford to stay this quiet. */
-.blame-age {
-  flex: none;
-  width: 3px;
-  align-self: stretch;
-  background: var(--accent);
-}
-.blame-age-0 {
-  opacity: 0.14;
-}
-.blame-age-1 {
-  opacity: 0.3;
-}
-.blame-age-2 {
-  opacity: 0.48;
-}
-.blame-age-3 {
-  opacity: 0.7;
-}
-.blame-age-4 {
-  opacity: 1;
-}
 /* Not yet committed, so it has no place on a ramp of commit dates. */
-.blame-row-uncommitted .blame-age {
-  background: repeating-linear-gradient(
-    135deg,
-    var(--accent) 0 2px,
-    transparent 2px 4px
-  );
-  opacity: 0.9;
-}
 
 /* Fixed width so code starts at the same column on every row, whether or not
    that row begins a run. */
-.blame-gutter {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-  flex: none;
-  width: 196px;
-  padding: 0 var(--s4);
-  overflow: hidden;
-  font-size: var(--fs-micro);
-  white-space: nowrap;
-}
-.blame-oid {
-  flex: none;
-  width: 50px;
-  color: var(--text-faint);
-}
 /* The name is what the eye scans for, so it is the one thing here at full
    strength; the hash beside it is an identifier you almost never read. */
-.blame-author {
-  flex: 1;
-  overflow: hidden;
-  color: var(--text-dim);
-  font-family: var(--sans);
-  text-overflow: ellipsis;
-}
-.blame-date {
-  flex: none;
-  color: var(--text-faint);
-}
-.blame-row-uncommitted .blame-author {
-  color: var(--accent);
-}
-
-.blame-line-no {
-  flex: none;
-  width: 48px;
-  padding-right: var(--s4);
-  border-right: 1px solid var(--border-soft);
-  color: var(--text-faint);
-  text-align: right;
-  user-select: none;
-}
-.blame-content {
-  padding-left: var(--s4);
-}
-
-.blame > .pane-hint {
-  flex: none;
-}
 
 /* --- searchable field -------------------------------------------------- */
 
@@ -1891,57 +1301,6 @@ kbd.key-live {
    scrolls would otherwise clip the list and grow its own scroll height around
    it, burying whatever comes after the field. Its position is measured from
    the field each time it opens. */
-.combo-list {
-  position: fixed;
-  z-index: 40;
-  max-height: 232px;
-  margin: 0;
-  padding: var(--s2);
-  overflow-y: auto;
-  list-style: none;
-  background: var(--chrome);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-pop-lg);
-}
-
-.combo-option {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-  width: 100%;
-  padding: 4px var(--s3);
-  background: none;
-  border: none;
-  border-radius: var(--radius);
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-  text-align: left;
-  cursor: pointer;
-}
-.combo-option-cursor {
-  background: var(--accent);
-  color: #fff;
-}
-.combo-value {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.combo-note {
-  flex: none;
-  font-family: var(--sans);
-  font-size: var(--fs-micro);
-  opacity: 0.75;
-}
-
-.combo-more {
-  padding: 4px var(--s3);
-  color: var(--text-faint);
-  font-size: var(--fs-micro);
-}
 
 /* What the value in the field will actually do, said before the button is
    pressed rather than reported afterwards as an error. */
@@ -2152,189 +1511,20 @@ kbd.key-live {
 /* A shelf of repositories, not a landing page. The window is as wide as the
    monitor and a row of four is not; the content sits in a column it can
    actually be read across, and the rest of the width is left alone. */
-.library {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  background: var(--surface);
-  outline: none;
-}
-
-.library-column {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  flex: 1;
-  width: 100%;
-  max-width: 880px;
-  margin: 0 auto;
-  padding: var(--s7) var(--s6) 0;
-}
-
-.library-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s4);
-  flex: none;
-}
 /* No wordmark and no channel badge: the status bar already carries both, and
    repeating them here made a list of four repositories look like a splash. */
-.library-title {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-.library-count {
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-}
-.library-actions {
-  display: flex;
-  gap: var(--s3);
-  margin-left: auto;
-}
-
-.library-filter {
-  flex: none;
-  max-width: 320px;
-  margin: var(--s6) 0 var(--s3);
-}
-
-.library-list {
-  flex: 1;
-  min-height: 0;
-  margin: var(--s5) 0 0;
-  padding: 0;
-  overflow-y: auto;
-  list-style: none;
-}
-
-.library-row {
-  display: flex;
-  align-items: stretch;
-  gap: var(--s4);
-  border-bottom: 1px solid var(--border-soft);
-}
-.library-row:hover {
-  background: var(--surface-alt);
-}
 /* The keyboard cursor, drawn as the sidebar draws its own so that landing on a
    row means the same thing everywhere in the app. */
-.library-row-cursor {
-  background: var(--surface-alt);
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
 
 /* The lane. Lit where a tab is open on this repository, faint where none is --
    the app's own mark, saying the one thing about a row that is not already
    written across it. */
-.library-lane {
-  flex: none;
-  width: 3px;
-  margin: var(--s3) 0;
-  background: var(--border);
-  border-radius: 2px;
-}
-.library-row-open .library-lane {
-  background: var(--accent);
-}
 
 /* Name over path rather than beside it: a path is long and a name is short,
    and side by side the path pushed every name into a narrow column of its own
    while leaving the row two thirds empty. */
-.library-body {
-  display: grid;
-  gap: 1px;
-  flex: 1;
-  min-width: 0;
-  padding: var(--s4) 0;
-  background: none;
-  border: none;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.library-name {
-  overflow: hidden;
-  color: var(--text);
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.library-body:hover .library-name {
-  color: var(--accent);
-}
-
-.library-path {
-  overflow: hidden;
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* Shown at rest, quiet until the row is under the pointer or the cursor. */
-.library-row-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--s5);
-  flex: none;
-  padding-right: var(--s4);
-}
-.library-action {
-  padding: 0;
-  background: none;
-  border: none;
-  color: var(--text-faint);
-  font: inherit;
-  font-size: var(--fs-small);
-  cursor: pointer;
-}
-.library-row:hover .library-action,
-.library-row-cursor .library-action {
-  color: var(--text-dim);
-}
-.library-action:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
-.library-action-danger:hover {
-  color: var(--removed);
-}
-
-.library-empty {
-  flex: 1;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: var(--s3);
-  max-width: 44ch;
-  margin: 0 auto;
-  text-align: center;
-}
-.library-empty-lead {
-  margin: 0;
-  color: var(--text);
-  font-size: var(--fs-lead);
-}
-.library-empty-hint {
-  margin: 0;
-  color: var(--text-faint);
-  font-size: var(--fs-small);
-}
-
-.library-none {
-  padding: var(--s5) 0;
-  color: var(--text-faint);
-}
-
-.library > .pane-hint {
-  flex: none;
-}
 
 /* The repository list's own tab. Italic rather than a different colour: it is
    still a tab, it just holds the shelf instead of a repository. */

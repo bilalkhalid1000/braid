@@ -18,6 +18,45 @@ const NEWLINE = "\n";
 
 /** How many steps the age ramp has. Five reads as a gradient without claiming a
  *  precision the eye cannot resolve at three pixels wide. */
+const FRAME = "flex h-full min-h-0 flex-col bg-surface";
+
+const HEADER =
+  "flex flex-none items-center gap-4 px-4 py-3 bg-chrome border-b border-b-border";
+
+const SUBTLE = "font-mono text-micro text-text-dim";
+
+const FOCUS =
+  "flex flex-none items-baseline gap-6 px-4 py-3 bg-surface-alt " +
+  "border-b border-b-border-soft text-small";
+
+const FOCUS_SUMMARY = "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap";
+
+/* Absolutely placed: the lines are virtualized. `pre` because the file's own
+   indentation is part of what the line says. */
+const ROW =
+  "absolute top-0 left-0 flex min-w-full items-center font-mono text-body " +
+  "leading-[19px] whitespace-pre cursor-default";
+
+const GUTTER =
+  "flex w-[196px] flex-none items-center gap-4 overflow-hidden px-4 " +
+  "text-micro whitespace-nowrap";
+
+const AUTHOR = "flex-1 overflow-hidden text-ellipsis font-sans text-text-dim";
+
+const LINE_NO =
+  "w-24 flex-none pr-4 border-r border-r-border-soft text-right text-text-faint select-none";
+
+/** The bar down the left of each line, opaque where the commit is recent.
+ *  Spelled out step by step: a class built from a number at runtime is one
+ *  Tailwind's scanner cannot see. */
+const AGE = "w-[3px] flex-none self-stretch bg-accent";
+const AGE_FADE = ["opacity-[0.14]", "opacity-30", "opacity-[0.48]", "opacity-70", "opacity-100"];
+
+/* Hatched rather than solid: the line is not committed, so its "age" is not a
+   measurement of anything. */
+const UNCOMMITTED_AGE =
+  "bg-[repeating-linear-gradient(135deg,var(--color-accent)_0_2px,transparent_2px_4px)] opacity-90";
+
 const AGE_STEPS = 5;
 
 interface Props {
@@ -123,12 +162,12 @@ export function BlameView({ repoId, target, keyboardActive, onClose }: Props) {
   const focused = current ? commits[current.oid] : undefined;
 
   return (
-    <div className="blame">
-      <header className="blame-header">
-        <span className="blame-path">{target.path}</span>
-        {target.rev && <span className="blame-rev">at {target.rev.slice(0, 7)}</span>}
-        <span className="blame-spacer" />
-        <span className="blame-count">
+    <div className={FRAME}>
+      <header className={HEADER}>
+        <span className="font-mono text-small">{target.path}</span>
+        {target.rev && <span className={SUBTLE}>at {target.rev.slice(0, 7)}</span>}
+        <span className="flex-1" />
+        <span className={SUBTLE}>
           {lines.length.toLocaleString()} {lines.length === 1 ? "line" : "lines"}
         </span>
         <button className="btn" onClick={onClose}>
@@ -139,23 +178,23 @@ export function BlameView({ repoId, target, keyboardActive, onClose }: Props) {
       {/* The commit under the cursor, spelled out. The gutter has room for a
           name and a date and nothing else, so the summary lives here. */}
       {focused && (
-        <div className={`blame-focus ${focused.uncommitted ? "blame-focus-uncommitted" : ""}`}>
+        <div className={FOCUS}>
           {focused.uncommitted ? (
-            <span className="blame-focus-summary">
+            <span className={`${FOCUS_SUMMARY} ${focused.uncommitted ? "text-accent" : "text-text-dim"}`}>
               Not committed yet — this line is only in your working tree.
             </span>
           ) : (
             <>
-              <span className="blame-focus-oid">{current!.oid.slice(0, 7)}</span>
-              <span className="blame-focus-author">{focused.author}</span>
-              <span className="blame-focus-date">{fullDate(focused.authorTime)}</span>
-              <span className="blame-focus-summary">{focused.summary}</span>
+              <span className="flex-none font-mono text-accent">{current!.oid.slice(0, 7)}</span>
+              <span className="flex-none text-text">{focused.author}</span>
+              <span className="flex-none font-mono text-micro text-text-faint">{fullDate(focused.authorTime)}</span>
+              <span className={`${FOCUS_SUMMARY} ${focused.uncommitted ? "text-accent" : "text-text-dim"}`}>{focused.summary}</span>
             </>
           )}
         </div>
       )}
 
-      <div className="blame-body" ref={scrollRef}>
+      <div className="min-h-0 flex-1 overflow-auto" ref={scrollRef}>
         {blame.isPending && <div className="pane-empty">Blaming {target.path}…</div>}
 
         {blame.isError && (
@@ -184,11 +223,13 @@ export function BlameView({ repoId, target, keyboardActive, onClose }: Props) {
               <div
                 key={item.key}
                 className={[
-                  "blame-row",
-                  item.index === selected && "blame-row-selected",
-                  kin && "blame-row-kin",
-                  starts && "blame-row-start",
-                  commit?.uncommitted && "blame-row-uncommitted",
+                  ROW,
+                  item.index === selected
+                    ? "bg-accent-soft"
+                    : kin
+                      ? "bg-surface-alt"
+                      : "",
+                  starts && "shadow-[inset_0_1px_0_var(--color-border-soft)]",
                 ]
                   .filter(Boolean)
                   .join(" ")}
@@ -196,31 +237,33 @@ export function BlameView({ repoId, target, keyboardActive, onClose }: Props) {
                 onMouseDown={() => setSelected(item.index)}
               >
                 <span
-                  className={`blame-age blame-age-${ageOf[line.oid] ?? AGE_STEPS - 1}`}
+                  className={`${AGE} ${AGE_FADE[ageOf[line.oid] ?? AGE_STEPS - 1]} ${
+                    commit?.uncommitted ? UNCOMMITTED_AGE : ""
+                  }`}
                   aria-hidden
                 />
 
                 <span
-                  className="blame-gutter"
+                  className={GUTTER}
                   {...(commit ? tip(commitTitle(commit)) : {})}
                 >
                   {starts && commit && (
                     <>
-                      <span className="blame-oid">
+                      <span className="w-25 flex-none text-text-faint">
                         {commit.uncommitted ? "——" : line.oid.slice(0, 7)}
                       </span>
-                      <span className="blame-author">
+                      <span className={AUTHOR}>
                         {commit.uncommitted ? "Uncommitted" : commit.author}
                       </span>
-                      <span className="blame-date">
+                      <span className="flex-none text-text-faint">
                         {commit.uncommitted ? "" : shortDate(commit.authorTime)}
                       </span>
                     </>
                   )}
                 </span>
 
-                <span className="blame-line-no">{line.line}</span>
-                <span className="blame-content">
+                <span className={LINE_NO}>{line.line}</span>
+                <span className="pl-4">
                   <Code tokens={highlighted?.[item.index]} text={line.content} />
                 </span>
               </div>
