@@ -1288,6 +1288,37 @@ The stashed changes are discarded.`,
     });
   };
 
+  /** Take a commit out of the branch entirely.
+   *
+   *  Everything after it is replayed, so this rewrites history exactly as a
+   *  reset does -- and earns the same warning when any of it is published.
+   */
+  const confirmDrop = async (commit: Commit) => {
+    if (!id) return;
+
+    const impact = await api.dropImpact(id, commit.oid);
+    const after = impact.dropped - 1;
+
+    const replayed =
+      after === 0
+        ? "It is the newest commit, so nothing has to be replayed."
+        : `The ${after === 1 ? "commit" : `${after} commits`} after it will be replayed and get new hashes.`;
+
+    const warning =
+      impact.published > 0
+        ? ` ${impact.published} of them ${impact.published === 1 ? "is" : "are"} already on ${impact.upstream}, so this rewrites history other people have.`
+        : "";
+
+    setDialog({
+      title: `Drop ${commit.short}`,
+      message: `Removes "${commit.subject}" from the branch. ${replayed}${warning} A conflict will stop the replay part way, like any rebase.`,
+      confirmLabel: "Drop",
+      danger: true,
+      onConfirm: () =>
+        act(`Drop ${commit.short}`, () => api.dropCommit(id, commit.oid)),
+    });
+  };
+
   const confirmRevert = (commit: Commit) => {
     if (!id) return;
 
@@ -1316,6 +1347,14 @@ The stashed changes are discarded.`,
       {
         label: `Revert ${commit.short}…`,
         onClick: () => confirmRevert(commit),
+      },
+      {
+        label: `Drop ${commit.short}…`,
+        // A merge has two histories behind it, so "without this commit" does
+        // not name one; the backend refuses, and so does the menu.
+        disabled: detached || commit.parents.length !== 1,
+        danger: true,
+        onClick: () => void confirmDrop(commit),
       },
       "separator",
       {

@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::cli::Git;
-use crate::error::Result;
+use crate::error::{AppError, Result};
 
 #[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -155,4 +155,74 @@ mod tests {
         assert_eq!(count(""), 0);
         assert_eq!(count("fatal: bad revision"), 0);
     }
+}
+
+/// The parent of a commit, or an error naming why it has none.
+///
+/// Both refusals are real cases rather than defensive noise: the first commit
+/// in a repository has nothing to rebase onto, and a merge has two parents so
+/// "without this commit" does not name one history.
+async fn sole_parent(git: &Git, oid: &str) -> Result<String> {
+    let parents = git
+        .run_str(&["rev-list", "--parents", "-n", "1", oid])
+        .await?;
+
+    let mut fields = parents.split_whitespace().skip(1);
+    let first = fields.next();
+
+    if fields.next().is_some() {
+        return Err(AppError::Git {
+            code: 1,
+            stderr: "A merge cannot be dropped: it has two histories behind it, and removing \
+                     it would not say which one to keep."
+                .into(),
+        });
+    }
+
+    first.map(str::to_string).ok_or_else(|| AppError::Git {
+        code: 1,
+        stderr: "This is the first commit in the repository, so there is nothing to rebase \
+                 the rest onto."
+            .into(),
+    })
+}
+
+/// What dropping a commit would rewrite.
+///
+/// Everything from the dropped commit onwards gets a new hash, so the cost is
+/// measured from its parent -- not from the commit itself, as a reset is.
+pub async fn drop_impact(git: &Git, oid: &str) -> Result<ResetImpact> {
+    let parent = sole_parent(git, oid).await?;
+
+    impact(git, &parent).await
+}
+
+/// Remove a commit from the middle of the current branch.
+///
+/// Every commit after it is replayed, so this is a rewrite: the same cost as a
+/// reset, and worth the same warning when the history is published. It can stop
+/// on a conflict like any rebase, which leaves the repository mid-operation --
+/// the state the operation banner exists to report.
+pub async fn drop_commit(git: &Git, oid: &str) -> Result<String> {
+    let parent = sole_parent(git, oid).await?;
+
+    // Not reachable from HEAD means it belongs to some other branch, and
+    // rebasing onto its parent would drag unrelated history along.
+    // Exit 1 means "not an ancestor", so the failure is the answer -- allowing
+    // that code would return Ok either way and the check would never refuse.
+    let reachable = git
+        .run(&["merge-base", "--is-ancestor", oid, "HEAD"])
+        .await
+        .is_ok();
+
+    if !reachable {
+        return Err(AppError::Git {
+            code: 1,
+            stderr: "That commit is not on the branch you have checked out.".into(),
+        });
+    }
+
+    git.run_reported(&["rebase", "--onto", &parent, oid]).await?;
+
+    Ok(format!("Dropped {oid}"))
 }

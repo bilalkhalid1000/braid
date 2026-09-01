@@ -7,7 +7,7 @@
 
 mod common;
 
-use braid_lib::git::{impact, reset, revert, ResetMode};
+use braid_lib::git::{drop_commit, drop_impact, impact, reset, revert, ResetMode};
 use common::TestRepo;
 
 /// main with three commits, the newest touching `work.txt`.
@@ -196,4 +196,87 @@ async fn reverting_an_older_commit_leaves_the_newer_ones_alone() {
 
     assert!(!repo.exists("a.txt"), "the reverted commit's file is gone");
     assert!(repo.exists("b.txt"), "the commit after it is untouched");
+}
+
+#[tokio::test]
+async fn dropping_a_commit_takes_it_out_and_keeps_the_rest() {
+    let repo = TestRepo::new();
+    repo.write("a.txt", "a\n");
+    repo.commit_all("Add a");
+    let middle = repo.head();
+    repo.write("b.txt", "b\n");
+    repo.commit_all("Add b");
+
+    drop_commit(repo.git_api(), &middle).await.unwrap();
+
+    assert!(!subjects(&repo).contains("Add a"));
+    assert!(subjects(&repo).contains("Add b"), "the commit after it survives");
+    assert!(!repo.exists("a.txt"));
+    assert!(repo.exists("b.txt"));
+}
+
+#[tokio::test]
+async fn dropping_the_newest_commit_just_removes_it() {
+    let repo = three();
+
+    drop_commit(repo.git_api(), &repo.head()).await.unwrap();
+
+    assert!(!subjects(&repo).contains("Third"));
+    assert!(subjects(&repo).contains("Second"));
+}
+
+#[tokio::test]
+async fn the_first_commit_cannot_be_dropped() {
+    // There is nothing to rebase the rest onto, and saying so is better than
+    // whatever git does with an unresolvable revision.
+    let repo = three();
+    let root = repo.git(&["rev-list", "--max-parents=0", "HEAD"]).trim().to_string();
+
+    let refused = drop_commit(repo.git_api(), &root).await;
+
+    assert!(refused.is_err());
+}
+
+#[tokio::test]
+async fn a_merge_cannot_be_dropped() {
+    // Two histories behind it, so "without this commit" does not name one.
+    let repo = TestRepo::new();
+    repo.git(&["checkout", "-b", "side"]);
+    repo.write("side.txt", "side\n");
+    repo.commit_all("On the side");
+    repo.git(&["checkout", "main"]);
+    repo.write("main.txt", "main\n");
+    repo.commit_all("On main");
+    repo.git(&["merge", "--no-ff", "--no-edit", "side"]);
+
+    let refused = drop_commit(repo.git_api(), &repo.head()).await;
+
+    assert!(refused.is_err());
+}
+
+#[tokio::test]
+async fn a_commit_on_another_branch_is_refused() {
+    // Rebasing onto its parent would drag history that is not on this branch.
+    let repo = three();
+    repo.git(&["checkout", "-b", "elsewhere"]);
+    repo.write("only.txt", "only\n");
+    repo.commit_all("Only over here");
+    let stranger = repo.head();
+    repo.git(&["checkout", "main"]);
+
+    let refused = drop_commit(repo.git_api(), &stranger).await;
+
+    assert!(refused.is_err());
+}
+
+#[tokio::test]
+async fn dropping_measures_the_rewrite_from_the_parent() {
+    // A reset counts what the branch stops pointing at; a drop counts what has
+    // to be replayed, which includes the commit itself.
+    let repo = three();
+    let middle = repo.git(&["rev-parse", "HEAD~1"]).trim().to_string();
+
+    let found = drop_impact(repo.git_api(), &middle).await.unwrap();
+
+    assert_eq!(found.dropped, 2, "the commit and the one after it");
 }

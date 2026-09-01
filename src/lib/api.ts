@@ -365,6 +365,8 @@ export const api = {
   resetTo: (id: string, oid: string, mode: ResetMode) =>
     invoke<string>("reset_to", { id, oid, mode }),
   revertCommit: (id: string, oid: string) => invoke<string>("revert_commit", { id, oid }),
+  dropImpact: (id: string, oid: string) => invoke<ResetImpact>("drop_impact", { id, oid }),
+  dropCommit: (id: string, oid: string) => invoke<string>("drop_commit", { id, oid }),
   repoLog: (id: string, skip: number, limit: number, scope: HistoryScope) =>
     invoke<LogPage>("repo_log", { id, skip, limit, scope }),
   applyHunk: (

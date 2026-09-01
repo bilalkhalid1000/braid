@@ -18,7 +18,7 @@ pub mod worktree;
 pub use blame::{blame, Blame};
 pub use clone::{clone, CloneProgress, CLONE_PROGRESS_EVENT};
 pub use cli::Git;
-pub use reset::{impact, reset, revert, ResetImpact, ResetMode};
+pub use reset::{drop_commit, drop_impact, impact, reset, revert, ResetImpact, ResetMode};
 pub use commit::CommitDetail;
 pub use diff::{file_diff, DiffOptions, DiffTarget, FileDiff};
 pub use flow::{FinishOptions, FlowConfig, FlowKind, FlowStatus};

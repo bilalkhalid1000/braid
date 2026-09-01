@@ -799,6 +799,27 @@ pub async fn reset_to(
     git::reset(&session.git, &oid, mode).await
 }
 
+/// What dropping this commit would rewrite, asked before it is offered.
+#[tauri::command]
+pub async fn drop_impact(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    oid: String,
+) -> Result<git::ResetImpact> {
+    let session = registry.get(&id)?;
+    git::drop_impact(&session.git, &oid).await
+}
+
+#[tauri::command]
+pub async fn drop_commit(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    oid: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    git::drop_commit(&session.git, &oid).await
+}
+
 #[tauri::command]
 pub async fn revert_commit(
     registry: State<'_, RepoRegistry>,

@@ -119,6 +119,8 @@ pub fn run() {
             ipc::reset_impact,
             ipc::reset_to,
             ipc::revert_commit,
+            ipc::drop_impact,
+            ipc::drop_commit,
             ipc::fsmonitor_state,
         ])
         .run(tauri::generate_context!())
