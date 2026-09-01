@@ -114,8 +114,57 @@ export function useGitLog(): GitLog {
 }
 
 /** A command written the way you would type it. */
+/** One backslash, built rather than written.
+ *
+ *  Escapes in this file describe other escapes, and a literal one here is a
+ *  step away from meaning something else. */
+const SLASH = String.fromCharCode(92);
+
+/** Control characters, written the way a shell would take them back.
+ *
+ *  Several of our formats separate fields with the unit and record separators,
+ *  0x1f and 0x1e. Printed raw they are invisible or arrive as tofu, so the log
+ *  showed an argument that looked corrupted and could not be copied anywhere
+ *  useful. */
+const escapeControls = (text: string) =>
+  Array.from(text, (ch) => {
+    const code = ch.charCodeAt(0);
+    if (code > 0x1f && code !== 0x7f) return ch;
+
+    if (code === 9) return SLASH + "t";
+    if (code === 10) return SLASH + "n";
+    if (code === 13) return SLASH + "r";
+
+    return SLASH + "x" + code.toString(16).padStart(2, "0");
+  }).join("");
+
+/** One argument, quoted where it would not survive being pasted unquoted. */
+const quote = (arg: string) => {
+  // An empty argument is a real one, and disappears entirely without quotes.
+  if (arg === "") return String.fromCharCode(34, 34);
+
+  const shown = escapeControls(arg);
+  const quoteChar = String.fromCharCode(34);
+  const risky =
+    shown.includes(" ") || shown.includes(quoteChar) || shown.includes("'");
+
+  if (!risky) return shown;
+
+  return (
+    quoteChar +
+    shown.split(quoteChar).join(SLASH + quoteChar) +
+    quoteChar
+  );
+};
+
+/** A command written the way you would type it.
+ *
+ *  Quoted and escaped, so the line in the log is one you could paste into a
+ *  terminal and get the same command back. A commit message with spaces in it
+ *  is one argument rather than several, and a separator you cannot see is
+ *  worse than one spelled out. */
 export const gitCommandLine = (command: GitCommand) =>
-  `git ${command.args.join(" ")}`;
+  `git ${command.args.map(quote).join(" ")}`;
 
 const pad = (n: number, width = 2) => String(n).padStart(width, "0");
 
