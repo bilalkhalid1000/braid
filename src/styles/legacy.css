@@ -1321,127 +1321,10 @@ kbd.key-live {
 
 /* --- activity log ------------------------------------------------------ */
 
-.log-panel {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  min-height: 0;
-  background: var(--chrome);
-  border-left: 1px solid var(--border);
-}
-
-.log-head {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-  height: 26px;
-  padding: 0 var(--s4);
-  background: var(--surface-alt);
-  border-bottom: 1px solid var(--border-soft);
-  font-size: var(--fs-small);
-  font-weight: 600;
-}
-
-.log-count {
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-weight: 400;
-}
-
-.log-close {
-  background: none;
-  border: none;
-  color: var(--text-faint);
-  font-size: var(--fs-lead);
-  line-height: 1;
-  cursor: pointer;
-}
-
-.log-body {
-  position: relative;
-  overflow-y: auto;
-}
-
-.log-entry {
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.log-entry-row {
-  display: grid;
-  grid-template-columns: 9px minmax(0, auto) minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: var(--s3);
-  width: 100%;
-  padding: var(--s3) var(--s4);
-  background: none;
-  border: none;
-  font-size: var(--fs-small);
-  text-align: left;
-  cursor: pointer;
-}
-
-.log-entry-row:hover {
-  background: var(--surface-alt);
-}
-
-.log-dot {
-  width: 7px;
-  height: 7px;
-  background: var(--text-faint);
-  border-radius: 50%;
-}
-
-.log-success {
-  background: var(--added);
-}
-
-.log-error {
-  background: var(--removed);
-}
-
-.log-running {
-  background: var(--accent);
-  animation: pulse 900ms ease-in-out infinite;
-}
-
-@keyframes pulse {
+@keyframes dot-pulse {
   50% {
     opacity: 0.3;
   }
-}
-
-.log-label {
-  overflow: hidden;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.log-summary {
-  overflow: hidden;
-  color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.log-meta {
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-  white-space: nowrap;
-}
-
-.log-output {
-  max-height: 240px;
-  margin: 0;
-  padding: var(--s3) var(--s4) var(--s4) 26px;
-  overflow: auto;
-  background: var(--surface);
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 /* --- buttons, menus, dialogs ------------------------------------------- */
@@ -2973,46 +2856,10 @@ kbd.key-live {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.log-tab {
-  padding: 0 var(--s2);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--text-dim);
-  font: inherit;
-  cursor: pointer;
-}
-.log-tab-active {
-  border-bottom-color: var(--accent);
-  color: var(--text);
-}
-
-.git-row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s3);
-  padding: 3px var(--s4);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-  line-height: 1.55;
-}
 /* A hairline between runs rather than around every row: the list is dense and
    a full border on each would weigh more than the text. */
-.git-row + .git-row {
-  border-top: 1px solid var(--border-soft);
-}
-.git-row:hover {
-  background: var(--surface-alt);
-}
-.git-row-running {
-  color: var(--text);
-}
 /* A non-zero exit is not always a failure — several git commands report a
    result that way — so this is a mark, not an alarm. */
-.git-row-failed .git-line {
-  color: var(--removed);
-}
 /* The clock, in its own column at the left, so a burst reads as a burst: the
    times line up and the gaps between them are visible without reading a single
    argument.
@@ -3020,31 +2867,9 @@ kbd.key-live {
    Sized by its content rather than a guessed width -- every timestamp is the
    same length, so they align anyway, and a fixed `ch` value was one character
    short of "13:03:56.673" and ran underneath the command. */
-.git-at {
-  flex: none;
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.git-line {
-  flex: 1;
-  min-width: 0;
-  color: var(--text-dim);
-  overflow-wrap: anywhere;
-}
-.git-time {
-  flex: none;
-  color: var(--text-faint);
-  font-variant-numeric: tabular-nums;
-}
 
 /* The spinner sits where the duration will be, so a row does not shift
    sideways the moment its command finishes. */
-.git-row-running .spinner {
-  flex: none;
-  margin-left: auto;
-}
 
 /* A toolbar button whose operation is running.
  *

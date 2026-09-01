@@ -89,6 +89,10 @@
     }
   }
 
+  /* Named dot-pulse rather than pulse: Tailwind ships a `pulse` of its own,
+     and two keyframes with one name means whichever is defined last wins for
+     both. */
+  --animate-dot-pulse: dot-pulse 900ms ease-in-out infinite;
   --animate-toast-in: toast-in 140ms ease-out;
 
   /* Row heights. A list row is a fixed height everywhere because the

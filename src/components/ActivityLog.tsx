@@ -12,6 +12,32 @@ interface Props {
 
 type Tab = "activity" | "commands";
 
+const PANEL =
+  "grid grid-rows-[auto_minmax(0,1fr)] min-h-0 bg-chrome border-l border-l-border";
+
+const HEAD =
+  "flex h-row-lg items-center gap-4 px-4 bg-surface-alt border-b border-b-border-soft " +
+  "text-small font-semibold";
+
+const TAB =
+  "px-2 bg-none border-0 border-b-2 [font:inherit] cursor-pointer";
+
+const META = "font-mono text-micro text-text-faint whitespace-nowrap";
+
+/* A run of commands reads as a block, so the rule goes between rows rather
+   than under every one -- which would put a line under the last row with
+   nothing beneath it to separate. */
+const GIT_ROW =
+  "flex items-baseline gap-3 px-4 py-[3px] font-mono text-micro leading-[1.55] " +
+  "hover:bg-surface-alt [&:not(:first-child)]:border-t " +
+  "[&:not(:first-child)]:border-t-border-soft";
+
+const DOT: Record<ActivityEntry["status"], string> = {
+  success: "bg-added",
+  error: "bg-removed",
+  running: "bg-accent animate-dot-pulse",
+};
+
 /** The running record of every git operation, with the output git produced.
  *
  *  The equivalent of SourceTree's console: when something behaves unexpectedly,
@@ -26,22 +52,22 @@ export function ActivityLog({ entries, git, onClear, onClose }: Props) {
   const count = commands ? git.finished.length : entries.length;
 
   return (
-    <aside className="log-panel">
-      <header className="log-head">
+    <aside className={PANEL}>
+      <header className={HEAD}>
         <button
-          className={`log-tab ${!commands ? "log-tab-active" : ""}`}
+          className={`${TAB} ${!commands ? "border-b-accent text-text" : "border-b-transparent text-text-dim"}`}
           onClick={() => setTab("activity")}
         >
           Activity
         </button>
         <button
-          className={`log-tab ${commands ? "log-tab-active" : ""}`}
+          className={`${TAB} ${commands ? "border-b-accent text-text" : "border-b-transparent text-text-dim"}`}
           onClick={() => setTab("commands")}
         >
           Commands
         </button>
 
-        <span className="log-count">{count}</span>
+        <span className="font-mono font-normal text-text-faint">{count}</span>
         <button
           className="link-button"
           disabled={count === 0}
@@ -49,21 +75,29 @@ export function ActivityLog({ entries, git, onClear, onClose }: Props) {
         >
           clear
         </button>
-        <button className="log-close" title="Close" onClick={onClose}>
+        <button
+          className="border-0 bg-none text-lead leading-none text-text-faint cursor-pointer"
+          title="Close"
+          onClick={onClose}
+        >
           &times;
         </button>
       </header>
 
-      <div className="log-body">
+      <div className="relative overflow-y-auto">
         {commands ? (
           <>
             {/* Still running, at the top, because that is the question being
                 asked when something seems stuck. */}
             {git.running.map((command) => (
-              <div key={command.id} className="git-row git-row-running">
-                <span className="git-at">{commandTime(command.startedAt)}</span>
-                <span className="git-line">{gitCommandLine(command)}</span>
-                <span className="spinner" />
+              <div key={command.id} className={`${GIT_ROW} text-text`}>
+                <span className="flex-none tabular-nums whitespace-nowrap text-text-faint">
+                  {commandTime(command.startedAt)}
+                </span>
+                <span className="min-w-0 flex-1 [overflow-wrap:anywhere] text-text-dim">
+                  {gitCommandLine(command)}
+                </span>
+                <span className="spinner ml-auto flex-none" />
               </div>
             ))}
 
@@ -71,13 +105,20 @@ export function ActivityLog({ entries, git, onClear, onClose }: Props) {
               <div className="pane-empty">No git commands yet</div>
             ) : (
               git.finished.map((command) => (
-                <div
-                  key={command.id}
-                  className={`git-row ${command.code === 0 ? "" : "git-row-failed"}`}
-                >
-                  <span className="git-at">{commandTime(command.startedAt)}</span>
-                  <span className="git-line">{gitCommandLine(command)}</span>
-                  <span className="git-time">{command.durationMs}ms</span>
+                <div key={command.id} className={GIT_ROW}>
+                  <span className="flex-none tabular-nums whitespace-nowrap text-text-faint">
+                    {commandTime(command.startedAt)}
+                  </span>
+                  <span
+                    className={`min-w-0 flex-1 [overflow-wrap:anywhere] ${
+                      command.code === 0 ? "text-text-dim" : "text-removed"
+                    }`}
+                  >
+                    {gitCommandLine(command)}
+                  </span>
+                  <span className="flex-none tabular-nums text-text-faint">
+                    {command.durationMs}ms
+                  </span>
                 </div>
               ))
             )}
@@ -97,18 +138,29 @@ function LogRow({ entry }: { entry: ActivityEntry }) {
   const summary = headline(entry.detail);
 
   return (
-    <div className="log-entry">
-      <button className="log-entry-row" onClick={() => setOpen((v) => !v)}>
-        <span className={`log-dot log-${entry.status}`} />
-        <span className="log-label">{entry.label}</span>
-        <span className="log-summary">{summary}</span>
-        <span className="log-meta">
+    <div className="border-b border-b-border-soft">
+      <button
+        className="grid w-full grid-cols-[9px_minmax(0,auto)_minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-3 bg-none border-0 text-small text-left cursor-pointer hover:bg-surface-alt"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className={`size-[7px] rounded-full ${DOT[entry.status]}`} />
+        <span className="overflow-hidden font-semibold text-ellipsis whitespace-nowrap">
+          {entry.label}
+        </span>
+        <span className="overflow-hidden font-mono text-micro text-text-dim text-ellipsis whitespace-nowrap">
+          {summary}
+        </span>
+        <span className={META}>
           {entry.durationMs !== undefined ? `${entry.durationMs}ms` : "…"}
         </span>
-        <span className="log-meta">{new Date(entry.startedAt).toLocaleTimeString()}</span>
+        <span className={META}>{new Date(entry.startedAt).toLocaleTimeString()}</span>
       </button>
 
-      {open && entry.detail && <pre className="log-output">{entry.detail}</pre>}
+      {open && entry.detail && (
+        <pre className="m-0 max-h-[240px] overflow-auto bg-surface pt-3 pr-4 pb-4 pl-[26px] font-mono text-small whitespace-pre-wrap break-words">
+          {entry.detail}
+        </pre>
+      )}
     </div>
   );
 }
