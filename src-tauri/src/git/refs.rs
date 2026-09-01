@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use super::cli::Git;
-use crate::error::Result;
+use crate::error::{AppError, Result};
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -116,6 +116,36 @@ fn parse_track(track: &str) -> (i64, i64) {
     }
 
     (ahead, behind)
+}
+
+/// The remote to publish to when the user has not said.
+///
+/// `origin` where it exists, because that is what it means. Otherwise the only
+/// remote there is -- a repository with one remote called something else should
+/// not be told it has none. With several and no `origin`, there is a real
+/// choice to make and guessing is worse than asking.
+pub async fn default_remote(git: &Git) -> Result<String> {
+    let out = git.run_str(&["remote"]).await?;
+    let remotes: Vec<&str> = out.lines().map(str::trim).filter(|r| !r.is_empty()).collect();
+
+    if remotes.contains(&"origin") {
+        return Ok("origin".into());
+    }
+
+    match remotes.as_slice() {
+        [only] => Ok((*only).to_string()),
+        [] => Err(AppError::Git {
+            code: 1,
+            stderr: "This repository has no remote to publish to.".into(),
+        }),
+        many => Err(AppError::Git {
+            code: 1,
+            stderr: format!(
+                "Several remotes and no origin ({}). Pick one to publish to.",
+                many.join(", "),
+            ),
+        }),
+    }
 }
 
 /// Turn a flat `origin/main`, `origin/dev`, `upstream/main` list into groups.

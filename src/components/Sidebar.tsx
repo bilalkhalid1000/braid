@@ -74,6 +74,7 @@ interface Props {
   keyboardActive: boolean;
   onFocusPanel: (panel: PanelId) => void;
   onCheckout: (name: string) => void;
+  onPublish: (name: string) => void;
   onStash: (selector: string, action: "apply" | "pop" | "drop") => void;
   onOpenPath: (path: string) => void;
   onNewBranch: () => void;
@@ -111,6 +112,7 @@ export function Sidebar({
   keyboardActive,
   onFocusPanel,
   onCheckout,
+  onPublish,
   onStash,
   onOpenPath,
   onNewBranch,
@@ -390,13 +392,25 @@ export function Sidebar({
             onContextMenu={(e) => onMenu({ kind: "branch", branch }, { x: e.clientX, y: e.clientY })}
             trailing={
               <>
-                <Tracking ahead={branch.ahead} behind={branch.behind} />
-                {!branch.isHead && (
+                <Tracking branch={branch} />
+                {branch.upstream ? (
+                  !branch.isHead && (
+                    <LinkAction
+                      label="checkout"
+                      title={`Check out ${branch.name}`}
+                      hoverOnly
+                      onClick={() => onCheckout(branch.name)}
+                    />
+                  )
+                ) : (
+                  // Publishing displaces checkout on an unpublished branch: it
+                  // is the thing that branch is missing, and the row has room
+                  // for one action.
                   <LinkAction
-                    label="checkout"
-                    title={`Check out ${branch.name}`}
+                    label="publish"
+                    title={`Push ${branch.name} and track it`}
                     hoverOnly
-                    onClick={() => onCheckout(branch.name)}
+                    onClick={() => onPublish(branch.name)}
                   />
                 )}
               </>
@@ -879,13 +893,20 @@ function LinkAction({
   );
 }
 
-function Tracking({ ahead, behind }: { ahead: number; behind: number }) {
-  if (!ahead && !behind) return null;
+function Tracking({ branch }: { branch: BranchRef }) {
+  // No upstream at all is a different state from "in step with one", and the
+  // two looked identical: both drew nothing. A branch that exists only on this
+  // machine is worth saying out loud, since it is the one that gets lost.
+  if (!branch.upstream) {
+    return <span className="tracking-pill tracking-local">local</span>;
+  }
+
+  if (!branch.ahead && !branch.behind) return null;
 
   return (
     <span className="tracking-pill">
-      {ahead > 0 && <span className="ahead">&uarr;{ahead}</span>}
-      {behind > 0 && <span className="behind">&darr;{behind}</span>}
+      {branch.ahead > 0 && <span className="ahead">&uarr;{branch.ahead}</span>}
+      {branch.behind > 0 && <span className="behind">&darr;{branch.behind}</span>}
     </span>
   );
 }

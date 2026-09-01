@@ -20,7 +20,7 @@ pub use diff::{file_diff, DiffOptions, DiffTarget, FileDiff};
 pub use flow::{FinishOptions, FlowConfig, FlowKind, FlowStatus};
 pub use log::{log, LogPage};
 pub use operation::RepoState;
-pub use refs::{refs, RefsSnapshot};
+pub use refs::{default_remote, refs, RefsSnapshot};
 pub use status::{status, RepoStatus};
 pub use submodule::Submodule;
 pub use worktree::Worktree;

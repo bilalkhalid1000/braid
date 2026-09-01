@@ -694,6 +694,15 @@ kbd.key-live {
   font-size: var(--fs-micro);
 }
 
+/* A branch with no upstream. Deliberately not coloured like ahead/behind: it
+   is not a count of anything, it is the absence of a remote — and the one
+   state where the work exists on exactly one machine. */
+.tracking-local {
+  color: var(--text-faint);
+  font-family: var(--sans);
+  letter-spacing: 0.02em;
+}
+
 .ahead {
   color: var(--added);
 }

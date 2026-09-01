@@ -376,13 +376,39 @@ pub async fn push(registry: State<'_, RepoRegistry>, id: String) -> Result<Strin
                 return Err(AppError::Git { stderr, code });
             }
 
+            let remote = git::default_remote(&session.git).await?;
+
             session
                 .git
-                .run_reported(&["push", "--set-upstream", "origin", &branch])
+                .run_reported(&["push", "--set-upstream", &remote, &branch])
                 .await
         }
         Err(e) => Err(e),
     }
+}
+
+/// Push a branch and set it to track the remote it lands on.
+///
+/// Separate from `push` because it names the branch: publishing is the one
+/// push you make for something you are not standing on.
+#[tauri::command]
+pub async fn publish_branch(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    branch: String,
+    remote: Option<String>,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+
+    let remote = match remote {
+        Some(name) => name,
+        None => git::default_remote(&session.git).await?,
+    };
+
+    session
+        .git
+        .run_reported(&["push", "--set-upstream", &remote, &branch])
+        .await
 }
 
 // --- branches -------------------------------------------------------------

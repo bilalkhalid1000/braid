@@ -60,6 +60,7 @@ pub fn run() {
             ipc::file_diff,
             ipc::blame_file,
             ipc::clone_repo,
+            ipc::publish_branch,
             ipc::commit_detail,
             ipc::commit_file_diff,
             ipc::apply_hunk,

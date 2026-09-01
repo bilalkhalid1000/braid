@@ -3,7 +3,9 @@
 mod common;
 
 use braid_lib::git::flow::{FinishOptions, FlowConfig, FlowKind};
-use braid_lib::git::{flow, operation, status, submodule, worktree, RepoState};
+use braid_lib::git::{
+    default_remote, flow, operation, refs, status, submodule, worktree, RepoState,
+};
 use common::TestRepo;
 
 /// Two branches that changed the same line, ready to collide.
@@ -205,6 +207,72 @@ async fn a_submodule_is_listed_with_its_url() {
     assert_eq!(modules.len(), 1);
     assert_eq!(modules[0].path, "vendor/lib");
     assert!(modules[0].url.is_some(), "the URL comes from .gitmodules");
+}
+
+// --- publishing ------------------------------------------------------------
+
+#[tokio::test]
+async fn publishing_picks_origin_when_there_is_one() {
+    let repo = TestRepo::new();
+    repo.git(&["remote", "add", "upstream", "https://example.invalid/a.git"]);
+    repo.git(&["remote", "add", "origin", "https://example.invalid/b.git"]);
+
+    // Named origin wins over both alphabetical order and insertion order,
+    // because that is what the name means.
+    assert_eq!(default_remote(repo.git_api()).await.unwrap(), "origin");
+}
+
+#[tokio::test]
+async fn publishing_uses_the_only_remote_whatever_it_is_called() {
+    let repo = TestRepo::new();
+    repo.git(&["remote", "add", "fork", "https://example.invalid/a.git"]);
+
+    // A repository with one remote called something else has a remote, and
+    // telling the user it has none would be simply wrong.
+    assert_eq!(default_remote(repo.git_api()).await.unwrap(), "fork");
+}
+
+#[tokio::test]
+async fn publishing_refuses_to_guess_between_several() {
+    let repo = TestRepo::new();
+    repo.git(&["remote", "add", "fork", "https://example.invalid/a.git"]);
+    repo.git(&["remote", "add", "mirror", "https://example.invalid/b.git"]);
+
+    let error = default_remote(repo.git_api()).await.unwrap_err();
+    let text = format!("{error:?}");
+
+    assert!(text.contains("fork") && text.contains("mirror"), "names them: {text}");
+}
+
+#[tokio::test]
+async fn publishing_says_so_when_there_is_no_remote_at_all() {
+    let repo = TestRepo::new();
+
+    let error = default_remote(repo.git_api()).await.unwrap_err();
+    assert!(format!("{error:?}").contains("no remote"));
+}
+
+#[tokio::test]
+async fn an_unpublished_branch_has_no_upstream_until_it_is_pushed() {
+    let repo = TestRepo::new();
+    let remote = TestRepo::empty();
+    remote.git(&["config", "receive.denyCurrentBranch", "ignore"]);
+    repo.git(&["remote", "add", "origin", &remote.path().to_string_lossy()]);
+
+    repo.git(&["checkout", "-b", "feature/new"]);
+    repo.write("work.txt", "work
+");
+    repo.commit_all("Some work");
+
+    let before = refs(repo.git_api()).await.unwrap();
+    let branch = before.branches.iter().find(|b| b.name == "feature/new").unwrap();
+    assert!(branch.upstream.is_none(), "nothing to push to yet");
+
+    repo.git(&["push", "--set-upstream", "origin", "feature/new"]);
+
+    let after = refs(repo.git_api()).await.unwrap();
+    let branch = after.branches.iter().find(|b| b.name == "feature/new").unwrap();
+    assert_eq!(branch.upstream.as_deref(), Some("origin/feature/new"));
 }
 
 // --- git flow --------------------------------------------------------------

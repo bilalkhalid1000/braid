@@ -989,6 +989,43 @@ The stashed changes are discarded.`,
     }
   };
 
+  /** Push a branch for the first time and set it to track what it lands on.
+   *
+   *  With one remote — or an `origin` — there is nothing to ask, so it just
+   *  goes. Only a repository with several remotes and no origin has a real
+   *  choice in it, and that is the only case that stops to ask. */
+  const publishBranch = (name: string) => {
+    if (!id) return;
+
+    const remotes = refs.data?.remotes ?? [];
+    const obvious =
+      remotes.length <= 1 || remotes.some((remote) => remote.name === "origin");
+
+    if (obvious) {
+      act(`Publish ${name}`, () => api.publishBranch(id, name, null));
+      return;
+    }
+
+    setDialog({
+      title: `Publish ${name}`,
+      message: "This repository has several remotes and no origin, so there is a choice to make.",
+      fields: [
+        {
+          key: "remote",
+          label: "Remote",
+          value: remotes[0]?.name ?? "",
+          options: remotes.map((remote) => ({ value: remote.name })),
+          describe: (value) =>
+            value.trim() === ""
+              ? undefined
+              : `Pushes ${name} to ${value.trim()} and tracks it from now on.`,
+        },
+      ],
+      confirmLabel: "Publish",
+      onConfirm: (v) => act(`Publish ${name}`, () => api.publishBranch(id, name, v.remote)),
+    });
+  };
+
   /** Menus for the sidebar. The sidebar reports what was clicked; the git
    *  meaning of each target is decided here. */
   const onSidebarMenu = (target: MenuTarget, at: Point) => {
@@ -1004,6 +1041,17 @@ The stashed changes are discarded.`,
             disabled: branch.isHead,
             onClick: () => act(`Check out ${branch.name}`, () => api.checkout(id, branch.name)),
           },
+          // Only where there is nothing to push to yet. Once a branch tracks
+          // something, Push is the action and this would be a second name for
+          // it.
+          ...(branch.upstream
+            ? []
+            : [
+                {
+                  label: `Publish ${branch.name}…`,
+                  onClick: () => publishBranch(branch.name),
+                },
+              ]),
           {
             label: `Merge ${branch.name} into ${current}`,
             disabled: branch.isHead,
@@ -1433,6 +1481,7 @@ The stashed changes are discarded.`,
               submodules={submodules.data}
               view={view}
               onCheckout={(name) => act(`Check out ${name}`, () => api.checkout(id, name))}
+              onPublish={publishBranch}
               onStash={(selector, action) =>
                 act(
                   action === "drop" ? `Drop ${selector}` : `${action} ${selector}`,
