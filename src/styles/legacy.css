@@ -112,15 +112,6 @@ kbd.key-live {
   border-bottom: 1px solid var(--border);
 }
 
-.tab-strip {
-  display: flex;
-  align-items: stretch;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
 .tab-settings {
   display: flex;
   align-items: center;
@@ -145,92 +136,24 @@ kbd.key-live {
   height: 15px;
 }
 
-.tab {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-  max-width: 220px;
-  padding: 0 var(--s5);
-  background: transparent;
-  border: none;
-  border-right: 1px solid var(--border-soft);
-  color: var(--text-dim);
-  white-space: nowrap;
-  cursor: default;
-  /* A tab is a thing you press and drag, not a passage you read. Without this
-     a drag paints the repository name blue and leaves a selection behind. */
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.tab:hover {
-  background: var(--chrome);
-}
-
-.tab-active {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: inset 0 2px 0 var(--accent);
-}
-
-.tab-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tab-close {
-  color: var(--text-faint);
-  font-size: var(--fs-lead);
-  line-height: 1;
-}
-
-.tab-close:hover {
-  color: var(--removed);
-}
-
 /* --- dragging a tab ----------------------------------------------------- */
 
 /* The one being held. It rises off the strip -- the strip is --chrome-alt, so
    --chrome reads as lifted without inventing a colour -- and it tracks the
    pointer exactly, which is why it is the one element here with no transition.
    Anything else would put it behind your hand. */
-.tab-lifted {
-  z-index: 2;
-  background: var(--chrome);
-  box-shadow: var(--shadow-pop);
-  border-right-color: transparent;
-  color: var(--text);
-  transition: none;
-  cursor: grabbing;
-}
 
 /* The tabs it passes. They slide by exactly its width, which opens the lane it
    will drop into: that gap is the drop indicator, so there is no marker line
    drawn over the top of it. */
-.tab-yielding {
-  transition: transform 150ms cubic-bezier(0.2, 0.7, 0.3, 1);
-}
 
 /* Said on hover rather than only once the drag is under way, or the strip
    keeps the fact that it rearranges to itself. */
-.tab:hover {
-  cursor: grab;
-}
-.tab-close:hover,
-.tab-add:hover {
-  cursor: pointer;
-}
 
 @media (prefers-reduced-motion: reduce) {
   .tab-yielding {
     transition: none;
   }
-}
-
-.tab-add {
-  padding: 0 var(--s5);
-  font-size: var(--fs-lead);
-  cursor: pointer;
 }
 
 /* --- toolbar ----------------------------------------------------------- */
@@ -254,13 +177,6 @@ kbd.key-live {
   background: var(--surface);
 }
 
-.content > .file-status,
-.content > .history {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: auto;
-}
-
 /* --- in-progress operation --------------------------------------------- */
 
 /* Widen the grab target well past the visible line: a 4px hit area is a
@@ -274,18 +190,13 @@ kbd.key-live {
   background: var(--chrome);
 }
 
-.sidebar-filter,
-.fs-filter {
+.sidebar-filter {
   position: sticky;
   top: 0;
   z-index: 1;
   padding: var(--s3) var(--s4);
   background: var(--chrome);
   border-bottom: 1px solid var(--border-soft);
-}
-
-.fs-filter {
-  background: var(--surface-alt);
 }
 
 .side-header-row {
@@ -466,61 +377,9 @@ kbd.key-live {
 
 /* --- file status ------------------------------------------------------- */
 
-.file-status {
-  display: grid;
-  height: 100%;
-  min-height: 0;
-  outline: none;
-}
-
 /* A column for the same reason .app is one: the key hint at the bottom comes
    and goes with the keyboard, and a row template would hand its row to the
    commit box the moment the hint disappeared. */
-.fs-left {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.fs-left > .fs-filter,
-.fs-left > .pane-hint {
-  flex: none;
-}
-.fs-left > .file-list {
-  flex: 1;
-  min-height: 0;
-}
-
-.fs-right {
-  min-width: 0;
-  min-height: 0;
-}
-
-.file-list {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  min-height: 0;
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.pane-header {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-  height: 24px;
-  padding: 0 var(--s4);
-  background: var(--surface-alt);
-  border-bottom: 1px solid var(--border-soft);
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.pane-count {
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-weight: 400;
-}
 
 .link-button {
   margin-left: auto;
@@ -534,12 +393,6 @@ kbd.key-live {
 .link-button:disabled {
   color: var(--text-faint);
   cursor: default;
-}
-
-.pane-body {
-  position: relative;
-  overflow-y: auto;
-  background: var(--surface);
 }
 
 .pane-empty {
@@ -556,34 +409,6 @@ kbd.key-live {
 .virtual-canvas {
   position: relative;
   width: 100%;
-}
-
-.file-row {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  width: 100%;
-  padding: 0 var(--s4);
-  border-left: 2px solid transparent;
-  cursor: default;
-}
-
-.file-row:hover {
-  background: var(--surface-alt);
-}
-
-.file-row-selected,
-.file-row-selected:hover {
-  background: var(--select);
-  border-left-color: var(--accent);
-}
-
-.file-row input[type="checkbox"] {
-  margin: 0;
-  accent-color: var(--accent);
 }
 
 .badge {
@@ -617,26 +442,6 @@ kbd.key-live {
 
 .badge-conflict {
   color: var(--conflict);
-}
-
-.file-path {
-  overflow: hidden;
-  font-family: var(--mono);
-  font-size: var(--fs-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.path-dir {
-  color: var(--text-dim);
-}
-
-.file-orig {
-  margin-left: auto;
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-  white-space: nowrap;
 }
 
 /* --- commit box -------------------------------------------------------- */
@@ -760,32 +565,12 @@ kbd.key-live {
 
 /* --- history ----------------------------------------------------------- */
 
-.history {
-  display: grid;
-  height: 100%;
-  min-height: 0;
-}
-
 /* Three tracks, in order: the scope bar, the column headings, then the rows.
    Only the last one absorbs what is left -- an implicit track would have given
    the flexible row to the headings and sized the list to its content. */
-.history-table {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  min-height: 0;
-  outline: none;
-}
 
 /* The 4px column is the graph's resize handle, which lives in the header but
    is reserved on every row so the headings stay over their values. */
-.history-head,
-.history-row {
-  display: grid;
-  grid-template-columns: auto 4px minmax(0, 1fr) 92px 148px 74px;
-  align-items: center;
-  gap: var(--s4);
-  padding-right: var(--s5);
-}
 
 /* The graph resizer. It lives in a 24px header, so the visible line stays a
    hairline while the grab area is widened either side of it -- a four-pixel
@@ -793,75 +578,14 @@ kbd.key-live {
 
 /* How many lanes are folded onto the last column, so the pile-up at the edge
    is labelled rather than just dense. */
-.history-graph-head {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  overflow: hidden;
-}
-.history-lane-more {
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-}
-
-.history-head {
-  height: 24px;
-  padding-left: var(--s5);
-  background: var(--surface-alt);
-  border-bottom: 1px solid var(--border-soft);
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-  font-weight: 600;
-}
-
-.history-body {
-  position: relative;
-  overflow-y: auto;
-  background: var(--surface);
-}
-
-.history-row {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  padding-left: var(--s5);
-  border-left: 2px solid transparent;
-  cursor: default;
-}
 
 /* The gap a crossing line cuts in the one it passes. It has to be the row's
    own background, not a fixed colour, or the gap shows up as a bright dash the
    moment a row is selected or hovered. */
-.graph-casing {
-  stroke: var(--surface);
-}
-.history-row:hover .graph-casing {
-  stroke: var(--surface-alt);
-}
-.history-row-selected .graph-casing,
-.history-row-selected:hover .graph-casing {
-  stroke: var(--select);
-}
-
-.history-row:hover {
-  background: var(--surface-alt);
-}
-
-.history-row-selected,
-.history-row-selected:hover {
-  background: var(--select);
-  border-left-color: var(--accent);
-}
 
 /* Two lists on screen, one keyboard. The ring marks whichever of them the keys
    are actually driving; the other keeps its selection, quietly, so you can see
    what it will go back to. */
-.history-row-cursor,
-.commit-file-cursor {
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
 
 /* The lane graph. Rows draw only their own cell, which is what keeps the
    history list virtualized while still reading as continuous lines. */
@@ -871,19 +595,6 @@ kbd.key-live {
 .graph {
   display: block;
   overflow: hidden;
-}
-
-.col-subject,
-.col-author {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.col-date,
-.col-author {
-  color: var(--text-dim);
-  font-size: var(--fs-small);
 }
 
 .ref-chip {
@@ -918,13 +629,8 @@ kbd.key-live {
   color: var(--added);
 }
 
-.history-detail {
-  position: relative;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr);
-  min-height: 0;
-  overflow: hidden;
-  background: var(--surface);
+.commit-file-cursor {
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 /* --- commit detail ------------------------------------------------------ */
@@ -1073,14 +779,6 @@ kbd.key-live {
    directory loses its root rather than the folder next to the file.
    `unicode-bidi: plaintext` keeps the text itself in reading order — without
    it the segments themselves would reverse. */
-.commit-file-path .path-dir {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-dim);
-  text-overflow: ellipsis;
-  unicode-bidi: plaintext;
-}
 
 .commit-file-path .path-name {
   flex: none;
@@ -1343,161 +1041,13 @@ kbd.key-live {
   cursor: default;
 }
 
-.menu-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-}
-
-.menu {
-  position: fixed;
-  min-width: 200px;
-  padding: var(--s2);
-  background: var(--chrome);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-pop-lg);
-}
-
-.menu-item {
-  display: block;
-  width: 100%;
-  padding: 5px var(--s4);
-  background: none;
-  border: none;
-  border-radius: var(--radius);
-  font-size: var(--fs-body);
-  text-align: left;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.menu-item:hover:not(:disabled) {
-  background: var(--accent);
-  color: #fff;
-}
-
 /* The keyboard cursor reads the same as hover -- and hovering moves the
    cursor -- so the mouse and the keyboard never highlight two different
    entries. */
-.menu-item-cursor:not(:disabled) {
-  background: var(--accent);
-  color: #fff;
-}
-
-.menu-item:disabled {
-  color: var(--text-faint);
-  cursor: default;
-}
-
-.menu-item-danger {
-  color: var(--removed);
-}
-
-.menu-item-danger:hover:not(:disabled) {
-  background: var(--removed);
-  color: #fff;
-}
-
-.menu-separator {
-  height: 1px;
-  margin: var(--s2);
-  background: var(--border-soft);
-}
-
-.scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 25;
-  display: grid;
-  place-items: center;
-  background: rgb(10 14 20 / 42%);
-}
 
 /* The frame takes focus when there is no field to take it, purely so the key
    handling has somewhere to land. It should not draw a ring around the whole
    panel for that -- the scrim already says which surface has the keyboard. */
-.dialog:focus {
-  outline: none;
-}
-
-.dialog {
-  display: grid;
-  gap: var(--s5);
-  width: 400px;
-  /* The git flow setup form is eight fields tall; it scrolls rather than
-     running off a short window. */
-  max-height: calc(100vh - 64px);
-  overflow-y: auto;
-  padding: var(--s6);
-  background: var(--chrome);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-pop-lg);
-}
-
-.dialog-title {
-  margin: 0;
-  font-size: var(--fs-lead);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.dialog-message {
-  margin: 0;
-  color: var(--text-dim);
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-
-.dialog-field {
-  display: grid;
-  gap: var(--s2);
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-}
-
-.dialog-input-row {
-  display: flex;
-  gap: var(--s3);
-}
-
-.dialog-field input {
-  padding: 5px var(--s3);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-family: var(--mono);
-  font-size: var(--fs-body);
-}
-
-.dialog-input-row input {
-  flex: 1;
-  min-width: 0;
-}
-
-.dialog-field input:focus {
-  border-color: var(--accent);
-  outline: none;
-}
-
-.dialog-check {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-}
-
-.dialog-check input {
-  accent-color: var(--accent);
-}
-
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--s4);
-}
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -1802,11 +1352,6 @@ kbd.key-live {
 
 /* --- command palette --------------------------------------------------- */
 
-.scrim-top {
-  align-items: flex-start;
-  padding-top: 14vh;
-}
-
 .palette {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -1876,21 +1421,6 @@ kbd.key-live {
 
 /* A menu entry names its key on the right, so the menu teaches the keyboard
    rather than competing with it. */
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: var(--s6);
-}
-
-.menu-label {
-  flex: 1;
-}
-
-.menu-item:hover:not(:disabled) .menu-hint {
-  background: rgb(255 255 255 / 18%);
-  border-color: rgb(255 255 255 / 35%);
-  color: #fff;
-}
 
 /* --- panel focus ------------------------------------------------------- */
 
@@ -2031,24 +1561,12 @@ kbd.key-live {
 
 /* Revealed only while the modifier is down, so tabs stay clean until the
    question "which number is this one" is actually being asked. */
-.tab-key {
-  height: 14px;
-  min-width: 14px;
-  padding: 0 3px;
-  animation: tab-key-in 90ms ease-out;
-}
 
 @keyframes tab-key-in {
   from {
     opacity: 0;
     transform: scale(0.85);
   }
-}
-
-.tab-active .tab-key {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
 }
 
 /* --- hunk and line staging --------------------------------------------- */
@@ -2121,15 +1639,6 @@ kbd.key-live {
 /* Above the diff, so the choice sits next to the thing being decided. */
 
 /* The diff sits under the bar, so the pane becomes a column. */
-.fs-right {
-  display: flex;
-  flex-direction: column;
-}
-
-.fs-right > .diff {
-  flex: 1;
-  min-height: 0;
-}
 
 /* --- release channel ---------------------------------------------------- */
 
@@ -2377,14 +1886,6 @@ kbd.key-live {
 /* The wrapper is the positioning context for the list, and has to stretch like
    the bare input it replaces or the Browse button beside it would take the
    slack instead. */
-.combo {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
-.combo input {
-  width: 100%;
-}
 
 /* Fixed, and rendered into the body rather than into the field. A dialog that
    scrolls would otherwise clip the list and grow its own scroll height around
@@ -2444,10 +1945,6 @@ kbd.key-live {
 
 /* What the value in the field will actually do, said before the button is
    pressed rather than reported afterwards as an error. */
-.dialog-describe {
-  color: var(--text-faint);
-  font-size: var(--fs-micro);
-}
 
 /* --- syntax ------------------------------------------------------------ */
 
@@ -2841,131 +2338,13 @@ kbd.key-live {
 
 /* The repository list's own tab. Italic rather than a different colour: it is
    still a tab, it just holds the shelf instead of a repository. */
-.tab-shelf .tab-name {
-  font-style: italic;
-}
 
 /* --- search ------------------------------------------------------------- */
 
-.search {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  background: var(--surface);
-}
-
-.search-head {
-  display: flex;
-  align-items: center;
-  gap: var(--s5);
-  flex: none;
-  padding: var(--s4);
-  background: var(--chrome);
-  border-bottom: 1px solid var(--border);
-}
-
 /* The query leads, because it is the only thing on this screen you type. */
-.search-box {
-  flex: 1;
-  min-width: 0;
-  padding: var(--s3) var(--s4);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: var(--fs-body);
-}
-.search-box:focus {
-  border-color: var(--accent);
-  outline: none;
-}
 
 /* Three questions, one box. Segmented rather than a dropdown: there are three,
    they are always the same three, and a menu would hide two of them. */
-.search-kinds {
-  display: flex;
-  flex: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.search-kind {
-  padding: var(--s3) var(--s5);
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  font: inherit;
-  font-size: var(--fs-small);
-  cursor: pointer;
-}
-.search-kind:hover {
-  background: var(--surface-alt);
-  color: var(--text);
-}
-.search-kind-active,
-.search-kind-active:hover {
-  background: var(--accent);
-  color: #fff;
-}
-
-.search-status {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  flex: none;
-  padding: var(--s3) var(--s5);
-  border-bottom: 1px solid var(--border-soft);
-  color: var(--text-faint);
-  font-size: var(--fs-micro);
-}
-
-.search-body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
-.search-row {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--s5);
-  width: 100%;
-  padding: 0 var(--s5);
-  cursor: default;
-}
-.search-row-cursor {
-  background: var(--select);
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
 
 /* The match itself, in mono: a line of code and a commit subject both want to
    be read exactly, and a commit hash beside them has to line up. */
-.search-primary {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: var(--fs-body);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.search-secondary {
-  flex: none;
-  max-width: 45%;
-  overflow: hidden;
-  color: var(--text-faint);
-  font-family: var(--mono);
-  font-size: var(--fs-micro);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.search > .pane-hint {
-  flex: none;
-}

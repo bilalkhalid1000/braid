@@ -3,6 +3,12 @@ import { createPortal } from "react-dom";
 
 import { matchesFilter } from "./FilterInput";
 
+/* Matches the plain field in a dialog: this one is a box you type into that
+   happens to offer suggestions, not a different kind of control. */
+const FIELD =
+  "w-full px-3 py-[5px] bg-surface border border-border rounded-sm " +
+  "font-mono text-body focus:border-accent focus:outline-none";
+
 export interface ComboOption {
   value: string;
   /** Shown dimmed on the right — where a branch already is, usually. */
@@ -151,8 +157,9 @@ export function Combo({
   };
 
   return (
-    <div className="combo" ref={field}>
+    <div className="relative min-w-0 flex-1" ref={field}>
       <input
+        className={FIELD}
         ref={inputRef}
         autoFocus={autoFocus}
         value={value}

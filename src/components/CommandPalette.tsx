@@ -3,6 +3,7 @@ import { COMMANDS, type CommandDef } from "../lib/commands";
 import { formatBinding } from "../lib/shortcutLabel";
 import { useSettings } from "../lib/settings";
 import { matchesFilter } from "./FilterInput";
+import { SCRIM_TOP } from "../lib/overlay";
 
 interface Props {
   /** Which commands are runnable right now, and how to run them. */
@@ -52,7 +53,7 @@ export function CommandPalette({ handlers, onClose }: Props) {
   };
 
   return (
-    <div className="scrim scrim-top" onMouseDown={onClose}>
+    <div className={SCRIM_TOP} onMouseDown={onClose}>
       <div className="palette" onMouseDown={(e) => e.stopPropagation()}>
         <input
           className="palette-input"

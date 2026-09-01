@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 import { Combo, type ComboOption } from "./Combo";
+import { SCRIM } from "../lib/overlay";
 
 export interface DialogField {
   key: string;
@@ -41,6 +42,17 @@ export interface DialogSpec {
 /** WebView2 does not implement `window.prompt`, and `confirm` cannot be styled
  *  or keyboard-driven consistently. Everything that needs an answer goes
  *  through this instead. */
+/* The rule that styled these lived on the label; each box carries it now. */
+const FIELD =
+  "min-w-0 flex-1 px-3 py-[5px] bg-surface border border-border rounded-sm " +
+  "font-mono text-body focus:border-accent focus:outline-none";
+
+/* The git flow setup form is eight fields tall, so the box scrolls rather than
+   running off a short window. */
+const FRAME =
+  "grid w-[400px] max-h-[calc(100vh-64px)] gap-6 overflow-y-auto p-8 bg-chrome " +
+  "border border-border rounded-lg shadow-pop-lg focus:outline-none";
+
 export function Dialog({ spec, onClose }: { spec: DialogSpec; onClose: () => void }) {
   const [values, setValues] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
@@ -130,9 +142,9 @@ export function Dialog({ spec, onClose }: { spec: DialogSpec; onClose: () => voi
   };
 
   return (
-    <div className="scrim" onMouseDown={onClose}>
+    <div className={SCRIM} onMouseDown={onClose}>
       <div
-        className="dialog"
+        className={FRAME}
         ref={frame}
         role="dialog"
         aria-modal="true"
@@ -141,14 +153,16 @@ export function Dialog({ spec, onClose }: { spec: DialogSpec; onClose: () => voi
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
       >
-        <h2 className="dialog-title">{spec.title}</h2>
-        {spec.message && <p className="dialog-message">{spec.message}</p>}
+        <h2 className="m-0 text-lead font-semibold tracking-[-0.01em]">{spec.title}</h2>
+        {spec.message && (
+          <p className="m-0 leading-[1.5] whitespace-pre-wrap text-text-dim">{spec.message}</p>
+        )}
         {spec.graphic}
 
         {spec.fields?.map((field, index) => (
-          <label className="dialog-field" key={field.key}>
+          <label className="grid gap-2 text-small text-text-dim" key={field.key}>
             <span>{field.label}</span>
-            <div className="dialog-input-row">
+            <div className="flex gap-3">
               {field.options ? (
                 <Combo
                   inputRef={index === 0 ? firstInput : undefined}
@@ -160,6 +174,7 @@ export function Dialog({ spec, onClose }: { spec: DialogSpec; onClose: () => voi
                 />
               ) : (
                 <input
+                  className={FIELD}
                   ref={index === 0 ? firstInput : undefined}
                   autoFocus={index === 0}
                   value={values[field.key] ?? ""}
@@ -177,7 +192,7 @@ export function Dialog({ spec, onClose }: { spec: DialogSpec; onClose: () => voi
               )}
             </div>
             {field.describe?.(values[field.key] ?? "") && (
-              <span className="dialog-describe">
+              <span className="text-micro text-text-faint">
                 {field.describe(values[field.key] ?? "")}
               </span>
             )}
@@ -185,7 +200,7 @@ export function Dialog({ spec, onClose }: { spec: DialogSpec; onClose: () => voi
         ))}
 
         {spec.checkboxes?.map((box) => (
-          <label className="dialog-check" key={box.key}>
+          <label className="flex items-center gap-3 text-small text-text-dim" key={box.key}>
             <input
               type="checkbox"
               checked={values[box.key] === "true"}
@@ -197,7 +212,7 @@ export function Dialog({ spec, onClose }: { spec: DialogSpec; onClose: () => voi
           </label>
         ))}
 
-        <div className="dialog-actions">
+        <div className="flex justify-end gap-4">
           <button className="btn" onClick={onClose}>
             Cancel
           </button>

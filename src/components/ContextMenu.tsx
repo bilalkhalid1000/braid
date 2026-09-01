@@ -30,6 +30,26 @@ export interface MenuState {
  *  that could then only be finished with the mouse would be worse than no
  *  shortcut at all.
  */
+const MENU =
+  "fixed min-w-[200px] p-2 bg-chrome border border-border rounded-lg shadow-pop-lg";
+
+/* `group` so the key cap can follow the row it sits in: on a highlighted row
+   the cap has to lift off the accent behind it, and it cannot ask about its
+   parent's hover on its own. */
+const ITEM =
+  "group flex w-full items-center gap-8 px-4 py-[5px] bg-transparent border-0 rounded-sm " +
+  "text-body text-left whitespace-nowrap cursor-pointer " +
+  "disabled:text-text-faint disabled:cursor-default";
+
+const PLAIN = "enabled:hover:bg-accent enabled:hover:text-white";
+const DANGER = "text-removed enabled:hover:bg-removed enabled:hover:text-white";
+
+/** The key cap, lifted onto a coloured row. */
+const ON_ACCENT = "bg-white/[0.18] border-white/35 text-white";
+const HINT =
+  "group-enabled:group-hover:bg-white/[0.18] group-enabled:group-hover:border-white/35 " +
+  "group-enabled:group-hover:text-white";
+
 export function ContextMenu({ state, onClose }: { state: MenuState; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: state.x, top: state.y });
@@ -93,9 +113,13 @@ export function ContextMenu({ state, onClose }: { state: MenuState; onClose: () 
   const cursor = items[index]?.at;
 
   return (
-    <div className="menu-scrim" onMouseDown={onClose} onContextMenu={(e) => e.preventDefault()}>
+    <div
+      className="fixed inset-0 z-20"
+      onMouseDown={onClose}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <div
-        className="menu"
+        className={MENU}
         ref={ref}
         style={position}
         role="menu"
@@ -103,13 +127,20 @@ export function ContextMenu({ state, onClose }: { state: MenuState; onClose: () 
       >
         {state.entries.map((entry, at) =>
           entry === "separator" ? (
-            <div className="menu-separator" key={`sep-${at}`} />
+            <div className="mx-2 my-2 h-px bg-border-soft" key={`sep-${at}`} />
           ) : (
             <button
               key={entry.label}
-              className={`menu-item ${entry.danger ? "menu-item-danger" : ""} ${
-                at === cursor ? "menu-item-cursor" : ""
-              }`}
+              className={[
+                ITEM,
+                entry.danger ? DANGER : PLAIN,
+                // The keyboard cursor wears what hovering would give it. It
+                // never lands on a disabled entry, so there is no state where
+                // this and :disabled both apply.
+                at === cursor && (entry.danger ? "bg-removed text-white" : "bg-accent text-white"),
+              ]
+                .filter(Boolean)
+                .join(" ")}
               role="menuitem"
               tabIndex={-1}
               disabled={entry.disabled}
@@ -118,8 +149,10 @@ export function ContextMenu({ state, onClose }: { state: MenuState; onClose: () 
               onMouseEnter={() => setIndex(items.findIndex((row) => row.at === at))}
               onClick={() => run(entry)}
             >
-              <span className="menu-label">{entry.label}</span>
-              {entry.hint && <kbd className="menu-hint">{entry.hint}</kbd>}
+              <span className="flex-1">{entry.label}</span>
+              {entry.hint && (
+                <kbd className={`${HINT} ${at === cursor ? ON_ACCENT : ""}`}>{entry.hint}</kbd>
+              )}
             </button>
           ),
         )}

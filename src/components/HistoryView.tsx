@@ -15,6 +15,25 @@ import { useSettings } from "../lib/settings";
 
 const ROW_HEIGHT = 26;
 
+/* Three tracks, in order: the scope bar, the column headings, then the rows.
+   Only the last absorbs what is left. */
+const TABLE = "grid grid-rows-[auto_auto_minmax(0,1fr)] min-h-0 outline-none";
+
+const COLUMNS =
+  "grid grid-cols-[auto_4px_minmax(0,1fr)_92px_148px_74px] items-center gap-4 pr-6";
+
+const HEAD =
+  COLUMNS + " h-12 pl-6 bg-surface-alt border-b border-b-border-soft " +
+  "text-small font-semibold text-text-dim";
+
+/* `group` so the graph's casing can follow the row it is drawn on. Absolutely
+   placed, because the list is virtualized. */
+const ROW =
+  "group " + COLUMNS + " absolute top-0 left-0 w-full pl-6 border-l-2 cursor-default";
+
+const DETAIL =
+  "relative grid grid-rows-[minmax(0,1fr)] min-h-0 overflow-hidden bg-surface";
+
 /** Enough for a trunk and a couple of branches; the rest is a drag away. */
 const DEFAULT_GRAPH_WIDTH = 130;
 
@@ -161,8 +180,8 @@ export function HistoryView({
   }, keyboardActive);
 
   return (
-    <div className="history" style={{ gridTemplateRows: `${tableHeight}px 4px minmax(0, 1fr)` }}>
-      <div className="history-table">
+    <div className="grid h-full min-h-0 flex-1 basis-auto" style={{ gridTemplateRows: `${tableHeight}px 4px minmax(0, 1fr)` }}>
+      <div className={TABLE}>
         {/* What is being walked, said out loud. Without it a branch missing
             from the graph looks like a bug in the graph rather than a choice
             about which refs it starts from. */}
@@ -184,11 +203,11 @@ export function HistoryView({
           </span>
         </div>
 
-        <header className="history-head">
-          <span className="history-graph-head" style={{ width: laneColumns * LANE_WIDTH }}>
+        <header className={HEAD}>
+          <span className="flex items-center justify-end overflow-hidden" style={{ width: laneColumns * LANE_WIDTH }}>
             {graph.maxLanes > laneColumns && (
               <span
-                className="history-lane-more"
+                className="font-mono text-micro text-text-faint"
                 {...tip(`${graph.maxLanes} lanes`, undefined, "Drag the divider to show more")}
               >
                 +{graph.maxLanes - laneColumns}
@@ -214,7 +233,7 @@ export function HistoryView({
           <span>Commit</span>
         </header>
 
-        <div className="history-body" ref={scrollRef}>
+        <div className="relative overflow-y-auto bg-surface" ref={scrollRef}>
           <div className="virtual-canvas" style={{ height: virtualizer.getTotalSize() }}>
             {items.map((item) => {
               const commit = commits[item.index];
@@ -224,12 +243,15 @@ export function HistoryView({
               return (
                 <div
                   key={item.key}
+                  data-selected={commit.oid === selected?.oid}
                   className={[
-                    "history-row",
-                    commit.oid === selected?.oid && "history-row-selected",
+                    ROW,
+                    commit.oid === selected?.oid
+                      ? "bg-select border-l-accent"
+                      : "border-l-transparent hover:bg-surface-alt",
                     commit.oid === selected?.oid &&
                       pane === "commits" &&
-                      "history-row-cursor",
+                      "shadow-[inset_0_0_0_1px_var(--color-accent)]",
                   ]
                     .filter(Boolean)
                     .join(" ")}
@@ -259,7 +281,7 @@ export function HistoryView({
                       the values under it. */}
                   <span />
 
-                  <span className="col-subject">
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">
                     {commit.refs.map((ref) => (
                       <span key={ref} className={`ref-chip ${chipClass(ref)}`}>
                         {ref.replace("HEAD -> ", "")}
@@ -268,8 +290,8 @@ export function HistoryView({
                     {commit.subject}
                   </span>
 
-                  <span className="col-date">{formatDate(commit.timestamp)}</span>
-                  <span className="col-author" {...tip(commit.author, undefined, commit.email)}>
+                  <span className="text-small text-text-dim">{formatDate(commit.timestamp)}</span>
+                  <span className="overflow-hidden text-ellipsis whitespace-nowrap text-small text-text-dim" {...tip(commit.author, undefined, commit.email)}>
                     {commit.author}
                   </span>
                   <CopyHash
@@ -298,7 +320,7 @@ export function HistoryView({
         max={900}
       />
 
-      <div className="history-detail">
+      <div className={DETAIL}>
         {selected ? (
           <CommitDetail
             ref={detailRef}

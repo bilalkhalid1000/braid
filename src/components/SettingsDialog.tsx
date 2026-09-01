@@ -25,6 +25,7 @@ import { useAppVersion } from "../lib/useAppVersion";
 import { channelCaution, channelLabel } from "../lib/version";
 import { FilterInput, matchesFilter } from "./FilterInput";
 import { Keys } from "./Keys";
+import { SCRIM } from "../lib/overlay";
 import { useTip } from "./Tip";
 
 type Section = "general" | "diff" | "shortcuts" | "updates" | "about";
@@ -195,7 +196,7 @@ export function SettingsDialog({
   const current = SECTIONS.find((s) => s.id === section)!;
 
   return (
-    <div className="scrim" onMouseDown={onClose}>
+    <div className={SCRIM} onMouseDown={onClose}>
       <div
         className="settings"
         ref={frame}

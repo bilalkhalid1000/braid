@@ -43,6 +43,28 @@ interface Props {
  *  already does that faster than a walk from the outside could, and it agrees
  *  with the git the user runs in a terminal.
  */
+const BOX =
+  "min-w-0 flex-1 px-4 py-3 bg-surface border border-border rounded-sm " +
+  "font-mono text-body text-text focus:border-accent focus:outline-none";
+
+const KIND = "px-6 py-3 bg-transparent border-0 cursor-pointer";
+
+const STATUS =
+  "flex flex-none items-center gap-3 px-6 py-3 border-b border-b-border-soft " +
+  "text-micro text-text-faint";
+
+/* Absolutely placed: the rows are virtualized, so each one is positioned by
+   the measurement rather than by flow. */
+const ROW = "absolute top-0 left-0 flex w-full items-center gap-6 px-6 cursor-default";
+
+const PRIMARY =
+  "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-body text-text";
+
+/* Capped, so a long path cannot push the line it belongs to out of view. */
+const SECONDARY =
+  "max-w-[45%] flex-none overflow-hidden text-ellipsis whitespace-nowrap font-mono " +
+  "text-micro text-text-faint";
+
 export function SearchView({ repoId, keyboardActive, onClose, onCommit, onFile }: Props) {
   const [kind, setKind] = useState<SearchKind>("commits");
   const [typed, setTyped] = useState("");
@@ -125,10 +147,10 @@ export function SearchView({ repoId, keyboardActive, onClose, onCommit, onFile }
   const searching = searchable(typed) && (results.isFetching || typed !== query);
 
   return (
-    <div className="search">
-      <header className="search-head">
+    <div className="flex h-full min-h-0 flex-col bg-surface">
+      <header className="flex flex-none items-center gap-6 bg-chrome p-4 border-b border-b-border">
         <input
-          className="search-box"
+          className={BOX}
           data-filter="search"
           value={typed}
           autoFocus
@@ -151,11 +173,15 @@ export function SearchView({ repoId, keyboardActive, onClose, onCommit, onFile }
           }}
         />
 
-        <div className="search-kinds">
+        <div className="flex flex-none overflow-hidden rounded-sm border border-border">
           {KINDS.map((option) => (
             <button
               key={option.id}
-              className={`search-kind ${kind === option.id ? "search-kind-active" : ""}`}
+              className={`${KIND} ${
+                kind === option.id
+                  ? "bg-accent text-white"
+                  : "text-text-dim hover:bg-surface-alt hover:text-text"
+              }`}
               onClick={() => setKind(option.id)}
             >
               {option.label}
@@ -168,7 +194,7 @@ export function SearchView({ repoId, keyboardActive, onClose, onCommit, onFile }
         </button>
       </header>
 
-      <div className="search-status">
+      <div className={STATUS}>
         {!searchable(typed) ? (
           <span>
             {typed.trim() === ""
@@ -192,7 +218,7 @@ export function SearchView({ repoId, keyboardActive, onClose, onCommit, onFile }
         )}
       </div>
 
-      <div className="search-body" ref={scrollRef}>
+      <div className="min-h-0 flex-1 overflow-auto" ref={scrollRef}>
         <div className="virtual-canvas" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
             const row = rows[item.index];
@@ -201,13 +227,15 @@ export function SearchView({ repoId, keyboardActive, onClose, onCommit, onFile }
             return (
               <div
                 key={row.key}
-                className={`search-row ${item.index === cursor ? "search-row-cursor" : ""}`}
+                className={`${ROW} ${
+                  item.index === cursor ? "bg-select shadow-[inset_0_0_0_1px_var(--color-accent)]" : ""
+                }`}
                 style={{ height: item.size, transform: `translateY(${item.start}px)` }}
                 onMouseEnter={() => setCursor(item.index)}
                 onMouseDown={() => row.go()}
               >
-                <span className="search-primary">{row.primary}</span>
-                {row.secondary && <span className="search-secondary">{row.secondary}</span>}
+                <span className={PRIMARY}>{row.primary}</span>
+                {row.secondary && <span className={SECONDARY}>{row.secondary}</span>}
               </div>
             );
           })}

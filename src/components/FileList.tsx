@@ -4,6 +4,19 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { badgeFor, type StatusEntry } from "../lib/api";
 import { useTip } from "./Tip";
 
+const PANE =
+  "grid grid-rows-[auto_minmax(0,1fr)] min-h-0 border-b border-b-border-soft";
+
+const HEADER =
+  "flex h-12 items-center gap-4 px-4 bg-surface-alt border-b border-b-border-soft " +
+  "text-small font-semibold tracking-[0.02em] text-text-dim";
+
+/* Absolutely placed: the list is virtualized, so each row is positioned by its
+   measurement rather than by flow. */
+const ROW =
+  "absolute top-0 left-0 flex w-full items-center gap-3 px-4 border-l-2 cursor-default " +
+  "[&_input[type=checkbox]]:m-0 [&_input[type=checkbox]]:accent-accent";
+
 const ROW_HEIGHT = 22;
 
 /** Git's status letters, spelled out. The letters stay — they are what git and
@@ -70,10 +83,10 @@ export function FileList({
   }, [index, virtualizer]);
 
   return (
-    <section className="file-list">
-      <header className="pane-header">
-        <span className="pane-title">{title}</span>
-        <span className="pane-count">{entries.length}</span>
+    <section className={PANE}>
+      <header className={HEADER}>
+        <span>{title}</span>
+        <span className="font-mono font-normal text-text-faint">{entries.length}</span>
         <button
           className="link-button"
           disabled={entries.length === 0}
@@ -84,7 +97,7 @@ export function FileList({
         </button>
       </header>
 
-      <div className="pane-body" ref={scrollRef}>
+      <div className="relative overflow-y-auto bg-surface" ref={scrollRef}>
         <div className="virtual-canvas" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
             const entry = entries[item.index];
@@ -96,7 +109,11 @@ export function FileList({
             return (
               <div
                 key={item.key}
-                className={`file-row ${entry.path === selectedPath ? "file-row-selected" : ""}`}
+                className={`${ROW} ${
+                  entry.path === selectedPath
+                    ? "bg-select border-l-accent"
+                    : "border-l-transparent hover:bg-surface-alt"
+                }`}
                 style={{ height: item.size, transform: `translateY(${item.start}px)` }}
                 onMouseDown={() => onSelect(entry)}
                 onDoubleClick={() => onToggle(entry)}
@@ -126,10 +143,10 @@ export function FileList({
                 <span className={`badge badge-${badgeClass(badge)}`} {...tip(meaning)}>
                   {badge}
                 </span>
-                <span className="file-path" {...tip(entry.path, undefined, meaning)}>
+                <span className="overflow-hidden text-ellipsis whitespace-nowrap font-mono text-small" {...tip(entry.path, undefined, meaning)}>
                   <PathLabel path={entry.path} />
                 </span>
-                {entry.origPath && <span className="file-orig">was {entry.origPath}</span>}
+                {entry.origPath && <span className="ml-auto whitespace-nowrap font-mono text-micro text-text-faint">was {entry.origPath}</span>}
               </div>
             );
           })}
@@ -154,7 +171,7 @@ function PathLabel({ path }: { path: string }) {
 
   return (
     <>
-      <span className="path-dir">{path.slice(0, cut + 1)}</span>
+      <span className="text-text-dim">{path.slice(0, cut + 1)}</span>
       <span className="path-name">{path.slice(cut + 1)}</span>
     </>
   );

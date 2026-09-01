@@ -156,11 +156,11 @@ export function FileStatusView({
 
   return (
     <div
-      className="file-status"
+      className="grid h-full min-h-0 flex-1 basis-auto outline-none"
       style={{ gridTemplateColumns: `${columnWidth}px 4px minmax(0, 1fr)` }}
     >
-      <div className="fs-left">
-        <div className="fs-filter">
+      <div className="flex min-h-0 flex-col [&>*:first-child]:flex-none">
+        <div className="sticky top-0 z-[1] flex-none px-4 py-3 bg-surface-alt border-b border-b-border-soft">
           <FilterInput
             value={filter}
             onChange={setFilter}
@@ -251,7 +251,7 @@ export function FileStatusView({
         max={720}
       />
 
-      <div className="fs-right">
+      <div className="flex min-w-0 min-h-0 flex-col">
         {selected?.entry.kind === "unmerged" && status && (
           <ConflictBar
             path={selected.entry.path}

@@ -59,6 +59,23 @@ interface Props {
  *  which reads as a flicker and is one of the ways this kind of drag goes
  *  wrong; here it cannot happen, because there is nothing to oscillate.
  */
+/* A tab is a thing you press and drag, not a passage you read: without
+   select-none a drag paints the repository name blue and leaves a selection
+   behind it. */
+const TAB =
+  "flex max-w-[220px] items-center gap-4 px-6 bg-transparent border-0 " +
+  "border-r border-r-border-soft whitespace-nowrap cursor-default select-none " +
+  "hover:bg-chrome hover:cursor-grab";
+
+const ACTIVE = "bg-surface text-text shadow-[inset_0_2px_0_var(--color-accent)]";
+
+/* Lifted out of the strip: no transition, because it is following the pointer
+   rather than settling into a place. */
+const LIFTED =
+  "z-[2] bg-chrome text-text shadow-pop border-r-transparent transition-none cursor-grabbing";
+
+const KEY = "h-[14px] min-w-[14px] px-[3px] animate-tab-key-in";
+
 export function RepoTabs({
   repos,
   activeId,
@@ -120,7 +137,7 @@ export function RepoTabs({
   };
 
   return (
-    <div className="tab-strip" ref={strip}>
+    <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto [scrollbar-width:none]" ref={strip}>
       {repos.map((repo, index) => {
         const offset = shift(index);
         // Spread first, then overridden below: the tab needs the tip's own
@@ -138,11 +155,11 @@ export function RepoTabs({
             key={repo.id}
             data-tab={repo.id}
             className={[
-              "tab",
-              repo.id === activeId && "tab-active",
-              shelf && "tab-shelf",
-              drag?.id === repo.id && "tab-lifted",
-              drag && drag.id !== repo.id && "tab-yielding",
+              TAB,
+              repo.id === activeId ? ACTIVE : "text-text-dim",
+              shelf && "italic",
+              drag?.id === repo.id && LIFTED,
+              drag && drag.id !== repo.id && "transition-transform duration-150 ease-[cubic-bezier(0.2,0.7,0.3,1)]",
             ]
               .filter(Boolean)
               .join(" ")}
@@ -210,13 +227,15 @@ export function RepoTabs({
             }}
           >
             {modHeld && digitFor(index) !== null && (
-              <kbd className="tab-key">{digitFor(index)}</kbd>
+              <kbd className={`${KEY} ${repo.id === activeId ? "bg-accent border-accent text-white" : ""}`}>
+                {digitFor(index)}
+              </kbd>
             )}
 
-            <span className="tab-name">{repo.name}</span>
+            <span className="overflow-hidden text-ellipsis">{repo.name}</span>
 
             <span
-              className="tab-close"
+              className="text-lead leading-none text-text-faint hover:cursor-pointer hover:text-removed"
               {...closeTip}
               onPointerDown={(e) => {
                 closeTip.onPointerDown();
@@ -237,7 +256,7 @@ export function RepoTabs({
       {/* Inside the strip, so it stays at the end of the tabs rather than
           floating in place while they scroll past it. */}
       <button
-        className="tab tab-add"
+        className={`${TAB} px-6 text-lead cursor-pointer`}
         {...tip("Open or create a repository", "repo.open")}
         onClick={onAdd}
       >

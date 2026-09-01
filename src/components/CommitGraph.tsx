@@ -36,6 +36,13 @@ const LANE_COLORS = [
 
 export const laneColor = (index: number) => LANE_COLORS[index % LANE_COLORS.length];
 
+/* The gap a lane leaves around itself where it crosses another. It is painted
+   the colour of the row rather than a colour of its own, so it has to follow
+   the row's state -- hence the group on the row and the variants here. */
+const CASING =
+  "stroke-surface group-hover:stroke-surface-alt " +
+  "group-data-[selected=true]:stroke-select";
+
 interface Props {
   row: GraphRow;
   lanes: number;
@@ -72,7 +79,7 @@ export const CommitGraph = memo(function CommitGraph({ row, lanes, height, isHea
 
     return (
       <g key={key}>
-        <path className="graph-casing" d={d} fill="none" strokeWidth={4.5} />
+        <path className={CASING} d={d} fill="none" strokeWidth={4.5} />
         <path d={d} stroke={laneColor(link.color)} fill="none" strokeWidth={1.5} />
       </g>
     );

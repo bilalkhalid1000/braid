@@ -103,6 +103,7 @@
     }
   }
 
+  --animate-tab-key-in: tab-key-in 90ms ease-out;
   --animate-toast-in: toast-in 140ms ease-out;
 
   /* The splash mark draws itself: the trunk, then the lane out and back, then
