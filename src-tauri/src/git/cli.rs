@@ -4,6 +4,7 @@ use std::process::Stdio;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
+use super::trace;
 use crate::error::{AppError, Result};
 
 #[cfg(windows)]
@@ -99,8 +100,10 @@ impl Git {
     /// than a failure: `diff --no-index` exits 1 when files differ, and `log`
     /// exits 128 in a repository that has no commits yet.
     pub async fn run_allowing(&self, args: &[&str], allowed: &[i32]) -> Result<Vec<u8>> {
+        let run = trace::started(args);
         let output = self.command(args).output().await?;
         let code = output.status.code().unwrap_or(-1);
+        run.finished(code);
 
         if !output.status.success() && !allowed.contains(&code) {
             return Err(AppError::Git {
@@ -120,6 +123,7 @@ impl Git {
         let mut command = self.command(args);
         command.stdin(Stdio::piped());
 
+        let run = trace::started(args);
         let mut child = command.spawn()?;
 
         let mut stdin = child
@@ -132,6 +136,8 @@ impl Git {
         drop(stdin);
 
         let output = child.wait_with_output().await?;
+        run.finished(output.status.code().unwrap_or(-1));
+
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
 
@@ -166,7 +172,9 @@ impl Git {
     /// that gets parsed, where an interleaved stderr line would corrupt the
     /// result.
     pub async fn run_reported(&self, args: &[&str]) -> Result<String> {
+        let run = trace::started(args);
         let output = self.command(args).output().await?;
+        run.finished(output.status.code().unwrap_or(-1));
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);

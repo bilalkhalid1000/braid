@@ -215,6 +215,18 @@ export interface CloneProgress {
 
 export const CLONE_PROGRESS_EVENT = "clone://progress";
 
+/** One git process. Arrives twice: once as it starts, once as it ends. */
+export interface GitCommand {
+  id: number;
+  /** Arguments without the leading `git`. */
+  args: string[];
+  /** Null while it is still running. */
+  durationMs: number | null;
+  code: number | null;
+}
+
+export const GIT_COMMAND_EVENT = "git://command";
+
 export interface BlameCommit {
   oid: string;
   author: string;
@@ -414,6 +426,10 @@ export const submoduleLabel: Record<SubmoduleState, string> = {
   modified: "Different commit checked out",
   conflicted: "Conflicted",
 };
+
+/** Fires as each git process starts and again as it ends. */
+export const onGitCommand = (cb: (command: GitCommand) => void) =>
+  listen<GitCommand>(GIT_COMMAND_EVENT, (event) => cb(event.payload));
 
 /** Fires while a clone runs, many times a second on a large repository. */
 export const onCloneProgress = (cb: (progress: CloneProgress) => void) =>

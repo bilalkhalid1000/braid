@@ -9,7 +9,7 @@ mod watcher;
 
 use std::time::Duration;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 use registry::RepoRegistry;
 
@@ -37,6 +37,20 @@ pub fn run() {
 
                 if let Some(window) = handle.get_webview_window("main") {
                     let _ = window.show();
+                }
+            });
+
+            // Forward every git invocation to the window. Through a channel
+            // rather than emitting from the call site, so nothing in the git
+            // layer needs an AppHandle and the trace stays a no-op wherever
+            // one was never installed -- every test, for instance.
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+            git::trace::install(tx);
+
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                while let Some(command) = rx.recv().await {
+                    let _ = handle.emit(git::GIT_COMMAND_EVENT, command);
                 }
             });
 

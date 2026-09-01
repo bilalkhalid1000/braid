@@ -52,6 +52,7 @@ import { useSettings } from "./lib/settings";
 import { useCommands } from "./lib/useCommands";
 import { shortcutLabel } from "./lib/shortcutLabel";
 import { useActivity } from "./lib/useActivity";
+import { gitCommandLine, useGitLog } from "./lib/useGitLog";
 import { useUpdater } from "./lib/useUpdater";
 import { useAppVersion } from "./lib/useAppVersion";
 import { channelCaution, channelLabel } from "./lib/version";
@@ -171,6 +172,7 @@ export default function App() {
     updateSettings({ theme: next });
   };
   const activity = useActivity();
+  const gitLog = useGitLog();
   const [sidebarWidth, setSidebarWidth] = usePaneSize("sidebar", 232);
   const updater = useUpdater(settingsLoaded && settings.checkForUpdates);
   const app = useAppVersion();
@@ -1701,6 +1703,7 @@ The stashed changes are discarded.`,
             {logOpen && (
               <ActivityLog
                 entries={activity.entries}
+                git={gitLog}
                 onClear={activity.clear}
                 onClose={() => setLogOpen(false)}
               />
@@ -1751,6 +1754,19 @@ The stashed changes are discarded.`,
             {activity.running[0].label}
             {cloning && <span className="activity-detail">{cloning}</span>}
             {activity.running.length > 1 && ` +${activity.running.length - 1}`}
+          </span>
+        )}
+
+        {/* What git is running right now. The line above says what was asked
+            for; this says what is actually executing, which is the thing worth
+            seeing when something takes longer than it should. */}
+        {gitLog.running.length > 0 && (
+          <span
+            className="running-git"
+            title={gitLog.running.map(gitCommandLine).join("\n")}
+          >
+            <span className="spinner" />
+            {gitCommandLine(gitLog.running[gitLog.running.length - 1]!)}
           </span>
         )}
 

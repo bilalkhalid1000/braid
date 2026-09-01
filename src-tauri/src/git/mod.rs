@@ -9,6 +9,7 @@ pub mod patch;
 pub mod operation;
 pub mod refs;
 pub mod status;
+pub mod trace;
 pub mod submodule;
 pub mod worktree;
 
@@ -22,5 +23,6 @@ pub use log::{log, LogPage};
 pub use operation::RepoState;
 pub use refs::{default_remote, refs, RefsSnapshot};
 pub use status::{status, RepoStatus};
+pub use trace::{GitCommand, GIT_COMMAND_EVENT};
 pub use submodule::Submodule;
 pub use worktree::Worktree;

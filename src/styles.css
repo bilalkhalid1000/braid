@@ -3514,3 +3514,94 @@ kbd.key-live {
     opacity: 1;
   }
 }
+
+/* --- git command trace -------------------------------------------------- */
+
+/* What git is running right now, in the status bar. Mono and truncated: it is
+   an exact command, and an exact command that has been reflowed is no longer
+   the thing you could paste into a terminal. */
+.running-git {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-width: 0;
+  max-width: 40ch;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-tab {
+  padding: 0 var(--s2);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+}
+.log-tab-active {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
+.git-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+  padding: 3px var(--s4);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  line-height: 1.55;
+}
+/* A hairline between runs rather than around every row: the list is dense and
+   a full border on each would weigh more than the text. */
+.git-row + .git-row {
+  border-top: 1px solid var(--border-soft);
+}
+.git-row:hover {
+  background: var(--surface-alt);
+}
+.git-row-running {
+  color: var(--text);
+}
+/* A non-zero exit is not always a failure — several git commands report a
+   result that way — so this is a mark, not an alarm. */
+.git-row-failed .git-line {
+  color: var(--removed);
+}
+/* The clock, in its own column at the left, so a burst reads as a burst: the
+   times line up and the gaps between them are visible without reading a single
+   argument.
+
+   Sized by its content rather than a guessed width -- every timestamp is the
+   same length, so they align anyway, and a fixed `ch` value was one character
+   short of "13:03:56.673" and ran underneath the command. */
+.git-at {
+  flex: none;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.git-line {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.git-time {
+  flex: none;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The spinner sits where the duration will be, so a row does not shift
+   sideways the moment its command finishes. */
+.git-row-running .spinner {
+  flex: none;
+  margin-left: auto;
+}
