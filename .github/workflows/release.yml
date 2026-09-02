@@ -72,6 +72,13 @@ jobs:
       - run: pnpm test
       - run: cargo test --manifest-path src-tauri/Cargo.toml
 
+      # Keeps libwayland out of the AppImage, without which it aborts on startup
+      # on any host with a newer Mesa than the runner's. The wrapper this seeds,
+      # scripts/linuxdeploy-plugin-gtk-no-wayland.sh, explains why.
+      - name: Seed the AppImage build tools
+        if: matrix.platform == 'ubuntu-22.04'
+        run: scripts/seed-appimage-tools.sh
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -96,3 +103,17 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+      # The wrapper above is silent when it fails — the AppImage still builds,
+      # and only blows up on a user's machine. This is what makes that loud.
+      # It runs after the upload, but the release is a draft: a red job is the
+      # signal not to press publish.
+      - name: Verify no libwayland was bundled
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          img=$(ls src-tauri/target/release/bundle/appimage/*.AppImage)
+          "$img" --appimage-extract 'usr/lib/libwayland-*' >/dev/null
+          if ls squashfs-root/usr/lib/libwayland-* >/dev/null 2>&1; then
+            echo "libwayland leaked into $img — WebKitWebProcess will abort on hosts with a newer Mesa"
+            exit 1
+          fi

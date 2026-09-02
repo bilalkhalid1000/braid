@@ -36,6 +36,24 @@ Working today:
 Not built yet: branch lanes in the history graph, hunk and line staging,
 conflict resolution, command palette. Those are Phases 3–5 in the plan.
 
+## Running the Linux AppImage
+
+It mounts itself with FUSE 2, which several distributions no longer install by
+default — Fedora, Arch and Ubuntu 24.04 among them. Without it the app exits
+with `No suitable fusermount binary found on the $PATH`. Install whatever
+package provides `/usr/bin/fusermount`: `fuse2` on Arch, `fuse` on Fedora,
+`libfuse2` on Debian and Ubuntu (`libfuse2t64` from 24.04 on). FUSE 3 alone is
+not enough — that is `fusermount3`, a different program.
+
+Or skip the mount, at the cost of a slower start:
+
+```sh
+./Braid.AppImage --appimage-extract-and-run
+```
+
+It is built on Ubuntu 22.04, so it needs a distribution from 2022 or later.
+Debian 11, Ubuntu 20.04, RHEL 9 and openSUSE Leap 15 are too old for it.
+
 ## Requirements
 
 - Rust (stable) and the MSVC toolchain
