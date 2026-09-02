@@ -165,6 +165,9 @@ export default function App() {
   const [tabOrder, setTabOrder] = useState<string[]>([]);
   /** How many tabs the restore is reopening, so the wait can say so. */
   const [restoring, setRestoring] = useState(0);
+  /** What was open last time, when the preference says not to reopen it. The
+   *  list offers it rather than the app doing it unasked. */
+  const [lastSession, setLastSession] = useState<string[]>([]);
   /** Reveal the app even if the restore never finishes.
    *
    *  Deliberately a separate flag from `restored`, which also gates writing the
@@ -319,10 +322,17 @@ export default function App() {
 
     void (async () => {
       try {
-        if (!settings.restoreTabs) return;
-
+        // Read it either way. Turning "reopen repositories" off means do not
+        // open them for me -- not forget which they were. Skipping the read
+        // left the window with no idea a previous session existed, so the only
+        // route back to yesterday's tabs was to remember the paths yourself.
         const stored = await api.loadSession();
         if (cancelled) return;
+
+        if (!settings.restoreTabs) {
+          setLastSession(stored.repos);
+          return;
+        }
 
         setRestoring(stored.repos.length);
 
@@ -2024,6 +2034,16 @@ The stashed changes are discarded.`,
           openPaths={tabs.map((repo) => repo.root)}
           keyboardActive={!inputOpen}
           onOpen={(path) => void openFromLibrary(path)}
+          lastSession={lastSession}
+          onReopen={() => {
+            // Clearing first: the offer is answered, whether or not every path
+            // still resolves, and leaving it up would invite a second press.
+            const paths = lastSession;
+            setLastSession([]);
+            void (async () => {
+              for (const path of paths) await openFromLibrary(path);
+            })();
+          }}
           onEdit={editRepo}
           onRemove={confirmForgetRepo}
           onAdd={() => void openRepo()}
