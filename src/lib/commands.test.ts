@@ -250,9 +250,11 @@ describe("every command is wired to something", () => {
       (/^tab\.\d+$/.test(id) && src.includes("`tab.${")) ||
       (/^panel\./.test(id) && src.includes("`panel.${"));
 
-    const unwired = COMMANDS.map((c) => c.id).filter(
-      (id) => !src.includes(`"${id}"`) && !generated(id),
-    );
+    // Either quote: a formatter rewriting the file must not read as every
+    // command in that file losing its handler.
+    const wired = (id: string) => src.includes(`"${id}"`) || src.includes(`'${id}'`);
+
+    const unwired = COMMANDS.map((c) => c.id).filter((id) => !wired(id) && !generated(id));
 
     expect(unwired).toEqual([]);
   });
