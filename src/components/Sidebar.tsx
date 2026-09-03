@@ -104,7 +104,7 @@ interface Row {
 
 /* Pushed to the right of the row: it is a status on the branch, not part of
    its name. */
-const TRACKING = "ml-auto flex gap-2 font-mono text-micro";
+const TRACKING = "ml-auto flex flex-none gap-2 font-mono text-micro";
 
 const FILTER =
   "sticky top-0 z-[1] px-4 py-3 bg-chrome border-b border-b-border-soft";
@@ -138,7 +138,7 @@ const FOLDER =
 const CURSOR = "bg-surface-alt shadow-[inset_0_0_0_1px_var(--color-accent)]";
 
 const ITEM_LABEL =
-  "overflow-hidden text-ellipsis whitespace-nowrap font-mono text-small";
+  "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-small";
 
 const BADGE =
   "ml-auto min-w-[18px] px-[5px] rounded-full bg-accent text-center font-mono " +
@@ -147,8 +147,8 @@ const BADGE =
 /* Capped: a worktree's state is an aside, and a long one must not push the
    path it belongs to out of the row. */
 const NOTE =
-  "ml-auto max-w-24 overflow-hidden pl-3 text-ellipsis whitespace-nowrap font-mono " +
-  "text-micro text-text-faint";
+  "ml-auto max-w-24 flex-none overflow-hidden pl-3 text-ellipsis whitespace-nowrap " +
+  "font-mono text-micro text-text-faint";
 
 export function Sidebar({
   refs,
@@ -438,7 +438,6 @@ export function Sidebar({
             onContextMenu={(e) => onMenu({ kind: "branch", branch }, { x: e.clientX, y: e.clientY })}
             trailing={
               <>
-                <Tracking branch={branch} />
                 {branch.upstream ? (
                   !branch.isHead && (
                     <LinkAction
@@ -459,6 +458,7 @@ export function Sidebar({
                     onClick={() => onPublish(branch.name)}
                   />
                 )}
+                <Tracking branch={branch} />
               </>
             }
           />
@@ -589,7 +589,6 @@ export function Sidebar({
             }
             trailing={
               <>
-                <span className={NOTE}>{worktreeSubtitle(worktree)}</span>
                 {/* A prunable worktree's directory is already gone, so
                     `worktree remove` has nothing to remove; pruning is the
                     operation that actually clears it. */}
@@ -610,6 +609,7 @@ export function Sidebar({
                     />
                   )
                 )}
+                <span className={NOTE}>{worktreeSubtitle(worktree)}</span>
               </>
             }
           />
