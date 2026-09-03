@@ -26,6 +26,8 @@ const TIP =
   "bg-chrome-alt border border-border rounded-sm shadow-pop text-small " +
   "pointer-events-none -translate-x-1/2 animate-tip-in";
 
+/** Wider than this and the control is a row, not a button. */
+const WIDE = 200;
 const DELAY = 350;
 /** How often an open tip checks that its subject is still there. */
 export const GONE_CHECK_MS = 120;
@@ -84,7 +86,7 @@ export function TipProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const open = useCallback(
-    (target: HTMLElement, label: string, commandId?: string, note?: string) => {
+    (target: HTMLElement, label: string, commandId?: string, note?: string, pointerX?: number) => {
       window.clearTimeout(timer.current);
 
       trigger.current = target;
@@ -95,12 +97,18 @@ export function TipProvider({ children }: { children: ReactNode }) {
         // control is never described by a tip that falls off the bottom.
         const above = box.top > window.innerHeight / 2;
 
+        // Centred on the control, unless the control is a whole row. A
+        // sidebar row is as wide as the sidebar, and a tip centred on it lands
+        // in the middle of nothing -- half a panel away from the word being
+        // pointed at. For those, the pointer is the better anchor.
+        const wide = box.width > WIDE && pointerX !== undefined;
+
         setLeft(null);
         setAnchor({
           label,
           keys: commandId ? shortcutLabel(keymap[commandId]) : "",
           note,
-          x: box.left + box.width / 2,
+          x: wide ? pointerX : box.left + box.width / 2,
           y: above ? window.innerHeight - box.top + GAP : box.bottom + GAP,
           above,
         });
@@ -149,7 +157,7 @@ export function TipProvider({ children }: { children: ReactNode }) {
   const value = useMemo<TipContextValue>(
     () => ({
       tip: (label, commandId, note) => ({
-        onMouseEnter: (e) => open(e.currentTarget, label, commandId, note),
+        onMouseEnter: (e) => open(e.currentTarget, label, commandId, note, e.clientX),
         onMouseLeave: hide,
         onFocus: (e) => open(e.currentTarget, label, commandId, note),
         onBlur: hide,

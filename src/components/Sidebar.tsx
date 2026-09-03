@@ -744,7 +744,7 @@ function RefTree<T>({
           <Fragment key={node.path}>
             <button
               {...folderProps(node.path)}
-              {...tip(node.path)}
+              {...(node.path !== node.label ? tip(node.path) : {})}
               onClick={() => onToggle(node.path)}
             >
               {/* The rail stays empty: it is the keyboard column, and a digit
