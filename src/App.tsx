@@ -284,21 +284,30 @@ export default function App() {
   const worktrees = useQuery({
     queryKey: ["worktrees", activeId],
     queryFn: () => api.listWorktrees(activeId!),
-    enabled: activeId !== null,
+    // After the status, not alongside it. On a cold disk every git process
+    // that starts at once contends for the same pack files, and the ones that
+    // feed the sidebar's lower panels are not what anyone is waiting to see.
+    enabled: activeId !== null && status.data !== undefined,
     ...eventDriven,
   });
 
   const submodules = useQuery({
     queryKey: ["submodules", activeId],
     queryFn: () => api.listSubmodules(activeId!),
-    enabled: activeId !== null,
+    // After the status, not alongside it. On a cold disk every git process
+    // that starts at once contends for the same pack files, and the ones that
+    // feed the sidebar's lower panels are not what anyone is waiting to see.
+    enabled: activeId !== null && status.data !== undefined,
     ...eventDriven,
   });
 
   const flow = useQuery({
     queryKey: ["flow", activeId],
     queryFn: () => api.flowStatus(activeId!),
-    enabled: activeId !== null,
+    // After the status, not alongside it. On a cold disk every git process
+    // that starts at once contends for the same pack files, and the ones that
+    // feed the sidebar's lower panels are not what anyone is waiting to see.
+    enabled: activeId !== null && status.data !== undefined,
     ...eventDriven,
   });
 

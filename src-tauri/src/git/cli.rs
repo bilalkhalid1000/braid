@@ -45,6 +45,11 @@ impl Git {
         }
     }
 
+    /// The working tree this runs in.
+    pub fn workdir(&self) -> &std::path::Path {
+        &self.workdir
+    }
+
     /// Without the performance config.
     ///
     /// `core.fsmonitor` starts a daemon that watches the worktree, and on

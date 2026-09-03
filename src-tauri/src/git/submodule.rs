@@ -28,8 +28,14 @@ pub struct Submodule {
 }
 
 pub async fn list(git: &Git) -> Result<Vec<Submodule>> {
-    // A repository with no submodules produces no output and exits 0, so no
-    // special case is needed for the common path.
+    // Nothing to list without the file that declares them. Worth asking first
+    // because `git submodule` is a shell script rather than a built-in, and on
+    // Windows spawning it costs over a second -- paid on every tab activation
+    // by every repository that has no submodules, which is nearly all of them.
+    if !tokio::fs::try_exists(git.workdir().join(".gitmodules")).await.unwrap_or(false) {
+        return Ok(Vec::new());
+    }
+
     let status = git.run_str(&["submodule", "status"]).await?;
 
     // URLs live in .gitmodules, which `submodule status` does not report.
