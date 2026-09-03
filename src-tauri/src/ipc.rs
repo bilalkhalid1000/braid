@@ -830,6 +830,30 @@ pub async fn revert_commit(
     git::revert(&session.git, &oid).await
 }
 
+#[tauri::command]
+pub async fn open_in_editor(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    editor: Option<String>,
+    command: Option<String>,
+    terminal: Option<String>,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    system::open_editor(
+        &session.info.root,
+        editor.as_deref().unwrap_or("auto"),
+        command.as_deref().unwrap_or_default(),
+        terminal.as_deref().unwrap_or("auto"),
+    )
+    .await
+}
+
+/// The editors this app knows, with what is installed marked.
+#[tauri::command]
+pub fn editor_options() -> Vec<system::EditorOption> {
+    system::editor_options()
+}
+
 /// The terminals this platform can offer, for the settings picker.
 #[tauri::command]
 pub fn terminal_options() -> Vec<system::TerminalOption> {

@@ -84,6 +84,7 @@ import {
   IconPush,
   IconStash,
   IconTerminal,
+  IconCode,
   IconSubmodule,
   IconWorktree,
 } from "./components/icons";
@@ -251,6 +252,18 @@ export default function App() {
   const ctrlHeld = useKeyHold("Control");
   const metaHeld = useKeyHold("Meta");
   const modHeld = ctrlHeld || metaHeld;
+
+  // Whether any editor is installed decides if the toolbar button is live. A
+  // custom command is taken on trust: the user wrote it, and the only way to
+  // find out it is wrong is to run it.
+  const editors = useQuery({
+    queryKey: ["editorOptions"],
+    queryFn: api.editorOptions,
+    staleTime: Infinity,
+  });
+  const editorReady =
+    settings.editor === "custom" ||
+    (editors.data ?? []).some((editor) => editor.id !== "custom" && editor.installed);
 
   const repos = useQuery({
     queryKey: ["repos"],
@@ -1855,6 +1868,18 @@ The stashed changes are discarded.`,
                 api.openInTerminal(id, settings.terminal, settings.terminalCommand),
               ),
           },
+          {
+            key: "editor",
+            commandId: "repo.editor",
+            label: "Editor",
+            icon: <IconCode />,
+            disabled: !editorReady,
+            disabledReason: "No code editor was found. Set one in Settings.",
+            onClick: () =>
+              act("Open in code editor", () =>
+                api.openInEditor(id, settings.editor, settings.editorCommand, settings.terminal),
+              ),
+          },
         ],
       ]
     : [];
@@ -1906,6 +1931,13 @@ The stashed changes are discarded.`,
     "repo.terminal": id
       ? () => act("Open in terminal", () => api.openInTerminal(id, settings.terminal, settings.terminalCommand))
       : undefined,
+    "repo.editor":
+      id && editorReady
+        ? () =>
+            act("Open in code editor", () =>
+              api.openInEditor(id, settings.editor, settings.editorCommand, settings.terminal),
+            )
+        : undefined,
 
     // A tab shortcut only exists while that tab does, so the palette never
     // lists a repository you do not have open.

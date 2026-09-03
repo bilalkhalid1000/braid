@@ -83,6 +83,12 @@ export const IconTerminal = () => (
   </svg>
 );
 
+export const IconCode = () => (
+  <svg {...base}>
+    <path d="M9 7l-5 5 5 5M15 7l5 5-5 5" />
+  </svg>
+);
+
 export const IconWorktree = () => (
   <svg {...base}>
     <rect x="2.5" y="4" width="8.5" height="7" rx="1.5" />

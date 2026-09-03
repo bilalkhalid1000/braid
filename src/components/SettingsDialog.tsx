@@ -357,6 +357,26 @@ function GeneralSection() {
   // choose, the other is a command typed here. A picker with nothing in it
   // would leave no way to change the setting, which looks exactly like the
   // setting being ignored.
+  const editors = useQuery({
+    queryKey: ["editorOptions"],
+    queryFn: api.editorOptions,
+    staleTime: Infinity,
+  });
+
+  // Greyed by wording rather than hidden. "Why is mine not listed" answers
+  // itself when the entry is there and says it was not found.
+  const editorChoices = (
+    editors.data?.length
+      ? editors.data
+      : [
+          { id: "auto", label: "Choose automatically", installed: true },
+          { id: "custom", label: "Custom command", installed: true },
+        ]
+  ).map((option) => ({
+    value: option.id,
+    label: option.installed ? option.label : `${option.label} (not installed)`,
+  }));
+
   const available: TerminalOption[] = terminals.data?.length
     ? terminals.data
     : [
@@ -423,6 +443,32 @@ function GeneralSection() {
         settings.terminalCommand,
         "alacritty --working-directory {path}",
         (terminalCommand) => update({ terminalCommand }),
+      ),
+    );
+  }
+
+  rows.push(
+    selectRow(
+      "editor",
+      "Code editor",
+      editors.isError
+        ? "This build cannot list editors, which means it is older than the settings it is showing. Restart it for the full list; a custom command works either way."
+        : "What “Open in code editor” starts. Choosing automatically takes the first one installed. Vim and Neovim open inside your terminal, since they have no window of their own.",
+      settings.editor,
+      editorChoices,
+      (editor) => update({ editor }),
+    ),
+  );
+
+  if (settings.editor === "custom") {
+    rows.push(
+      textRow(
+        "editorCommand",
+        "Editor command",
+        "{path} becomes the repository's folder. Quote anything containing spaces. Not a shell: pipes and chained commands are ordinary arguments.",
+        settings.editorCommand,
+        "code {path}",
+        (editorCommand) => update({ editorCommand }),
       ),
     );
   }

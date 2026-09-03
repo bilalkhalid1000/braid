@@ -664,3 +664,449 @@ mod tests {
         }
     }
 }
+
+
+/* --- code editors ------------------------------------------------------- */
+
+/// An editor the user can pick in settings.
+#[derive(serde::Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct EditorOption {
+    pub id: String,
+    pub label: String,
+    /// Found on this machine. The picker greys the rest out rather than
+    /// hiding them, so "why is mine not listed" answers itself.
+    pub installed: bool,
+}
+
+/// Where each editor's command-line launcher lives.
+///
+/// Everything a name on PATH would find, then the places an installer puts it
+/// without touching PATH -- VS Code's per-user install leaves `code.cmd` under
+/// Local/Programs and nowhere else.
+fn editor_launchers(id: &str, roots: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+
+    let (names, under): (&[&str], &[&str]) = match id {
+        "vscode" => (
+            &["code.cmd", "code"],
+            &["Microsoft VS Code/bin/code.cmd", "Microsoft VS Code/bin/code"],
+        ),
+        "cursor" => (
+            &["cursor.cmd", "cursor"],
+            &["cursor/resources/app/bin/cursor.cmd"],
+        ),
+        "sublime" => (&["subl.exe", "subl"], &["Sublime Text/subl.exe"]),
+        "zed" => (&["zed.exe", "zed"], &["Zed/Zed.exe"]),
+        // GUI builds first, so a machine that has one opens a window of its
+        // own rather than a terminal. The plain binaries are terminal
+        // editors and are hosted in one -- see `hosted`.
+        "vim" => (&["gvim.exe", "gvim", "vim.exe", "vim"], &["Vim/vim91/gvim.exe", "Vim/vim90/gvim.exe"]),
+        "neovim" => (
+            &["nvim-qt.exe", "neovide.exe", "nvim-qt", "neovide", "nvim.exe", "nvim"],
+            &["Neovim/bin/nvim-qt.exe", "Neovim/bin/nvim.exe"],
+        ),
+        _ => return out,
+    };
+
+    // Git for Windows ships vim under usr/bin, off PATH. Found the same way
+    // Git Bash is: by walking up from the git.exe that is on PATH.
+    if id == "vim" && cfg!(windows) {
+        if let Some(git) = on_path("git.exe") {
+            let mut dir = parent_dir(&git);
+            for _ in 0..3 {
+                let Some(current) = dir else { break };
+                out.push(format!("{current}/usr/bin/vim.exe"));
+                dir = parent_dir(current);
+            }
+        }
+    }
+
+    for name in names {
+        if let Some(found) = on_path(name) {
+            out.push(found);
+        }
+    }
+
+    for root in roots {
+        for rel in under {
+            out.push(format!("{root}/{rel}"));
+        }
+    }
+
+    if cfg!(target_os = "macos") {
+        match id {
+            "vscode" => out.push(
+                "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code".into(),
+            ),
+            "cursor" => out.push("/Applications/Cursor.app/Contents/Resources/app/bin/cursor".into()),
+            "zed" => out.push("/Applications/Zed.app/Contents/MacOS/cli".into()),
+            "sublime" => out.push("/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl".into()),
+            _ => {}
+        }
+    }
+
+    out
+}
+
+/// Every editor this app knows how to start, in the order "automatic" tries
+/// them.
+const EDITORS: &[(&str, &str)] = &[
+    ("vscode", "Visual Studio Code"),
+    ("cursor", "Cursor"),
+    ("zed", "Zed"),
+    ("sublime", "Sublime Text"),
+    ("neovim", "Neovim"),
+    ("vim", "Vim"),
+];
+
+/// Whether a launcher opens a window of its own. Everything else is a
+/// terminal editor and has to be given a terminal to run in.
+fn is_gui(program: &str) -> bool {
+    let stem = std::path::Path::new(program)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+
+    !matches!(stem.as_str(), "vim" | "nvim")
+}
+
+/// The launcher for an editor, if it is installed.
+pub fn editor_program(id: &str) -> Option<String> {
+    editor_launchers(id, &install_roots())
+        .into_iter()
+        .find(|candidate| std::path::Path::new(candidate).is_file())
+        .map(|found| native_path(&found))
+}
+
+/// A terminal command that opens a shell at `path` and runs `program` there.
+///
+/// Every host sets the directory itself, so the editor is handed `.` rather
+/// than the path -- which also keeps a path with spaces out of the one place
+/// it would have to be quoted differently per shell. A custom terminal is a
+/// template we cannot inject a command into, so it yields nothing and the
+/// automatic list is used instead.
+pub fn terminal_running(id: &str, path: &str, program: &str) -> Option<(String, Vec<String>)> {
+    let native = native_path(path);
+    let quoted_ps = program.replace('\'', "''");
+
+    let (host, args): (String, Vec<String>) = match id {
+        "wt" => ("wt.exe".into(), vec!["-d".into(), native, program.into(), ".".into()]),
+        "powershell" | "pwsh" => (
+            format!("{id}.exe"),
+            vec![
+                "-NoExit".into(),
+                "-Command".into(),
+                format!(
+                    "Set-Location -LiteralPath '{}'; & '{quoted_ps}' .",
+                    native.replace('\'', "''")
+                ),
+            ],
+        ),
+        "cmd" => (
+            "cmd.exe".into(),
+            vec!["/K".into(), format!("cd /d \"{native}\" && \"{program}\" .")],
+        ),
+        // AppleScript is the only way to hand Terminal a command to run.
+        "terminal" | "iterm" => (
+            "osascript".into(),
+            vec![
+                "-e".into(),
+                format!(
+                    "tell application \"Terminal\" to do script \"cd '{}' && '{}' .\"",
+                    native.replace('\'', "'\\''"),
+                    program.replace('\'', "'\\''")
+                ),
+            ],
+        ),
+        "gnome-terminal" => (
+            "gnome-terminal".into(),
+            vec![format!("--working-directory={native}"), "--".into(), program.into(), ".".into()],
+        ),
+        "konsole" => (
+            "konsole".into(),
+            vec!["--workdir".into(), native, "-e".into(), program.into(), ".".into()],
+        ),
+        "xfce4-terminal" => (
+            "xfce4-terminal".into(),
+            vec![format!("--working-directory={native}"), "-x".into(), program.into(), ".".into()],
+        ),
+        "alacritty" => (
+            "alacritty".into(),
+            vec!["--working-directory".into(), native, "-e".into(), program.into(), ".".into()],
+        ),
+        "kitty" => ("kitty".into(), vec!["--directory".into(), native, program.into(), ".".into()]),
+        "xterm" => ("xterm".into(), vec!["-e".into(), program.into(), ".".into()]),
+        _ => return None,
+    };
+
+    Some((host, args))
+}
+
+/// Put a terminal editor inside the terminal the user chose, or the first one
+/// this platform usually has.
+fn hosted(path: &str, program: &str, terminal: &str) -> Option<(String, Vec<String>)> {
+    if let Some(found) = terminal_running(terminal, path, program) {
+        return Some(found);
+    }
+
+    let ids: &[&str] = if cfg!(windows) {
+        &["wt", "powershell", "cmd"]
+    } else if cfg!(target_os = "macos") {
+        &["terminal"]
+    } else {
+        &["gnome-terminal", "konsole", "xfce4-terminal", "alacritty", "kitty", "xterm"]
+    };
+
+    ids.iter().find_map(|id| terminal_running(id, path, program))
+}
+
+/// What to offer in settings, with what is actually here marked.
+pub fn editor_options() -> Vec<EditorOption> {
+    let known: Vec<EditorOption> = EDITORS
+        .iter()
+        .map(|(id, label)| EditorOption {
+            id: (*id).into(),
+            label: (*label).into(),
+            installed: editor_program(id).is_some(),
+        })
+        .collect();
+
+    let any = known.iter().any(|editor| editor.installed);
+
+    let mut options = vec![EditorOption {
+        id: "auto".into(),
+        label: "Choose automatically".into(),
+        installed: any,
+    }];
+    options.extend(known);
+    options.push(EditorOption {
+        id: "custom".into(),
+        label: "Custom command".into(),
+        installed: true,
+    });
+    options
+}
+
+/// How to open a path in a named editor. None when it is not installed.
+///
+/// A GUI editor is started on the path. A terminal editor is started inside
+/// `terminal`, since it has no window of its own to open.
+pub fn named_editor(id: &str, path: &str, terminal: &str) -> Option<(String, Vec<String>)> {
+    let program = editor_program(id)?;
+
+    if is_gui(&program) {
+        return Some((program, vec![native_path(path)]));
+    }
+
+    hosted(path, &program, terminal)
+}
+
+/// Everything to try, in order, for a given setting.
+///
+/// Same rule as the terminal: a choice we can honour is the only thing tried.
+/// Opening a different editor than the one chosen is indistinguishable from
+/// the setting being ignored.
+pub fn editor_candidates(
+    path: &str,
+    choice: &str,
+    custom: &str,
+    terminal: &str,
+) -> Vec<(String, Vec<String>)> {
+    let chosen = match choice {
+        "custom" => custom_terminal(custom, path),
+        "" | "auto" => None,
+        id => named_editor(id, path, terminal),
+    };
+
+    if let Some(chosen) = chosen {
+        return vec![chosen];
+    }
+
+    // Nothing chosen, or a choice this machine cannot honour: the first
+    // editor that is actually here.
+    EDITORS
+        .iter()
+        .filter_map(|(id, _)| named_editor(id, path, terminal))
+        .take(1)
+        .collect()
+}
+
+/// Open the repository in a code editor.
+pub async fn open_editor(
+    path: &str,
+    choice: &str,
+    custom: &str,
+    terminal: &str,
+) -> Result<String> {
+    let candidates = editor_candidates(path, choice, custom, terminal);
+
+    if candidates.is_empty() {
+        return Err(AppError::Git {
+            code: -1,
+            stderr: if choice == "auto" || choice.is_empty() {
+                "No code editor was found. Install one, or set a custom command in Settings.".into()
+            } else {
+                format!("{choice} is not installed on this machine. Pick another editor in Settings.")
+            },
+        });
+    }
+
+    let (program, args) = &candidates[0];
+    spawn(program, args, path).await?;
+
+    Ok(format!("Opened {program} in {path}"))
+}
+
+#[cfg(test)]
+mod editor_tests {
+    use super::*;
+
+    #[test]
+    fn the_list_starts_with_automatic_and_ends_with_custom() {
+        let options = editor_options();
+
+        assert_eq!(options.first().unwrap().id, "auto");
+        assert_eq!(options.last().unwrap().id, "custom");
+        assert!(options.last().unwrap().installed, "a custom command is always available");
+    }
+
+    #[test]
+    fn every_offered_editor_has_somewhere_to_be_looked_for() {
+        // Whether it is installed depends on the machine; that it is looked
+        // for at all does not. An id in the picker with no launcher path
+        // would be greyed out forever, everywhere.
+        for (id, _) in EDITORS {
+            assert!(
+                !editor_launchers(id, &["C:/Program Files".into()]).is_empty(),
+                "{id} has nowhere to be found"
+            );
+        }
+    }
+
+    #[test]
+    fn automatic_reports_installed_only_when_something_is() {
+        let options = editor_options();
+        let any = options.iter().skip(1).take(EDITORS.len()).any(|e| e.installed);
+
+        assert_eq!(options[0].installed, any);
+    }
+
+    #[test]
+    fn a_chosen_editor_is_never_quietly_replaced() {
+        for (id, _) in EDITORS {
+            let candidates = editor_candidates("/tmp/repo", id, "", "auto");
+            assert!(candidates.len() <= 1, "{id}: nothing may queue behind a choice");
+        }
+    }
+
+    #[test]
+    fn a_custom_command_is_the_only_thing_tried() {
+        let candidates = editor_candidates("/tmp/repo", "custom", "my-editor --wait {path}", "auto");
+
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].0, "my-editor");
+        assert_eq!(candidates[0].1[0], "--wait");
+    }
+
+    #[test]
+    fn an_unknown_editor_falls_to_the_automatic_choice() {
+        let auto = editor_candidates("/tmp/repo", "auto", "", "auto");
+        let unknown = editor_candidates("/tmp/repo", "no-such-editor", "", "auto");
+
+        assert_eq!(unknown, auto);
+    }
+
+    #[test]
+    fn a_terminal_editor_is_told_apart_from_a_windowed_one() {
+        assert!(!is_gui("C:/Program Files/Git/usr/bin/vim.exe"));
+        assert!(!is_gui("/usr/bin/nvim"));
+        assert!(is_gui("C:/Program Files/Vim/vim91/gvim.exe"));
+        assert!(is_gui("/usr/bin/nvim-qt"));
+        assert!(is_gui("C:/x/neovide.exe"));
+    }
+
+    #[test]
+    fn windows_terminal_runs_the_editor_in_the_repository() {
+        let (host, args) = terminal_running("wt", "C:/my repos/app", "nvim.exe").unwrap();
+
+        assert_eq!(host, "wt.exe");
+        assert_eq!(args[0], "-d");
+        assert!(args[1].ends_with("app"));
+        assert_eq!(&args[2..], ["nvim.exe", "."]);
+    }
+
+    #[test]
+    fn powershell_changes_directory_then_calls_the_editor() {
+        // The call operator is what lets a program with spaces in its path be
+        // invoked from a string; without it PowerShell prints the path.
+        let (_, args) = terminal_running("powershell", "C:/repo", "C:/Program Files/Neovim/bin/nvim.exe").unwrap();
+        let script = args.last().unwrap();
+
+        assert!(script.starts_with("Set-Location -LiteralPath"));
+        assert!(script.contains("& 'C:/Program Files/Neovim/bin/nvim.exe' ."));
+    }
+
+    #[test]
+    fn cmd_quotes_both_the_directory_and_the_program() {
+        let (_, args) = terminal_running("cmd", "C:/my repos/app", "C:/x y/vim.exe").unwrap();
+
+        assert_eq!(args[0], "/K");
+        assert!(args[1].contains("cd /d \""));
+        assert!(args[1].contains("\"C:/x y/vim.exe\" ."));
+    }
+
+    #[test]
+    fn linux_terminals_separate_their_own_flags_from_the_command() {
+        let (_, gnome) = terminal_running("gnome-terminal", "/r", "nvim").unwrap();
+        assert_eq!(&gnome[1..], ["--", "nvim", "."]);
+
+        let (_, konsole) = terminal_running("konsole", "/r", "nvim").unwrap();
+        assert_eq!(&konsole[2..], ["-e", "nvim", "."]);
+    }
+
+    #[test]
+    fn a_custom_terminal_cannot_host_an_editor() {
+        // A template is a command line we cannot inject into, so hosting falls
+        // to the automatic list rather than guessing where the editor goes.
+        assert!(terminal_running("custom", "/r", "nvim").is_none());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn git_for_windows_vim_is_found_off_path() {
+        // The case most Windows users are in: no editor they chose, but the
+        // vim that Git for Windows ships under usr/bin, which is on nobody's
+        // PATH. Resolving it is what makes Vim show as installed for them.
+        // git.exe may be cmd/, bin/ or mingw64/bin/ -- the root is one, two
+        // or three levels up, the same walk the launcher does.
+        let Some(git) = on_path("git.exe") else { return };
+        let mut dir = parent_dir(&git);
+        let mut bundled = false;
+        for _ in 0..3 {
+            let Some(current) = dir else { break };
+            if std::path::Path::new(&format!("{current}/usr/bin/vim.exe")).is_file() {
+                bundled = true;
+                break;
+            }
+            dir = parent_dir(current);
+        }
+        if !bundled {
+            return;
+        }
+
+        let found = editor_program("vim").expect("vim ships with Git for Windows");
+        eprintln!("vim resolved to: {found}");
+
+        assert!(std::path::Path::new(&found).is_file());
+        assert!(!is_gui(&found), "the Git-bundled vim is a terminal editor");
+    }
+
+    #[test]
+    fn every_offered_editor_has_somewhere_to_be_looked_for_including_the_new_ones() {
+        for id in ["vim", "neovim"] {
+            assert!(!editor_launchers(id, &["C:/Program Files".into()]).is_empty(), "{id}");
+        }
+    }
+}

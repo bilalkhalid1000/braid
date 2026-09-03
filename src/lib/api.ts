@@ -319,6 +319,14 @@ export interface TerminalOption {
   label: string;
 }
 
+/** An editor offered in settings. `installed` is what the backend found on
+ *  this machine; the picker greys out the rest rather than hiding them. */
+export interface EditorOption {
+  id: string;
+  label: string;
+  installed: boolean;
+}
+
 /** Which refs the history walks. Named the way the control names them, so the
  *  stored value reads as what the user chose. */
 export type HistoryScope = "all" | "local" | "head";
@@ -481,6 +489,11 @@ export const api = {
    *  backend rather than listed here, so the choices and the launcher cannot
    *  disagree about what exists. */
   terminalOptions: () => invoke<TerminalOption[]>("terminal_options"),
+  /** `terminal` is which terminal hosts a terminal editor such as Neovim,
+   *  which has no window of its own to open. */
+  openInEditor: (id: string, editor: string, command: string, terminal: string) =>
+    invoke<string>("open_in_editor", { id, editor, command, terminal }),
+  editorOptions: () => invoke<EditorOption[]>("editor_options"),
 
   fsmonitorState: (id: string) => invoke<string>("fsmonitor_state", { id }),
 };

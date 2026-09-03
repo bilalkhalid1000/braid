@@ -116,6 +116,8 @@ pub fn run() {
             ipc::open_in_file_manager,
             ipc::open_in_terminal,
             ipc::terminal_options,
+            ipc::open_in_editor,
+            ipc::editor_options,
             ipc::reset_impact,
             ipc::reset_to,
             ipc::revert_commit,

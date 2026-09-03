@@ -58,6 +58,7 @@ export const COMMANDS: CommandDef[] = [
   { id: "repo.close", label: "Close this tab", category: "Repository", scope: "global", binding: ["Mod+W"] },
   { id: "repo.explorer", label: "Open in file manager", category: "Repository", scope: "global", binding: ["Mod+E"], needsRepo: true },
   { id: "repo.terminal", label: "Open in terminal", category: "Repository", scope: "global", binding: ["Mod+T"], needsRepo: true },
+  { id: "repo.editor", label: "Open in code editor", category: "Repository", scope: "global", binding: ["Mod+Shift+E"], needsRepo: true },
 
   // --- Repository tabs ---
   //

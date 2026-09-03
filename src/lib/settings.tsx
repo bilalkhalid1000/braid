@@ -37,6 +37,12 @@ export interface Settings {
   /** The command line to run when terminal is "custom". {path} is replaced
    *  with the repository's folder. */
   terminalCommand: string;
+  /** Which code editor "Open in editor" starts. An id from the backend's
+   *  list, or "auto" for the first one installed. */
+  editor: string;
+  /** The command line to run when editor is "custom". {path} is replaced
+   *  with the repository's folder. */
+  editorCommand: string;
   /** Only the commands the user has actually rebound. Values are lists, so a
    *  command can answer to several keys. */
   keymap: Keymap;
@@ -56,6 +62,8 @@ export const DEFAULT_SETTINGS: Settings = {
   checkForUpdates: true,
   terminal: "auto",
   terminalCommand: "",
+  editor: "auto",
+  editorCommand: "",
   keymap: {},
 };
 
