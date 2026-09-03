@@ -195,6 +195,14 @@ export function FileStatusView({
           onMenu={(entry, point) => onMenu(entry, false, point)}
           actionLabel="Stage all"
           actionCommand="status.stageAll"
+          // Discard lives only on this list. Staged work is one step from
+          // safety; what is here is the work git has no record of yet.
+          secondary={{
+            label: "Discard all",
+            command: "git.discardAll",
+            onClick: () => onDiscard(unstaged.map((e) => e.path)),
+          }}
+          rowAction={{ label: "discard", onClick: (e) => onDiscard([e.path]) }}
           emptyMessage={
             filter ? "No matches" : total === 0 ? "Working tree clean" : "Everything is staged"
           }

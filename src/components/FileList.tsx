@@ -15,8 +15,9 @@ const HEADER =
 
 /* Absolutely placed: the list is virtualized, so each row is positioned by its
    measurement rather than by flow. */
+/* `group` so a row can reveal its own action on hover. */
 const ROW =
-  "absolute top-0 left-0 flex w-full items-center gap-3 px-4 border-l-2 cursor-default " +
+  "group absolute top-0 left-0 flex w-full items-center gap-3 px-4 border-l-2 cursor-default " +
   "[&_input[type=checkbox]]:m-0 [&_input[type=checkbox]]:accent-accent";
 
 const ROW_HEIGHT = 22;
@@ -48,6 +49,11 @@ interface Props {
   actionLabel: string;
   /** The command the action button runs, so its tip can show the key. */
   actionCommand?: string;
+  /** A second action in the header, drawn as destructive. The primary one
+   *  moves files between the lists; this one throws work away. */
+  secondary?: { label: string; command?: string; onClick: () => void };
+  /** Shown on a row while the pointer is over it, drawn as destructive. */
+  rowAction?: { label: string; onClick: (entry: StatusEntry) => void };
   emptyMessage: string;
 }
 
@@ -66,6 +72,8 @@ export function FileList({
   onMenu,
   actionLabel,
   actionCommand,
+  secondary,
+  rowAction,
   emptyMessage,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -97,6 +105,18 @@ export function FileList({
         >
           {actionLabel}
         </button>
+        {secondary && (
+          <button
+            // The link style puts itself at the far right; a second one
+            // would share that and drift apart from the first.
+            className="link-button ml-3 text-removed"
+            disabled={entries.length === 0}
+            onClick={secondary.onClick}
+            {...tip(secondary.label, secondary.command)}
+          >
+            {secondary.label}
+          </button>
+        )}
       </header>
 
       <div className="relative overflow-y-auto bg-surface" ref={scrollRef}>
@@ -149,6 +169,26 @@ export function FileList({
                   <PathLabel path={entry.path} />
                 </span>
                 {entry.origPath && <span className="ml-auto whitespace-nowrap font-mono text-micro text-text-faint">was {entry.origPath}</span>}
+                {rowAction && (
+                  <button
+                    className={`link-button hover-only group-hover:opacity-100 text-removed ${
+                      entry.origPath ? "ml-3" : "ml-auto"
+                    }`}
+                    // Out of the tab order for the same reason the checkbox
+                    // is: the keyboard route is the selection plus its key.
+                    tabIndex={-1}
+                    {...tip(`${rowAction.label} ${entry.path}`, "status.discard")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      rowAction.onClick(entry);
+                    }}
+                    // A quick second click must not fall through to the row
+                    // and stage the file that was just being discarded.
+                    onDoubleClick={(e) => e.stopPropagation()}
+                  >
+                    {rowAction.label}
+                  </button>
+                )}
               </div>
             );
           })}
