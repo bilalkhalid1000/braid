@@ -95,14 +95,14 @@ function Toast({
       {/* The interpretation leads, because it is the part that is actionable.
           Git's own words stay directly underneath rather than being replaced. */}
       {hint && (
-        <p className={`mt-3 mb-0 ${INDENT} text-body leading-[1.45] text-text`}>
+        <p className={`select-text mt-3 mb-0 ${INDENT} text-body leading-[1.45] text-text`}>
           {hint.message}
         </p>
       )}
 
       {summary ? (
         <p
-          className={`mt-2 mb-0 ${INDENT} font-mono text-small leading-[1.45] break-words text-text-dim`}
+          className={`select-text mt-2 mb-0 ${INDENT} font-mono text-small leading-[1.45] break-words text-text-dim`}
         >
           {summary}
         </p>
@@ -139,7 +139,7 @@ function Toast({
 
       {expanded && (
         <pre
-          className={`mt-3 mb-0 ${INDENT} max-h-[180px] overflow-auto p-3 bg-surface border border-border-soft rounded-sm font-mono text-small whitespace-pre-wrap break-words`}
+          className={`select-text mt-3 mb-0 ${INDENT} max-h-[180px] overflow-auto p-3 bg-surface border border-border-soft rounded-sm font-mono text-small whitespace-pre-wrap break-words`}
         >
           {entry.detail}
         </pre>

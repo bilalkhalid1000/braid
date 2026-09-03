@@ -57,12 +57,12 @@ const HEAD =
   "flex min-h-0 max-h-1/2 shrink basis-auto flex-col gap-2 px-6 py-4 " +
   "border-b border-b-border-soft";
 
-const SUBJECT = "m-0 flex-none text-lead font-semibold tracking-[-0.01em] leading-[1.35]";
+const SUBJECT = "select-text m-0 flex-none text-lead font-semibold tracking-[-0.01em] leading-[1.35]";
 const META = "m-0 flex flex-none items-center gap-4 text-small text-text-dim";
 const MERGE_CHIP = "px-3 rounded-full bg-accent-soft text-micro text-accent";
 
 const BODY =
-  "min-h-0 flex-1 basis-auto mt-2 mb-0 overflow-y-auto font-mono text-body " +
+  "select-text min-h-0 flex-1 basis-auto mt-2 mb-0 overflow-y-auto font-mono text-body " +
   "leading-[1.55] whitespace-pre-wrap [overflow-wrap:anywhere] text-text-dim";
 
 const SUMMARY =

@@ -39,6 +39,22 @@ textarea {
   color: inherit;
 }
 
+/* This is an instrument, not a document. A drag across the sidebar or a list
+   is a mis-aimed click, and painting half a branch name blue -- and leaving
+   the selection behind -- is the only thing it could do. Off here, and back
+   on, with select-text, exactly where copying is the point: a diff, a commit
+   message, a line of blame, what a command printed. Fields keep their own. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;

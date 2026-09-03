@@ -263,7 +263,7 @@ export function BlameView({ repoId, target, keyboardActive, onClose }: Props) {
                 </span>
 
                 <span className={LINE_NO}>{line.line}</span>
-                <span className="pl-4">
+                <span className="select-text pl-4">
                   <Code tokens={highlighted?.[item.index]} text={line.content} />
                 </span>
               </div>

@@ -190,7 +190,7 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
                   <div key={item.key} className={`${LINE} group bg-hunk-bg text-text-dim`} style={style}>
                     <span className={GUTTER} />
                     <span className={GUTTER} />
-                    <span className="pr-8">{row.header}</span>
+                    <span className="select-text pr-8">{row.header}</span>
 
                     {canApply && (
                       <span className={HUNK_ACTIONS}>

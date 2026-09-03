@@ -58,11 +58,11 @@ const STATUS =
 const ROW = "absolute top-0 left-0 flex w-full items-center gap-6 px-6 cursor-default";
 
 const PRIMARY =
-  "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-body text-text";
+  "select-text min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-body text-text";
 
 /* Capped, so a long path cannot push the line it belongs to out of view. */
 const SECONDARY =
-  "max-w-[45%] flex-none overflow-hidden text-ellipsis whitespace-nowrap font-mono " +
+  "select-text max-w-[45%] flex-none overflow-hidden text-ellipsis whitespace-nowrap font-mono " +
   "text-micro text-text-faint";
 
 export function SearchView({ repoId, keyboardActive, onClose, onCommit, onFile }: Props) {

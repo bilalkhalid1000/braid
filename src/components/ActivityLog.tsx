@@ -96,7 +96,7 @@ export function ActivityLog({ entries, git, onClear, onClose }: Props) {
                 <span className="flex-none tabular-nums whitespace-nowrap text-text-faint">
                   {commandTime(command.startedAt)}
                 </span>
-                <span className="min-w-0 flex-1 [overflow-wrap:anywhere] text-text-dim">
+                <span className="select-text min-w-0 flex-1 [overflow-wrap:anywhere] text-text-dim">
                   {gitCommandLine(command)}
                 </span>
                 <span className="spinner ml-auto flex-none" />
@@ -112,7 +112,7 @@ export function ActivityLog({ entries, git, onClear, onClose }: Props) {
                     {commandTime(command.startedAt)}
                   </span>
                   <span
-                    className={`min-w-0 flex-1 [overflow-wrap:anywhere] ${
+                    className={`select-text min-w-0 flex-1 [overflow-wrap:anywhere] ${
                       command.code === 0 ? "text-text-dim" : "text-removed"
                     }`}
                   >
@@ -159,7 +159,7 @@ function LogRow({ entry }: { entry: ActivityEntry }) {
       </button>
 
       {open && entry.detail && (
-        <pre className="m-0 max-h-[240px] overflow-auto bg-surface pt-3 pr-4 pb-4 pl-[26px] font-mono text-small whitespace-pre-wrap break-words">
+        <pre className="select-text m-0 max-h-[240px] overflow-auto bg-surface pt-3 pr-4 pb-4 pl-[26px] font-mono text-small whitespace-pre-wrap break-words">
           {entry.detail}
         </pre>
       )}
