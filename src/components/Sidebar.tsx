@@ -5,7 +5,7 @@ import { FilterInput, matchesFilter } from "./FilterInput";
 import { useCommands } from "../lib/useCommands";
 import { useSettings } from "../lib/settings";
 import { shortcutLabel } from "../lib/shortcutLabel";
-import { groupRefs, hasFolders, visibleNodes, type RefNode } from "../lib/refTree";
+import { groupRefs, hasFolders, leafCount, visibleNodes, type RefNode } from "../lib/refTree";
 import { Keys } from "./Keys";
 import { useTip } from "./Tip";
 import {
@@ -117,7 +117,8 @@ const SECTION_KEY = "h-[15px] min-w-[15px] px-[3px]";
 
 const HEADER =
   "flex min-w-0 flex-1 items-center gap-3 pt-3 pr-2 pb-2 pl-0 bg-transparent border-0 " +
-  "uppercase tracking-[0.09em] text-micro font-semibold text-text-dim text-left cursor-pointer";
+  "uppercase tracking-[0.09em] text-micro font-semibold text-text-dim text-left cursor-pointer " +
+  "hover:text-text";
 
 /* A nested section is a remote's name, not a heading: it reads as the thing it
    names rather than as a category. */
@@ -139,6 +140,8 @@ const CURSOR = "bg-surface-alt shadow-[inset_0_0_0_1px_var(--color-accent)]";
 
 const ITEM_LABEL =
   "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-small";
+const ITEM_LABEL_SANS =
+  "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-body";
 
 const BADGE =
   "ml-auto min-w-[18px] px-[5px] rounded-full bg-accent text-center font-mono " +
@@ -232,8 +235,9 @@ export function Sidebar({
   /** The disclosure column costs every row in the section 20px of indent, so it
    *  is only reserved where something is actually grouped. A repository with no
    *  slashes in its branch names looks exactly as it did before. */
-  const twisty = (present: boolean) =>
-    present ? <span className="flex w-7 flex-none justify-center text-text-faint" /> : undefined;
+  const twisty = (_present: boolean) => (
+    <span className="flex w-7 flex-none justify-center text-text-faint" />
+  );
 
   const branchesGrouped = hasFolders(branchTree);
   const tagsGrouped = hasFolders(tagTree);
@@ -389,6 +393,7 @@ export function Sidebar({
       <Section title="Workspace" defaultOpen>
         <Item
           label="File Status"
+          sans
           active={view === "status"}
           number={panelNumber("files")}
           badge={pending || undefined}
@@ -396,6 +401,7 @@ export function Sidebar({
         />
         <Item
           label="History"
+          sans
           active={view === "history"}
           number={panelNumber("history")}
           onClick={() => onFocusPanel("history")}
@@ -425,7 +431,7 @@ export function Sidebar({
           <Item
             key={branch.name}
             {...rowProps(`branch:${branch.name}`)}
-            leading={twisty(branchesGrouped)}
+            leading={branch.isHead ? <HeadMark /> : twisty(branchesGrouped)}
             label={label}
             active={branch.isHead}
             bold={branch.isHead}
@@ -467,6 +473,7 @@ export function Sidebar({
       </Section>
 
       <Section title="Tags" count={shown.tags.length} forceOpen={open}>
+        {shown.tags.length === 0 && <Empty>No tags</Empty>}
         <RefTree
           nodes={tagTree}
           isFolded={folded("tag")}
@@ -491,6 +498,7 @@ export function Sidebar({
         number={panelNumber("remotes")}
         focused={focused === "remotes"}
       >
+        {shown.remotes.length === 0 && <Empty>No remotes</Empty>}
         {shown.remotes.map((remote) => (
           <Section
             key={remote.name}
@@ -536,6 +544,7 @@ export function Sidebar({
         number={panelNumber("stashes")}
         focused={focused === "stashes"}
       >
+        {shown.stashes.length === 0 && <Empty>No stashes</Empty>}
         {shown.stashes.map((stash) => (
           <Item
             key={stash.selector}
@@ -747,7 +756,10 @@ function RefTree<T>({
               <span className="flex w-7 flex-none justify-center text-text-faint">
                 <IconChevron open={!isFolded(node.path)} />
               </span>
-              <span className="overflow-hidden text-ellipsis whitespace-nowrap">{node.label}</span>
+              <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                {node.label}
+              </span>
+              <span className={COUNT}>{leafCount(node)}</span>
             </button>
 
             {!isFolded(node.path) && (
@@ -796,9 +808,10 @@ function Section({
   const open = forceOpen || expanded;
 
   return (
-    <div
-      data-focused={focused || undefined}
-    >
+    // Space above a top-level section, and none above a nested one: a remote
+    // belongs to the Remotes heading above it, and a gap there would read as
+    // a section of its own.
+    <div data-focused={focused || undefined} className={nested ? "" : "mt-3"}>
       <div className="group flex items-center pr-4">
         {/* The rail. Every key in the sidebar sits in this column and nothing
             else does, so a digit here is always a key and a number on the
@@ -838,12 +851,43 @@ function Section({
   );
 }
 
+/** What a section says when it has nothing to list.
+ *
+ *  Laid out as a row -- rail, then text -- so it sits on the same left edge as
+ *  the rows it stands in for, rather than floating at its own indent. */
 function Empty({ children }: { children: ReactNode }) {
-  return <div className="pt-0 pr-4 pb-2 pl-7 text-small text-text-faint">{children}</div>;
+  return (
+    <div className="flex h-row items-center gap-3 pl-2 pr-4">
+      <span className={RAIL} />
+      <span className="text-small text-text-faint">{children}</span>
+    </div>
+  );
+}
+
+/** HEAD, drawn the way the history graph draws it: a ring on the lane. Sits in
+ *  the structure column beside the branch, where a folder shows its chevron --
+ *  a statement about where the checkout is in the tree, in the app's own mark.
+ *  Static, so reduced motion has nothing to switch off. */
+function HeadMark() {
+  return (
+    <span className="flex w-7 flex-none justify-center" aria-label="checked out">
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+        <circle
+          cx="7"
+          cy="7"
+          r="3.5"
+          fill="var(--color-surface)"
+          stroke="var(--color-accent)"
+          strokeWidth="1.75"
+        />
+      </svg>
+    </span>
+  );
 }
 
 function Item({
   label,
+  sans,
   active,
   bold,
   badge,
@@ -859,6 +903,10 @@ function Item({
   ...rest
 }: {
   label: string;
+  /** Set in the chrome face. For a name the app chose rather than a string
+   *  git would print -- the typographic rule is that refs and paths are mono
+   *  and everything you click is sans. */
+  sans?: boolean;
   active?: boolean;
   bold?: boolean;
   badge?: number;
@@ -911,7 +959,7 @@ function Item({
       </span>
 
       {leading}
-      <span className={ITEM_LABEL}>{label}</span>
+      <span className={sans ? ITEM_LABEL_SANS : ITEM_LABEL}>{label}</span>
       {badge !== undefined && <span className={BADGE}>{badge}</span>}
       {trailing}
     </div>

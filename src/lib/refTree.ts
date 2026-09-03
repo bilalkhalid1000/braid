@@ -105,3 +105,12 @@ export function visibleNodes<T>(
 export function hasFolders<T>(nodes: RefNode<T>[]): boolean {
   return nodes.some((node) => node.kind === "folder");
 }
+
+/** How many refs a folder holds, however deep.
+ *
+ *  Shown beside the folder the way a section shows its count, so the right
+ *  gutter means one thing all the way down: what is inside. */
+export function leafCount<T>(node: RefNode<T>): number {
+  if (node.kind === "leaf") return 1;
+  return node.children.reduce((sum, child) => sum + leafCount(child), 0);
+}

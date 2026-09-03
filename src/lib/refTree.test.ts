@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { groupRefs, hasFolders, visibleNodes, type RefNode } from "./refTree";
+import { groupRefs, hasFolders, visibleNodes, type RefNode, leafCount } from "./refTree";
 
 const name = (n: string) => n;
 const tree = (names: string[]) => groupRefs(names, name);
@@ -131,5 +131,20 @@ describe("hasFolders", () => {
   it("tells a flat list from a nested one", () => {
     expect(hasFolders(tree(["main", "develop"]))).toBe(false);
     expect(hasFolders(tree(["feature/login"]))).toBe(true);
+  });
+});
+
+describe("leafCount", () => {
+  it("counts the refs inside a folder, however deep", () => {
+    const tree = groupRefs(["a/one", "a/two", "a/deep/three", "b"], (name) => name);
+    const a = tree.find((node) => node.kind === "folder" && node.label === "a")!;
+
+    expect(leafCount(a)).toBe(3);
+  });
+
+  it("counts a ref on its own as one", () => {
+    const [b] = groupRefs(["b"], (name) => name);
+
+    expect(leafCount(b!)).toBe(1);
   });
 });
