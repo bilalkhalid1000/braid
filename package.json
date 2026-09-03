@@ -2,6 +2,17 @@
   "name": "braid",
   "private": true,
   "version": "0.1.0-alpha.5",
+  "description": "A fast, keyboard-first Git client",
+  "author": {
+    "name": "Bilal Khalid",
+    "email": "bilalkhalid1000@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bilalkhalid1000/braid.git"
+  },
+  "homepage": "https://github.com/bilalkhalid1000/braid",
   "type": "module",
   "scripts": {
     "dev": "vite",

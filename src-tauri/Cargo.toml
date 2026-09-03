@@ -2,7 +2,10 @@
 name = "braid"
 version = "0.1.0-alpha.5"
 description = "A fast, keyboard-first Git GUI"
-authors = ["you"]
+authors = ["Bilal Khalid <bilalkhalid1000@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/bilalkhalid1000/braid"
+homepage = "https://github.com/bilalkhalid1000/braid"
 edition = "2021"
 
 [lib]

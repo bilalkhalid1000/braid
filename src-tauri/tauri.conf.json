@@ -41,7 +41,14 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "publisher": "Bilal Khalid",
+    "copyright": "Copyright 2026 Bilal Khalid",
+    "shortDescription": "A fast, keyboard-first Git client",
+    "longDescription": "Braid is a Git client that keeps lazygit's keyboard model and adds a real interface: a lane graph for history, staging by hunk and line, blame, search, git flow, worktrees and submodules. Every action runs through your own git, so hooks, credential helpers and signing behave as they do in your terminal.",
+    "homepage": "https://github.com/bilalkhalid1000/braid",
+    "license": "MIT",
+    "category": "DeveloperTool"
   },
   "plugins": {
     "updater": {
