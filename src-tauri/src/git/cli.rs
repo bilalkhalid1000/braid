@@ -64,7 +64,7 @@ impl Git {
     }
 
     fn command(&self, args: &[&str]) -> Command {
-        let mut cmd = Command::new("git");
+        let mut cmd = crate::system::system_command("git");
         cmd.current_dir(&self.workdir);
 
         // Never take the index lock for a read. Without this, our background

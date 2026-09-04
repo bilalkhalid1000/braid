@@ -3,7 +3,6 @@ use std::process::Stdio;
 
 use serde::Serialize;
 use tokio::io::{AsyncReadExt, BufReader};
-use tokio::process::Command;
 
 use crate::error::{AppError, Result};
 
@@ -49,7 +48,7 @@ pub async fn clone(
         tokio::fs::create_dir_all(parent).await?;
     }
 
-    let mut command = Command::new("git");
+    let mut command = crate::system::system_command("git");
     command
         // Without this git writes no progress at all: it suppresses it when
         // stderr is a pipe rather than a terminal, which is exactly our case.

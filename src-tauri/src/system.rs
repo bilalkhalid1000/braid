@@ -370,7 +370,7 @@ pub async fn open_terminal(path: &str, choice: &str, custom: &str) -> Result<Str
 }
 
 async fn spawn(program: &str, args: &[String], cwd: &str) -> Result<()> {
-    Command::new(program)
+    system_command(program)
         .args(args)
         .current_dir(native_path(cwd))
         .stdin(Stdio::null())
@@ -382,6 +382,50 @@ async fn spawn(program: &str, args: &[String], cwd: &str) -> Result<()> {
             code: -1,
             stderr: format!("Could not launch {program}: {e}"),
         })
+}
+
+/// A command for a program that is not part of our bundle.
+///
+/// An AppImage runs us with `LD_LIBRARY_PATH`, `GTK_PATH` and friends pointed
+/// at the copies of glibc-adjacent libraries it ships. Anything we spawn
+/// inherits them — and git, an editor or a terminal is a *system* binary, so
+/// it ends up loading our bundled libnghttp2 against the system's libcurl and
+/// dies at the first fetch. Hand every spawned program the environment it
+/// would have had if we had never been an AppImage.
+pub(crate) fn system_command(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+
+    // Set only inside an AppImage; everywhere else there is nothing to undo.
+    let Ok(appdir) = std::env::var("APPDIR") else {
+        return cmd;
+    };
+
+    for (key, value) in std::env::vars() {
+        match without_appdir(&value, &appdir) {
+            None => {}
+            Some(rest) if rest.is_empty() => {
+                cmd.env_remove(&key);
+            }
+            Some(rest) => {
+                cmd.env(&key, rest);
+            }
+        }
+    }
+
+    cmd
+}
+
+/// The `:`-separated entries of `value` that did not come out of the bundle.
+///
+/// `None` means nothing did and the variable should be left alone — which is
+/// most of them, including values that are not paths at all.
+fn without_appdir(value: &str, appdir: &str) -> Option<String> {
+    let kept: Vec<&str> = value
+        .split(':')
+        .filter(|entry| !entry.starts_with(appdir))
+        .collect();
+
+    (kept.len() != value.split(':').count()).then(|| kept.join(":"))
 }
 
 #[cfg(test)]
@@ -662,6 +706,22 @@ mod tests {
         for (program, _) in terminal_commands("/tmp") {
             assert!(!program.is_empty());
         }
+    }
+
+    #[test]
+    fn only_bundle_paths_are_stripped_from_the_environment() {
+        assert_eq!(
+            without_appdir("/tmp/.mount_Braid/usr/lib:/usr/lib", "/tmp/.mount_Braid"),
+            Some("/usr/lib".to_string())
+        );
+        // Nothing left means the variable itself has to go.
+        assert_eq!(
+            without_appdir("/tmp/.mount_Braid/usr/lib", "/tmp/.mount_Braid"),
+            Some(String::new())
+        );
+        assert_eq!(without_appdir("/usr/lib", "/tmp/.mount_Braid"), None);
+        // Not every variable is a path list.
+        assert_eq!(without_appdir("Adwaita", "/tmp/.mount_Braid"), None);
     }
 }
 
