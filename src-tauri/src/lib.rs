@@ -33,6 +33,16 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
 
+            // Before the window is shown, so it never flashes a bar it is
+            // about to lose. Linux only: elsewhere the system's own frame is
+            // the right one.
+            #[cfg(target_os = "linux")]
+            if let Some(window) = handle.get_webview_window("main") {
+                let stored = settings::load_blocking(&handle);
+                let desktop = std::env::var("XDG_CURRENT_DESKTOP").ok();
+                let _ = window.set_decorations(settings::wants_title_bar(&stored, desktop.as_deref()));
+            }
+
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(Duration::from_secs(5)).await;
 

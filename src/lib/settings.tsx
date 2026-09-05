@@ -26,6 +26,10 @@ export interface Settings {
   ignoreWhitespace: boolean;
   /** One column with + and -, or the old and new side by side. */
   diffLayout: "unified" | "split";
+  /** Linux only: a title bar of the window's own, on Wayland where GTK
+   *  would otherwise draw one. "auto" drops it on compositors that frame
+   *  windows themselves. Read by the backend before the window is shown. */
+  titleBar: "auto" | "shown" | "hidden";
   /** Linux only: draw with the CPU rather than the GPU. On by default, since
    *  it measured better on every axis there -- memory, GPU memory, and CPU
    *  while scrolling. Read by the backend before the window exists, so it
@@ -68,6 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ignoreWhitespace: false,
   diffLayout: "unified",
   lowMemoryRendering: true,
+  titleBar: "auto",
   historyPageSize: 300,
   autoFetchMinutes: 5,
   // Every branch and tag, which is what a history view is usually opened to

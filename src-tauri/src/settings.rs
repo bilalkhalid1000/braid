@@ -39,6 +39,40 @@ pub async fn load(app: &AppHandle) -> Value {
     serde_json::from_str(&text).unwrap_or_else(|_| Value::Object(Default::default()))
 }
 
+/// Whether the window should carry a title bar of its own.
+///
+/// GTK on Wayland always draws one, a strip with the app's name over a
+/// window that already has a tab strip there. On a compositor that draws
+/// its own decorations, or none, the bar is only in the way, so "auto" drops
+/// it where the desktop says it is one of those. GNOME and the like keep it,
+/// since without it there would be no close button. The setting overrides
+/// either way; it is read before the window is shown.
+pub fn wants_title_bar(settings: &Value, desktop: Option<&str>) -> bool {
+    match settings["titleBar"].as_str() {
+        Some("shown") => true,
+        Some("hidden") => false,
+        _ => !decorates_itself(desktop.unwrap_or_default()),
+    }
+}
+
+/// Desktops whose compositor tiles and frames windows on its own.
+fn decorates_itself(desktop: &str) -> bool {
+    desktop
+        .split(':')
+        .map(|d| d.trim().to_ascii_lowercase())
+        .any(|d| matches!(d.as_str(), "hyprland" | "sway" | "river" | "niri" | "dwl" | "mango" | "labwc"))
+}
+
+/// The stored settings, read synchronously: for the moment before the window
+/// exists, when the async store is not yet convenient.
+pub fn load_blocking(app: &AppHandle) -> Value {
+    store_path(app)
+        .ok()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_else(|| Value::Object(Default::default()))
+}
+
 pub async fn save(app: &AppHandle, settings: &Value) -> Result<()> {
     let path = store_path(app)?;
 
@@ -51,4 +85,25 @@ pub async fn save(app: &AppHandle, settings: &Value) -> Result<()> {
 
     tokio::fs::write(&path, text).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn auto_drops_the_bar_only_where_the_desktop_frames_windows_itself() {
+        let auto = serde_json::json!({});
+        assert!(!wants_title_bar(&auto, Some("Hyprland")));
+        assert!(!wants_title_bar(&auto, Some("sway")));
+        assert!(wants_title_bar(&auto, Some("GNOME")));
+        assert!(wants_title_bar(&auto, Some("KDE")));
+        assert!(wants_title_bar(&auto, None));
+    }
+
+    #[test]
+    fn the_setting_overrides_the_desktop() {
+        assert!(wants_title_bar(&serde_json::json!({"titleBar": "shown"}), Some("Hyprland")));
+        assert!(!wants_title_bar(&serde_json::json!({"titleBar": "hidden"}), Some("GNOME")));
+    }
 }

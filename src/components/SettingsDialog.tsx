@@ -416,6 +416,19 @@ function GeneralSection() {
       (restoreTabs) => update({ restoreTabs }),
     ),
 
+    selectRow(
+      "titleBar",
+      "Window title bar",
+      "Linux only. On a compositor that frames windows itself, Hyprland or sway for instance, the bar with the app's name is only in the way and Automatic leaves it out. On GNOME it stays, since it holds the close button. Takes effect the next time the app starts.",
+      settings.titleBar,
+      [
+        { value: "auto", label: "Automatic" },
+        { value: "shown", label: "Shown" },
+        { value: "hidden", label: "Hidden" },
+      ],
+      (titleBar) => update({ titleBar: titleBar as Settings["titleBar"] }),
+    ),
+
     toggleRow(
       "lowMemoryRendering",
       "Draw with the CPU",

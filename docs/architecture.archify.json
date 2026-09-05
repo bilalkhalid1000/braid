@@ -1,0 +1,301 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Braid",
+    "subtitle": "A WebView for the UI, one Rust process for every repository, your own git for the work",
+    "output": "docs/architecture.html"
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "You",
+      "sublabel": "keyboard first",
+      "pos": [
+        40,
+        300
+      ],
+      "size": [
+        120,
+        60
+      ]
+    },
+    {
+      "id": "catalog",
+      "type": "frontend",
+      "label": "Command catalog",
+      "sublabel": "keys \u00b7 palette \u00b7 key strip",
+      "pos": [
+        210,
+        140
+      ],
+      "size": [
+        170,
+        60
+      ],
+      "tag": "one source"
+    },
+    {
+      "id": "webview",
+      "type": "frontend",
+      "label": "WebView",
+      "sublabel": "React \u00b7 TanStack Query",
+      "pos": [
+        210,
+        300
+      ],
+      "size": [
+        170,
+        60
+      ],
+      "tag": "virtualized lists"
+    },
+    {
+      "id": "settings",
+      "type": "cloud",
+      "label": "settings.json",
+      "sublabel": "keymap \u00b7 custom commands",
+      "pos": [
+        210,
+        460
+      ],
+      "size": [
+        170,
+        60
+      ]
+    },
+    {
+      "id": "ipc",
+      "type": "messagebus",
+      "label": "Tauri IPC",
+      "sublabel": "commands in, events out",
+      "pos": [
+        430,
+        300
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "registry",
+      "type": "backend",
+      "label": "RepoRegistry",
+      "sublabel": "one session per tab",
+      "pos": [
+        640,
+        300
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "tag": "N repos, 1 process"
+    },
+    {
+      "id": "watcher",
+      "type": "backend",
+      "label": "Watcher",
+      "sublabel": "inotify, only what git does not ignore",
+      "pos": [
+        640,
+        140
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "tag": "never polls"
+    },
+    {
+      "id": "runner",
+      "type": "security",
+      "label": "Git runner",
+      "sublabel": "reads free, writes one at a time",
+      "pos": [
+        640,
+        460
+      ],
+      "size": [
+        160,
+        60
+      ],
+      "tag": "write lock"
+    },
+    {
+      "id": "git",
+      "type": "external",
+      "label": "git",
+      "sublabel": "yours: hooks, signing, credentials",
+      "pos": [
+        880,
+        460
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "fsmonitor",
+      "type": "external",
+      "label": "fsmonitor daemon",
+      "sublabel": "git's own; status asks it",
+      "pos": [
+        1110,
+        140
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "repo",
+      "type": "cloud",
+      "label": "Repository",
+      "sublabel": ".git and the worktree",
+      "pos": [
+        1110,
+        300
+      ],
+      "size": [
+        150,
+        60
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "WebView process",
+      "wraps": [
+        "catalog",
+        "webview",
+        "settings"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Rust backend, one process for every open repository",
+      "wraps": [
+        "registry",
+        "watcher",
+        "runner"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "user",
+      "to": "webview",
+      "label": "keys",
+      "variant": "emphasis"
+    },
+    {
+      "from": "catalog",
+      "to": "webview",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "settings",
+      "to": "webview",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "variant": "dashed"
+    },
+    {
+      "from": "webview",
+      "to": "ipc",
+      "label": "invoke",
+      "variant": "emphasis"
+    },
+    {
+      "from": "ipc",
+      "to": "registry",
+      "variant": "emphasis"
+    },
+    {
+      "from": "registry",
+      "to": "runner",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "variant": "emphasis"
+    },
+    {
+      "from": "runner",
+      "to": "git",
+      "label": "spawn",
+      "variant": "emphasis"
+    },
+    {
+      "from": "git",
+      "to": "repo",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "variant": "emphasis"
+    },
+    {
+      "from": "repo",
+      "to": "watcher",
+      "fromSide": "left",
+      "toSide": "right",
+      "variant": "dashed",
+      "label": "file events"
+    },
+    {
+      "from": "watcher",
+      "to": "ipc",
+      "fromSide": "left",
+      "toSide": "top",
+      "variant": "dashed",
+      "label": "repo changed"
+    },
+    {
+      "from": "registry",
+      "to": "watcher",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "from": "repo",
+      "to": "fsmonitor",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "variant": "dashed",
+      "label": "watched"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Never polls",
+      "items": [
+        "File changes arrive from inotify and git's fsmonitor daemon, debounced, and refresh only what changed",
+        "The watcher stops at what git ignores: 765 watches for nine repositories, not 54,010",
+        "Idle with nine repositories open: 0 % CPU"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Your git does the work",
+      "items": [
+        "Every write shells out to the git on your PATH, so hooks, signing, credential helpers and LFS behave as in your terminal",
+        "One writing command at a time per repository; reads never wait",
+        "Interactive rebase is planned in the UI and handed to git as its own todo file"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Keyboard first",
+      "items": [
+        "One command catalog drives the palette, the key strip and the settings",
+        "Every list is virtualized, so 200k commits cost what 20 do",
+        "The window shows in half a second; a keystroke that closes a dialog cannot reach the list behind it"
+      ]
+    }
+  ]
+}

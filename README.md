@@ -1,11 +1,13 @@
 # Braid
 
 ![alpha](https://img.shields.io/badge/status-alpha-orange)
-![tests](https://img.shields.io/badge/tests-275%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-760%2B%20passing-brightgreen)
 
 A fast, keyboard-first Git GUI.
 
 Built because SourceTree becomes unusable with several repositories open at once.
+
+![Braid: the file status with a diff, the history with its graph, the menus and the key strip](docs/demo.gif)
 
 > **Alpha.** Usable daily, but early. Every write goes through your own `git`, so
 > nothing here invents a storage format of its own — but keep a backup of anything
@@ -13,6 +15,20 @@ Built because SourceTree becomes unusable with several repositories open at once
 
 See [PLAN.md](./PLAN.md) for the architecture, the performance rules the design
 is built around, and the phased roadmap.
+
+## Architecture
+
+![A WebView for the UI, one Rust process for every repository, your own git for the work](docs/architecture.png)
+
+Keys reach a React WebView, which talks to one Rust process over Tauri IPC.
+That process holds a session per open repository: a watcher on the
+directories git does not ignore, and a git runner that lets reads through
+freely and writes one at a time. Every write is your own `git`, so hooks,
+signing and credential helpers behave as they do in your terminal. Changes
+come back as events, never by polling.
+
+The diagram is [`docs/architecture.archify.json`](docs/architecture.archify.json),
+rendered with [archify](https://github.com/tt-a1i/archify).
 
 ## Status
 
