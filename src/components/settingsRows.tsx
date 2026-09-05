@@ -232,7 +232,7 @@ export function numberRow(
     control: (
       <input
         type="number"
-        className={`${FIELD} w-24 text-right`}
+        className={`${FIELD} w-[104px] text-right`}
         min={bounds.min}
         max={bounds.max}
         step={bounds.step}
