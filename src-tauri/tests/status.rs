@@ -2,6 +2,8 @@
 
 mod common;
 
+use braid_lib::watcher::ignored_dirs;
+
 use braid_lib::git::status::EntryKind;
 use braid_lib::git::{status, RepoState};
 use common::TestRepo;
@@ -164,4 +166,19 @@ async fn ignored_files_are_not_reported_as_untracked() {
 
     assert_eq!(result.untracked_count, 0);
     assert!(!result.entries.iter().any(|e| e.path.starts_with("ignored/")));
+}
+
+#[tokio::test]
+async fn the_ignored_directories_come_from_the_repository_rules() {
+    let repo = TestRepo::new();
+    repo.write(".gitignore", "build/\n*.log\n");
+    std::fs::create_dir_all(repo.path().join("build/out")).unwrap();
+    repo.write("build/out/a.js", "x\n");
+    repo.write("noise.log", "x\n");
+    std::fs::create_dir_all(repo.path().join("src")).unwrap();
+    repo.write("src/main.rs", "fn main() {}\n");
+
+    let dirs = ignored_dirs(repo.git_api()).await;
+
+    assert_eq!(dirs, vec![repo.path().join("build")]);
 }

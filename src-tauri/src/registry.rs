@@ -62,17 +62,22 @@ impl RepoRegistry {
             root: root.display().to_string(),
         };
 
+        // One runner for the session, shared with the watcher: the write
+        // lock inside it is what keeps the two from stepping on each other.
+        let git = Git::new(&root);
+
         let watcher = {
             let app = app.clone();
             let id = id.clone();
-            RepoWatcher::start(root.clone(), move || {
+            let ignored = crate::watcher::ignored_dirs(&git).await;
+            RepoWatcher::start(root.clone(), git.clone(), ignored, move || {
                 let _ = app.emit(REPO_CHANGED_EVENT, &id);
             })?
         };
 
         let session = Arc::new(RepoSession {
             info: info.clone(),
-            git: Git::new(&root),
+            git,
             _watcher: watcher,
         });
 

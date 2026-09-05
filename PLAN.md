@@ -189,8 +189,10 @@ and 63 MB with nine. It was 104 MB with nine before the watcher was changed:
 on Linux a recursive inotify watch takes one watch per directory, and one
 Node project had 8,452 of them, 66 outside node_modules and the like. Nine
 repositories held 54,010 watches; walking the tree and stopping at the
-directories whose events were dropped anyway brought that to 1,237, at about
-5 MB less per repository and no directory walk of node_modules at open.
+directories git ignores, plus a short list of names it usually should, brought
+that to 765, at about 5 MB less per repository and no directory walk of
+node_modules at open. The ignore rules are asked of git once, when the
+repository opens; a directory created later is checked before it is watched.
 
 Still to measure: history scroll frame times, and the same set against
 SourceTree and lazygit.

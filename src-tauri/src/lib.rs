@@ -6,7 +6,7 @@ mod library;
 mod session;
 mod settings;
 mod system;
-mod watcher;
+pub mod watcher;
 
 use std::time::Duration;
 

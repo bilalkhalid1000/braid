@@ -6,6 +6,7 @@ use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::mpsc;
 
 use crate::error::{AppError, Result};
+use crate::git::Git;
 
 /// How long to wait for a burst of filesystem events to settle before acting.
 ///
@@ -16,8 +17,9 @@ const DEBOUNCE: Duration = Duration::from_millis(60);
 /// Directory names whose contents never change git state in a way the user
 /// cares about, but which produce enormous event volume.
 ///
-/// This is a heuristic stand-in. The real fix is reading the repo's `.gitignore`
-/// and deriving the skip set from it; that is Phase 5 work.
+/// A backstop behind the repository's own ignore rules, which are what
+/// actually decide: see `ignored_dirs`. This list still matters for a
+/// project that forgot to ignore its node_modules.
 const NOISY_DIRS: &[&str] = &[
     "node_modules",
     "target",
@@ -56,18 +58,52 @@ pub struct RepoWatcher {
     _watcher: Arc<Mutex<RecommendedWatcher>>,
 }
 
+/// The directories git ignores in this repository, as absolute paths.
+///
+/// Asked of git rather than read from .gitignore, so every rule counts:
+/// nested ignore files, `.git/info/exclude`, the global excludes file.
+/// Taken once, at open. ponytail: a rule added later is not seen until the
+/// repository is reopened; the noisy-name backstop covers the usual case.
+pub async fn ignored_dirs(git: &Git) -> Vec<PathBuf> {
+    let out = git
+        .run_str(&[
+            "ls-files",
+            "--others",
+            "--ignored",
+            "--exclude-standard",
+            "--directory",
+            "-z",
+        ])
+        .await
+        .unwrap_or_default();
+
+    out.split('\0')
+        // With --directory an ignored directory is listed once, with a
+        // trailing slash, in place of everything under it. Ignored files
+        // come without one and are not worth a rule each.
+        .filter(|entry| entry.ends_with('/'))
+        .map(|entry| git.workdir().join(entry.trim_end_matches('/')))
+        .collect()
+}
+
 impl RepoWatcher {
-    pub fn start<F>(root: PathBuf, on_change: F) -> Result<Self>
+    pub fn start<F>(root: PathBuf, git: Git, ignored: Vec<PathBuf>, on_change: F) -> Result<Self>
     where
         F: Fn() + Send + Sync + 'static,
     {
         let (tx, mut rx) = mpsc::unbounded_channel::<Event>();
         let filter_root = root.clone();
+        let ignored = Arc::new(ignored);
+        let filter_ignored = Arc::clone(&ignored);
 
         let watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
             let Ok(event) = res else { return };
 
-            if event.paths.iter().any(|p| is_relevant(p, &filter_root)) {
+            if event
+                .paths
+                .iter()
+                .any(|p| is_relevant(p, &filter_root) && !under_any(p, &filter_ignored))
+            {
                 // Send failure just means the app is shutting down.
                 let _ = tx.send(event);
             }
@@ -85,7 +121,7 @@ impl RepoWatcher {
             // per-user limit with several open.
             let mut w = watcher.lock().unwrap();
             let mut first = true;
-            for dir in dirs_to_watch(&root) {
+            for dir in dirs_to_watch(&root, &ignored) {
                 let result = w.watch(&dir, RecursiveMode::NonRecursive);
                 if first {
                     result.map_err(|e| AppError::Watch(e.to_string()))?;
@@ -120,16 +156,32 @@ impl RepoWatcher {
                 // A directory made since the walk has no watch yet, and
                 // nothing inside it would be seen. Given one, and its
                 // children too, because an unpacked tree arrives all at once.
+                // Unless git ignores it: a fresh node_modules is exactly the
+                // thing not to start watching.
                 if cfg!(target_os = "linux") {
-                    let mut w = adder.lock().unwrap();
-                    for event in &burst {
-                        if !matches!(event.kind, EventKind::Create(_)) {
+                    let created: Vec<PathBuf> = burst
+                        .iter()
+                        .filter(|event| matches!(event.kind, EventKind::Create(_)))
+                        .flat_map(|event| event.paths.iter().cloned())
+                        .filter(|p| p.is_dir())
+                        .collect();
+
+                    for path in created {
+                        let rel = path.to_string_lossy().into_owned();
+                        // Exit 0 means ignored; 1 means not; anything else is
+                        // git failing, and then the directory is watched, which
+                        // errs towards seeing changes.
+                        let is_ignored = git
+                            .run_allowing(&["check-ignore", "-q", "--", &rel], &[])
+                            .await
+                            .is_ok();
+                        if is_ignored {
                             continue;
                         }
-                        for path in event.paths.iter().filter(|p| p.is_dir()) {
-                            for dir in dirs_to_watch(path) {
-                                let _ = w.watch(&dir, RecursiveMode::NonRecursive);
-                            }
+
+                        let mut w = adder.lock().unwrap();
+                        for dir in dirs_to_watch(&path, &ignored) {
+                            let _ = w.watch(&dir, RecursiveMode::NonRecursive);
                         }
                     }
                 }
@@ -142,12 +194,17 @@ impl RepoWatcher {
     }
 }
 
+/// Whether `path` is `dir` or inside it, for any of `dirs`.
+fn under_any(path: &Path, dirs: &[PathBuf]) -> bool {
+    dirs.iter().any(|dir| path.starts_with(dir))
+}
+
 /// The directories worth a watch of their own under `root`, `root` first.
 ///
-/// Stops at the noisy directories, whose events would be dropped, and inside
-/// `.git` takes only the directory itself and `refs`: `objects` churns on
-/// every fetch and never says anything the UI shows.
-pub fn dirs_to_watch(root: &Path) -> Vec<PathBuf> {
+/// Stops at the ignored and the noisy directories, whose events would be
+/// dropped, and inside `.git` takes only the directory itself and `refs`:
+/// `objects` churns on every fetch and never says anything the UI shows.
+pub fn dirs_to_watch(root: &Path, ignored: &[PathBuf]) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let mut stack = vec![root.to_path_buf()];
 
@@ -172,7 +229,7 @@ pub fn dirs_to_watch(root: &Path) -> Vec<PathBuf> {
                 stack_all(&path.join("refs"), &mut out);
                 continue;
             }
-            if NOISY_DIRS.contains(&name.as_str()) {
+            if NOISY_DIRS.contains(&name.as_str()) || under_any(&path, ignored) {
                 continue;
             }
             stack.push(path);
@@ -271,13 +328,15 @@ mod tests {
             "node_modules/react/cjs",
             "packages/app/node_modules/x",
             "packages/app/src",
+            "coverage/lcov-report",
             ".git/objects/ab",
             ".git/refs/heads/feature",
         ] {
             std::fs::create_dir_all(base.join(dir)).unwrap();
         }
 
-        let dirs = dirs_to_watch(&base);
+        // What git would have said it ignores: a name not on the noisy list.
+        let dirs = dirs_to_watch(&base, &[base.join("coverage")]);
         let rel: Vec<String> = dirs
             .iter()
             .map(|d| d.strip_prefix(&base).unwrap().to_string_lossy().replace('\\', "/"))
@@ -298,6 +357,7 @@ mod tests {
             assert!(rel.contains(&expected.to_string()), "missing {expected} in {rel:?}");
         }
         assert!(!rel.iter().any(|r| r.contains("node_modules")), "{rel:?}");
+        assert!(!rel.iter().any(|r| r.contains("coverage")), "{rel:?}");
         assert!(!rel.iter().any(|r| r.contains("objects")), "{rel:?}");
 
         let _ = std::fs::remove_dir_all(&base);
