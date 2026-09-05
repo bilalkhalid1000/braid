@@ -90,14 +90,30 @@ export const CommitGraph = memo(function CommitGraph({ row, lanes, height, isHea
       {ordered(row.up).map((link, i) => draw(link, `u${i}`, 0, middle))}
       {ordered(row.down).map((link, i) => draw(link, `d${i}`, middle, height))}
 
+      {/* The same accent ring the sidebar puts beside the checked-out branch,
+          so HEAD reads as the same mark in both places. A ring rather than a
+          bigger dot: a slightly larger dot in the lane's own colour was
+          indistinguishable from its neighbours. */}
+      {isHead && (
+        <circle
+          cx={x(row.lane)}
+          cy={middle}
+          // Outer edge exactly at the lane's edge, so the ring is whole in the
+          // first and last lanes rather than clipped flat by the svg.
+          r={LANE_WIDTH / 2 - 0.75}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth={1.5}
+        />
+      )}
       <circle
         cx={x(row.lane)}
         cy={middle}
-        r={isHead ? NODE_RADIUS + 1.5 : NODE_RADIUS}
+        r={NODE_RADIUS}
         // A merge is hollow: it is a join, not a new piece of work.
         fill={row.isMerge ? "var(--surface)" : laneColor(row.color)}
         stroke={laneColor(row.color)}
-        strokeWidth={row.isMerge || isHead ? 2 : 0}
+        strokeWidth={row.isMerge ? 2 : 0}
       />
     </svg>
   );

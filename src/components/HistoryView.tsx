@@ -37,13 +37,20 @@ const DETAIL =
 /** Enough for a trunk and a couple of branches; the rest is a drag away. */
 const DEFAULT_GRAPH_WIDTH = 130;
 
+/** How far down the walk goes looking for HEAD before giving up. */
+const REVEAL_PAGES = 10;
+
 interface Props {
   repoId: string;
   headOid: string | null;
   /** False while a sidebar panel holds the keyboard. */
   keyboardActive: boolean;
-  /** A commit to select when it arrives — set by a search result. */
+  /** A commit to select when it arrives — set by a search result or a click
+   *  on a branch. */
   focusOid?: string | null;
+  /** The commit was selected. The owner clears its request here, so the same
+   *  one can be asked for again and a later page load does not re-select it. */
+  onFocused?: () => void;
   /** Right-click on a commit. The menu itself belongs to the app, which is
    *  what knows how to run the things on it. */
   onCommitMenu: (commit: Commit, at: { x: number; y: number }) => void;
@@ -58,6 +65,7 @@ export function HistoryView({
   headOid,
   keyboardActive,
   focusOid,
+  onFocused,
   onCommitMenu,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -126,19 +134,51 @@ export function HistoryView({
     }
   };
 
+  // Reads the next page when a commit asked for is not loaded yet. History
+  // reads newest first, so an old commit may be several pages down.
+  // ponytail: walks up to REVEAL_PAGES pages, then gives up rather than
+  // pulling a whole 200k-commit history for a detached HEAD.
+  const walkFurther = () => {
+    const pages = log.data?.pages.length ?? 0;
+    if (pages < REVEAL_PAGES && log.hasNextPage && !log.isFetchingNextPage) {
+      void log.fetchNextPage();
+    }
+  };
+
   // A commit asked for from elsewhere, selected once the page holding it has
-  // loaded. History reads newest first, so an old commit may be several pages
-  // down; this waits rather than guessing, and does nothing if it never
-  // arrives.
+  // loaded.
   useEffect(() => {
     if (!focusOid) return;
 
     const at = commits.findIndex((commit) => commit.oid === focusOid);
-    if (at === -1) return;
+    if (at === -1) {
+      walkFurther();
+      return;
+    }
 
+    toCommits();
     setSelected(commits[at]!);
     virtualizer.scrollToIndex(at, { align: "center" });
-  }, [focusOid, commits, virtualizer]);
+    onFocused?.();
+  }, [focusOid, commits, log, virtualizer]);
+
+  // HEAD scrolled into view whenever it moves, so a checkout to a branch far
+  // down the list shows where you landed. Selection is left alone: checking
+  // out is not choosing a commit to read. Remembered by hash rather than done
+  // once, so a later page load does not drag the view back.
+  const shownHead = useRef<string | null>(null);
+  useEffect(() => {
+    if (!headOid || shownHead.current === headOid) return;
+
+    const at = commits.findIndex((commit) => commit.oid === headOid);
+    if (at === -1) {
+      walkFurther();
+      return;
+    }
+
+    shownHead.current = headOid;
+    virtualizer.scrollToIndex(at, { align: "auto" });
+  }, [headOid, commits, log, virtualizer]);
 
   // Picking a different commit puts the keyboard back on the commit list: the
   // file list under it has just been replaced by another commit's.
@@ -243,10 +283,15 @@ export function HistoryView({
               return (
                 <div
                   key={item.key}
-                  data-selected={commit.oid === selected?.oid}
+                  // The graph's casing follows the fill, so HEAD counts too.
+                  data-selected={commit.oid === selected?.oid || commit.oid === headOid}
                   className={[
                     ROW,
-                    commit.oid === selected?.oid
+                    // The checked-out commit wears the same fill and edge as
+                    // the checked-out branch in the sidebar: that fill means
+                    // "current" there, and now here. The cursor is the inset
+                    // outline, in both places, so the two never collide.
+                    commit.oid === selected?.oid || commit.oid === headOid
                       ? "bg-select border-l-accent"
                       : "border-l-transparent hover:bg-surface-alt",
                     commit.oid === selected?.oid &&
@@ -281,9 +326,20 @@ export function HistoryView({
                       the values under it. */}
                   <span />
 
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                  {/* The checked-out commit is set in bold as well as ringed
+                      in the graph: the ring can sit in a folded lane. */}
+                  <span
+                    className={
+                      "overflow-hidden text-ellipsis whitespace-nowrap" +
+                      (commit.oid === headOid ? " font-semibold" : "")
+                    }
+                  >
                     {commit.refs.map((ref) => (
-                      <span key={ref} className={`ref-chip ${chipClass(ref)}`}>
+                      <span
+                        key={ref}
+                        className={`ref-chip ${chipClass(ref)}`}
+                        {...(ref.startsWith("HEAD ->") ? tip("Current branch") : {})}
+                      >
                         {ref.replace("HEAD -> ", "")}
                       </span>
                     ))}

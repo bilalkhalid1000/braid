@@ -2118,6 +2118,11 @@ The stashed changes are discarded.`,
               submodules={submodules.data}
               view={view}
               onCheckout={(name) => act(`Check out ${name}`, () => api.checkout(id, name))}
+              // Only while history is showing: a click on a branch is not a
+              // request to leave the file list.
+              onReveal={(oid) => {
+                if (view === "history") setHistoryFocus(oid);
+              }}
               onPublish={publishBranch}
               onStash={(selector, action) =>
                 act(
@@ -2236,6 +2241,7 @@ The stashed changes are discarded.`,
                   repoId={id}
                   headOid={head?.headOid ?? null}
                   focusOid={historyFocus}
+                  onFocused={() => setHistoryFocus(null)}
                   keyboardActive={!isSidebarPanel(focusedPanel) && !inputOpen}
                   onCommitMenu={openCommitMenu}
                 />

@@ -74,6 +74,9 @@ interface Props {
   keyboardActive: boolean;
   onFocusPanel: (panel: PanelId) => void;
   onCheckout: (name: string) => void;
+  /** A branch was clicked: show the commit it points at, where that means
+   *  something. */
+  onReveal: (oid: string) => void;
   onPublish: (name: string) => void;
   onStash: (selector: string, action: "apply" | "pop" | "drop") => void;
   onOpenPath: (path: string) => void;
@@ -163,6 +166,7 @@ export function Sidebar({
   keyboardActive,
   onFocusPanel,
   onCheckout,
+  onReveal,
   onPublish,
   onStash,
   onOpenPath,
@@ -440,6 +444,7 @@ export function Sidebar({
                 ? `${branch.name} (current)`
                 : `${branch.name} – double-click or Enter to check out`
             }
+            onClick={() => onReveal(branch.oid)}
             onDoubleClick={() => onCheckout(branch.name)}
             onContextMenu={(e) => onMenu({ kind: "branch", branch }, { x: e.clientX, y: e.clientY })}
             trailing={

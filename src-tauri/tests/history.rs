@@ -107,6 +107,9 @@ async fn branches_are_listed_with_the_current_one_marked() {
     assert_eq!(snapshot.branches.len(), 2);
     let head = snapshot.branches.iter().find(|b| b.is_head).unwrap();
     assert_eq!(head.name, "main");
+    // The full hash, because the history view finds a branch's tip by
+    // comparing it with the full hashes it lists. An abbreviation never matched.
+    assert_eq!(head.oid.len(), 40);
 }
 
 #[tokio::test]

@@ -43,7 +43,7 @@ pub struct RefsSnapshot {
 
 /// Tab is safe as a field separator: git refnames cannot contain one.
 const BRANCH_FORMAT: &str =
-    "--format=%(refname:short)\t%(HEAD)\t%(upstream:short)\t%(upstream:track)\t%(objectname:short)";
+    "--format=%(refname:short)\t%(HEAD)\t%(upstream:short)\t%(upstream:track)\t%(objectname)";
 
 pub async fn refs(git: &Git) -> Result<RefsSnapshot> {
     let (branches, remotes, tags, stashes) = tokio::try_join!(
