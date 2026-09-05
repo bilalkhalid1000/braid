@@ -602,3 +602,34 @@ async fn ignoring_twice_writes_once() {
 
     assert_eq!(repo.read(".gitignore"), "/build.log\n");
 }
+
+// --- one write at a time ---------------------------------------------------
+
+#[tokio::test]
+async fn writes_started_together_take_turns() {
+    // Without a lock, concurrent `add`s collide on the index lock and some
+    // fail with "Unable to create index.lock". With one, every one lands.
+    let repo = TestRepo::new();
+    let git = repo.git_api().clone();
+
+    let names: Vec<String> = (0..8).map(|i| format!("file-{i}.txt")).collect();
+    for name in &names {
+        repo.write(name, "x\n");
+    }
+
+    let tasks: Vec<_> = names
+        .iter()
+        .map(|name| {
+            let git = git.clone();
+            let name = name.clone();
+            tokio::spawn(async move { git.run(&["add", &name]).await.map(|_| ()) })
+        })
+        .collect();
+
+    for task in tasks {
+        task.await.unwrap().unwrap();
+    }
+
+    let staged = repo.git(&["diff", "--cached", "--name-only"]);
+    assert_eq!(staged.lines().count(), 8);
+}

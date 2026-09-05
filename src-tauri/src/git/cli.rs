@@ -1,8 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::Arc;
 
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
+use tokio::sync::{Mutex, MutexGuard};
 
 use super::trace;
 use crate::error::{AppError, Result};
@@ -35,6 +37,81 @@ const PERF_CONFIG: &[&str] = &["core.fsmonitor=true", "core.untrackedCache=true"
 pub struct Git {
     workdir: PathBuf,
     perf: bool,
+    /// One write at a time per repository. Shared by every clone, so a
+    /// session's commands queue behind each other however they were reached.
+    ///
+    /// Two writes started together are how a delete and a checkout raced:
+    /// git's own index lock only makes the loser fail, and ref-level
+    /// operations do not take it at all. Reads stay outside it, which is what
+    /// keeps a status refresh from waiting on a push.
+    writes: Arc<Mutex<()>>,
+}
+
+/// Subcommands that only look. Anything not listed is assumed to write,
+/// which errs the safe way: a read taken for a write merely waits its turn.
+const READS: &[&str] = &[
+    "blame",
+    "cat-file",
+    "check-ignore",
+    "count-objects",
+    "describe",
+    "diff",
+    "diff-tree",
+    "for-each-ref",
+    "grep",
+    "log",
+    "ls-files",
+    "ls-tree",
+    "merge-base",
+    "name-rev",
+    "rev-list",
+    "rev-parse",
+    "show",
+    "status",
+    "symbolic-ref",
+    "version",
+    "--version",
+];
+
+/// Whether an invocation only reads. The first argument that is not an option
+/// names the subcommand; a few subcommands read or write depending on what
+/// follows, and those are looked at one step further.
+fn is_read(args: &[&str]) -> bool {
+    // `-c key=value` and `-C dir` carry a value that is not the subcommand.
+    let mut words = Vec::new();
+    let mut skip = false;
+    for arg in args {
+        if skip {
+            skip = false;
+            continue;
+        }
+        if *arg == "-c" || *arg == "-C" {
+            skip = true;
+            continue;
+        }
+        if !arg.starts_with('-') {
+            words.push(*arg);
+        }
+    }
+
+    let mut words = words.into_iter();
+    let Some(sub) = words.next() else {
+        return true;
+    };
+    let next = words.next();
+
+    match sub {
+        "stash" | "worktree" | "submodule" | "remote" | "config" | "flow" => {
+            matches!(next, Some("list") | Some("status") | Some("show") | Some("get") | None)
+                || (sub == "remote" && args.contains(&"-v"))
+                || (sub == "config" && args.iter().any(|a| a.starts_with("--get")))
+        }
+        "branch" | "tag" => {
+            // Listing has no name to act on; anything else creates or changes.
+            next.is_none() || args.iter().any(|a| matches!(*a, "--list" | "-l" | "--show-current"))
+        }
+        other => READS.contains(&other),
+    }
 }
 
 impl Git {
@@ -42,6 +119,17 @@ impl Git {
         Self {
             workdir: workdir.into(),
             perf: true,
+            writes: Arc::new(Mutex::new(())),
+        }
+    }
+
+    /// The write lock, held for the life of a writing command and nothing
+    /// for a reading one.
+    async fn turn(&self, args: &[&str]) -> Option<MutexGuard<'_, ()>> {
+        if is_read(args) {
+            None
+        } else {
+            Some(self.writes.lock().await)
         }
     }
 
@@ -60,6 +148,7 @@ impl Git {
         Self {
             workdir: workdir.into(),
             perf: false,
+            writes: Arc::new(Mutex::new(())),
         }
     }
 
@@ -105,6 +194,7 @@ impl Git {
     /// than a failure: `diff --no-index` exits 1 when files differ, and `log`
     /// exits 128 in a repository that has no commits yet.
     pub async fn run_allowing(&self, args: &[&str], allowed: &[i32]) -> Result<Vec<u8>> {
+        let _turn = self.turn(args).await;
         let run = trace::started(args);
         let output = self.command(args).output().await?;
         let code = output.status.code().unwrap_or(-1);
@@ -125,6 +215,7 @@ impl Git {
     /// The pipe is closed before waiting: git reads the patch until EOF, so
     /// holding the handle open would leave both sides waiting on each other.
     pub async fn run_with_stdin(&self, args: &[&str], input: &str) -> Result<String> {
+        let _turn = self.turn(args).await;
         let mut command = self.command(args);
         command.stdin(Stdio::piped());
 
@@ -177,6 +268,7 @@ impl Git {
     /// that gets parsed, where an interleaved stderr line would corrupt the
     /// result.
     pub async fn run_reported(&self, args: &[&str]) -> Result<String> {
+        let _turn = self.turn(args).await;
         let run = trace::started(args);
         let output = self.command(args).output().await?;
         run.finished(output.status.code().unwrap_or(-1));
@@ -227,7 +319,25 @@ fn join_output(stdout: &str, stderr: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::join_output;
+    use super::{is_read, join_output};
+
+    #[test]
+    fn tells_reads_from_writes() {
+        assert!(is_read(&["status", "--porcelain=v2"]));
+        assert!(is_read(&["-c", "x=y", "log", "--all"]));
+        assert!(is_read(&["stash", "list"]));
+        assert!(is_read(&["remote", "-v"]));
+        assert!(is_read(&["branch", "--show-current"]));
+        assert!(is_read(&["rev-parse", "HEAD"]));
+
+        assert!(!is_read(&["stash", "push", "-m", "x"]));
+        assert!(!is_read(&["branch", "-m", "a", "b"]));
+        assert!(!is_read(&["tag", "v1"]));
+        assert!(!is_read(&["remote", "add", "o", "url"]));
+        assert!(!is_read(&["checkout", "main"]));
+        assert!(!is_read(&["push", "--force-with-lease"]));
+        assert!(!is_read(&["apply", "--cached"]));
+    }
 
     #[test]
     fn merges_both_streams() {
