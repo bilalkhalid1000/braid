@@ -230,6 +230,15 @@ export default function App() {
     }
     setFocusedPanel(panel);
   };
+  // The window is created hidden, and this is what reveals it: the first
+  // effect runs once the splash is in the DOM, so there is never a blank
+  // frame, and it runs whether or not the window is visible, which an
+  // animation frame does not on WebKitGTK. The backend shows the window after
+  // five seconds regardless, as a backstop against a failure here.
+  useEffect(() => {
+    void getCurrentWindow().show().catch(() => {});
+  }, []);
+
   // A hung IPC call must not strand the window on a splash. The shell appears
   // regardless after this; the restore keeps running and tabs arrive when they
   // do. The backend shows the window on a similar backstop for the same reason.

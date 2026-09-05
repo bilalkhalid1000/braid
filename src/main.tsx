@@ -1,7 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import App from "./App";
 import { SettingsProvider } from "./lib/settings";
@@ -49,16 +48,8 @@ document.addEventListener("contextmenu", (event) => {
   event.preventDefault();
 });
 
-/** The window is created hidden and revealed here.
- *
- *  Starting hidden is what removes the blank frame entirely: there is nothing
- *  to see until the first real paint has happened. Two nested frames, because
- *  one only guarantees the work is scheduled, not that it reached the screen.
- *
- *  A failure here would leave an invisible app, so the backend shows the window
- *  unconditionally after a few seconds as a backstop. */
-requestAnimationFrame(() =>
-  requestAnimationFrame(() => {
-    void getCurrentWindow().show().catch(() => {});
-  }),
-);
+// The window starts hidden and App reveals it from its first effect, once the
+// splash is in the DOM. It used to be revealed from two nested animation
+// frames here, but WebKitGTK runs no animation frames for a window that is
+// not shown, so on Linux the frames waited for the backend's five-second
+// backstop and every launch took five seconds to appear.

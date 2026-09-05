@@ -172,8 +172,20 @@ fixture's tree is shallow, and it had just been written so the OS cache was hot.
 mean the claim is currently unearned, and a fixture large enough to test it properly is the
 next thing this harness needs.
 
-Still to measure: cold repo open to first paint, history scroll frame times, idle CPU and
-RAM with 5 repos open, and the same set against SourceTree and lazygit on this machine.
+### The app itself, measured
+
+Linux (Arch, Hyprland, WebKitGTK), release build, 2026-09-05, with the nine
+repositories of a real session restoring at launch.
+
+| Measure | Result |
+| --- | --- |
+| Launch to window shown | 0.5 s. It was 5.3 s: the window was revealed from an animation frame, and WebKitGTK runs none for a hidden window, so every launch waited for the backend's five-second backstop |
+| Memory after restore, whole process tree | about 570 MB: WebKit's web process 260, the backend 210, WebKit's network process 65 |
+| Idle CPU over 30 s, nine repositories open | 0 % of one core |
+
+Still to measure: history scroll frame times, and the same set against
+SourceTree and lazygit. The memory number is worth a closer look: 210 MB in
+the backend for nine repositories is more than the design intends.
 
 ## 7. Risks
 
