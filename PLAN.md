@@ -180,12 +180,20 @@ repositories of a real session restoring at launch.
 | Measure | Result |
 | --- | --- |
 | Launch to window shown | 0.5 s. It was 5.3 s: the window was revealed from an animation frame, and WebKitGTK runs none for a hidden window, so every launch waited for the backend's five-second backstop |
-| Memory after restore, whole process tree | about 570 MB: WebKit's web process 260, the backend 210, WebKit's network process 65 |
+| Memory after restore, whole process tree | about 520 MB: WebKit's web process 260, the backend 195, WebKit's network process 65 |
 | Idle CPU over 30 s, nine repositories open | 0 % of one core |
 
+The backend's 195 MB is almost all shared toolkit pages, GTK and WebKit
+mapped into the main process; its own heap is 62 MB with one repository open
+and 63 MB with nine. It was 104 MB with nine before the watcher was changed:
+on Linux a recursive inotify watch takes one watch per directory, and one
+Node project had 8,452 of them, 66 outside node_modules and the like. Nine
+repositories held 54,010 watches; walking the tree and stopping at the
+directories whose events were dropped anyway brought that to 1,237, at about
+5 MB less per repository and no directory walk of node_modules at open.
+
 Still to measure: history scroll frame times, and the same set against
-SourceTree and lazygit. The memory number is worth a closer look: 210 MB in
-the backend for nine repositories is more than the design intends.
+SourceTree and lazygit.
 
 ## 7. Risks
 
