@@ -324,3 +324,25 @@ of the backend.
 7. **Commit box.** "Skip hooks" checkbox.
 8. **Stash.** Push dialog gains staged-only and keep-index. Clicking a stash
    shows its files and diff in the main panel.
+
+## 7. Status after Tier 2
+
+Also implemented 2026-09-05, after the Tier 1 batch:
+
+| Area | Now in Braid |
+| --- | --- |
+| Commits | Interactive rebase editor (pick, reword, edit, squash, fixup, drop, reorder by key or drag), reword, squash and fixup into parent, amend an older commit with the staged changes, cherry-pick, bisect with marks in the history and a banner, open on GitHub, GitLab or Bitbucket |
+| Reflog | Panel 8: check out, branch, cherry-pick, copy, reset to any entry; Z undoes the last move of HEAD |
+| Conflicts | Open the file in the editor or the merge tool from the conflict bar, step through conflicted files. No resolver of Braid's own, by decision |
+| Custom commands | `customCommands` in settings.json with contexts, prompts, confirm, keys and placeholders; a Commands section in Settings |
+| Files | History of one file, followed across renames; ignore a tracked file and stop tracking it; open in editor; copy path |
+| Sync | Background fetch on a timer, off with 0 |
+| Diff | Side by side as well as unified, switched from the header or Mod+\ |
+| Commit box | Skip hooks; Ctrl+Up recalls earlier messages |
+| Branches | Create pull request, open on the web |
+| Safety | One writing git command at a time per repository; a keystroke that closes a dialog cannot reach the list behind it |
+
+Still open from the report: a three-way merge editor (declined), compare two
+refs, file tree view and range select, branch sort orders, external difftool,
+pull request status icons, add a fork remote, live reload of the settings
+file.
