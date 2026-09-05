@@ -1,6 +1,6 @@
 [package]
 name = "braid"
-version = "0.1.0-alpha.7"
+version = "0.1.0-alpha.8"
 description = "A fast, keyboard-first Git GUI"
 authors = ["Bilal Khalid <bilalkhalid1000@gmail.com>"]
 license = "MIT"

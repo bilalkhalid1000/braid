@@ -1,7 +1,7 @@
 {
   "name": "braid",
   "private": true,
-  "version": "0.1.0-alpha.7",
+  "version": "0.1.0-alpha.8",
   "description": "A fast, keyboard-first Git client",
   "author": {
     "name": "Bilal Khalid",
