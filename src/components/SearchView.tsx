@@ -4,9 +4,6 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { api, type SearchKind } from "../lib/api";
 import { useCommands } from "../lib/useCommands";
-import { useSettings } from "../lib/settings";
-import { shortcutLabel } from "../lib/shortcutLabel";
-import { Keys } from "./Keys";
 import { MIN_QUERY, SETTLE_MS, searchable } from "../lib/search";
 
 const ROW_HEIGHT = 22;
@@ -71,7 +68,6 @@ export function SearchView({ repoId, keyboardActive, onClose, onCommit, onFile }
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { keymap } = useSettings();
 
   // Debounced: the box holds what was typed, the query holds what git was
   // actually asked, and they converge once typing stops. Every keystroke
@@ -242,22 +238,6 @@ export function SearchView({ repoId, keyboardActive, onClose, onCommit, onFile }
         </div>
       </div>
 
-      {keyboardActive && (
-        <p className="pane-hint">
-          <Keys>
-            <kbd>{shortcutLabel(keymap["search.next"])}</kbd>
-            <kbd>{shortcutLabel(keymap["search.previous"])}</kbd> move
-          </Keys>{" "}
-          ·{" "}
-          <Keys>
-            <kbd>{shortcutLabel(keymap["search.open"])}</kbd> go to it
-          </Keys>{" "}
-          ·{" "}
-          <Keys>
-            <kbd>{shortcutLabel(keymap["search.close"])}</kbd> close
-          </Keys>
-        </p>
-      )}
     </div>
   );
 }

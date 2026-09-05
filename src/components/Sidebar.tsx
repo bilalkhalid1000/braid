@@ -3,14 +3,12 @@ import { Fragment, useEffect, useMemo, useState, type MouseEvent, type ReactNode
 import { IconChevron } from "./icons";
 import { FilterInput, matchesFilter } from "./FilterInput";
 import { useCommands } from "../lib/useCommands";
-import { useSettings } from "../lib/settings";
-import { shortcutLabel } from "../lib/shortcutLabel";
 import { groupRefs, hasFolders, leafCount, visibleNodes, type RefNode } from "../lib/refTree";
-import { Keys } from "./Keys";
 import { useTip } from "./Tip";
 import {
   submoduleLabel,
   type BranchRef,
+  type RemoteGroup,
   type RefsSnapshot,
   type RepoStatus,
   type StashEntry,
@@ -53,6 +51,7 @@ export const panelNumber = (panel: PanelId) => PANELS.indexOf(panel) + 1;
 export type MenuTarget =
   | { kind: "branch"; branch: BranchRef }
   | { kind: "remote"; remote: string; branch: string }
+  | { kind: "remoteGroup"; remote: RemoteGroup }
   | { kind: "tag"; tag: string }
   | { kind: "stash"; stash: StashEntry }
   | { kind: "worktree"; worktree: Worktree }
@@ -81,6 +80,10 @@ interface Props {
   onStash: (selector: string, action: "apply" | "pop" | "drop") => void;
   onOpenPath: (path: string) => void;
   onNewBranch: () => void;
+  onNewRemote: () => void;
+  onNewTag: () => void;
+  /** A stash was clicked: show what it holds. */
+  onShowStash: (stash: StashEntry) => void;
   onAddWorktree: () => void;
   onRemoveWorktree: (path: string) => void;
   onPruneWorktrees: () => void;
@@ -93,6 +96,9 @@ interface Props {
   /** Delete whatever the cursor is on. Which things can be deleted, and what
    *  deleting one means, is decided where the git actions live. */
   onDelete: (target: MenuTarget | null) => void;
+  /** Edit whatever the cursor is on: a remote's name and URL, a branch's name. */
+  onEdit: (target: MenuTarget | null) => void;
+  onFetchRemote: (name: string) => void;
 }
 
 /** One row the keyboard can land on. */
@@ -171,6 +177,9 @@ export function Sidebar({
   onStash,
   onOpenPath,
   onNewBranch,
+  onNewRemote,
+  onNewTag,
+  onShowStash,
   onAddWorktree,
   onRemoveWorktree,
   onPruneWorktrees,
@@ -179,8 +188,9 @@ export function Sidebar({
   onMenu,
   onCursor,
   onDelete,
+  onEdit,
+  onFetchRemote,
 }: Props) {
-  const { keymap } = useSettings();
   const [filter, setFilter] = useState("");
   const [index, setIndex] = useState(0);
   const open = filter !== "";
@@ -275,14 +285,22 @@ export function Sidebar({
     }
 
     if (focused === "remotes") {
-      return shown.remotes.flatMap((remote) =>
-        remote.branches.map((branch) => ({
+      // The remote itself is a stop, before its branches: it is the thing
+      // you edit, fetch or remove, and a row is how a key reaches it.
+      return shown.remotes.flatMap<Row>((remote) => [
+        {
+          key: `remote-group:${remote.name}`,
+          activate: () => onFetchRemote(remote.name),
+          menu: (at: Point) => onMenu({ kind: "remoteGroup", remote }, at),
+          target: { kind: "remoteGroup", remote },
+        },
+        ...remote.branches.map<Row>((branch) => ({
           key: `remote:${remote.name}/${branch}`,
           activate: () => onCheckout(branch),
           menu: (at: Point) => onMenu({ kind: "remote", remote: remote.name, branch }, at),
           target: { kind: "remote", remote: remote.name, branch },
         })),
-      );
+      ]);
     }
 
     if (focused === "stashes") {
@@ -363,6 +381,7 @@ export function Sidebar({
       // that silently does nothing is indistinguishable from one that is not
       // bound, which is exactly how this looked.
       "sidebar.delete": () => onDelete(rows[index]?.target ?? null),
+      "sidebar.edit": () => onEdit(rows[index]?.target ?? null),
       "sidebar.leave": () => onFocusPanel(view === "history" ? "history" : "files"),
     },
     // Escape belongs to whatever is on top: without this the sidebar would
@@ -373,6 +392,12 @@ export function Sidebar({
   const rowProps = (key: string) => ({
     "data-row": key,
     className: selectedKey === key ? `${ITEM} ${CURSOR}` : ITEM,
+  });
+
+  /** The same, for a section heading that is also a row -- a remote. */
+  const groupProps = (key: string) => ({
+    "data-row": key,
+    className: selectedKey === key ? CURSOR : "",
   });
 
   /** The same, for a folder row. It carries `data-row` for the same reason a
@@ -477,7 +502,17 @@ export function Sidebar({
         />
       </Section>
 
-      <Section title="Tags" count={shown.tags.length} forceOpen={open}>
+      <Section
+        title="Tags"
+        count={shown.tags.length}
+        forceOpen={open}
+        action={{
+          title: "New tag",
+          label: "New tag",
+          command: "git.tag",
+          onClick: onNewTag,
+        }}
+      >
         {shown.tags.length === 0 && <Empty>No tags</Empty>}
         <RefTree
           nodes={tagTree}
@@ -502,6 +537,12 @@ export function Sidebar({
         forceOpen={open || focused === "remotes"}
         number={panelNumber("remotes")}
         focused={focused === "remotes"}
+        action={{
+          title: "Add a remote",
+          label: "Add remote",
+          command: "git.remote",
+          onClick: onNewRemote,
+        }}
       >
         {shown.remotes.length === 0 && <Empty>No remotes</Empty>}
         {shown.remotes.map((remote) => (
@@ -511,7 +552,12 @@ export function Sidebar({
             nested
             count={remote.branches.length}
             forceOpen={open || focused === "remotes"}
+            headerProps={groupProps(`remote-group:${remote.name}`)}
+            onContextMenu={(e) =>
+              onMenu({ kind: "remoteGroup", remote }, { x: e.clientX, y: e.clientY })
+            }
           >
+            {remote.branches.length === 0 && <Empty>Nothing fetched yet</Empty>}
             {remote.branches.map((branch) => (
               <Item
                 key={branch}
@@ -555,7 +601,8 @@ export function Sidebar({
             key={stash.selector}
             {...rowProps(`stash:${stash.selector}`)}
             label={stash.message}
-            title={`${stash.selector} – Enter to pop`}
+            title={`${stash.selector} – click to see what it holds, Enter to pop`}
+            onClick={() => onShowStash(stash)}
             onDoubleClick={() => onStash(stash.selector, "pop")}
             onContextMenu={(e) =>
               onMenu({ kind: "stash", stash }, { x: e.clientX, y: e.clientY })
@@ -682,26 +729,6 @@ export function Sidebar({
         ))}
       </Section>
 
-      {focused && (
-        <p className="pane-hint">
-          <Keys>
-            <kbd>{shortcutLabel(keymap["sidebar.next"])}</kbd>
-            <kbd>{shortcutLabel(keymap["sidebar.previous"])}</kbd> move
-          </Keys>{" "}
-          ·{" "}
-          <Keys>
-            <kbd>{shortcutLabel(keymap["sidebar.activate"])}</kbd> use
-          </Keys>{" "}
-          ·{" "}
-          <Keys>
-            <kbd>{shortcutLabel(keymap["sidebar.delete"])}</kbd> delete
-          </Keys>{" "}
-          ·{" "}
-          <Keys>
-            <kbd>{shortcutLabel(keymap["sidebar.leave"])}</kbd> back
-          </Keys>
-        </p>
-      )}
     </nav>
   );
 }
@@ -795,9 +822,16 @@ function Section({
   number,
   focused = false,
   action,
+  onContextMenu,
+  headerProps,
 }: {
   title: string;
   children: ReactNode;
+  /** Right-click on the heading, for a section that is itself a thing. */
+  onContextMenu?: (event: MouseEvent) => void;
+  /** For a heading the keyboard cursor can land on: its row key and the
+   *  cursor's look when it is there. */
+  headerProps?: { "data-row": string; className: string };
   defaultOpen?: boolean;
   nested?: boolean;
   count?: number;
@@ -817,7 +851,17 @@ function Section({
     // belongs to the Remotes heading above it, and a gap there would read as
     // a section of its own.
     <div data-focused={focused || undefined} className={nested ? "" : "mt-3"}>
-      <div className="group flex items-center pr-4">
+      <div
+        data-row={headerProps?.["data-row"]}
+        className={`group flex items-center pr-4 ${headerProps?.className ?? ""}`}
+        onContextMenu={
+          onContextMenu &&
+          ((e: MouseEvent) => {
+            e.preventDefault();
+            onContextMenu(e);
+          })
+        }
+      >
         {/* The rail. Every key in the sidebar sits in this column and nothing
             else does, so a digit here is always a key and a number on the
             right is always a count. */}

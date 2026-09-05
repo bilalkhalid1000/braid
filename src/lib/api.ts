@@ -99,11 +99,16 @@ export interface BranchRef {
 
 export interface RemoteGroup {
   name: string;
+  /** The fetch URL. */
+  url: string;
   branches: string[];
 }
 
 export interface StashEntry {
   selector: string;
+  /** The stash commit itself. `stash@{0}` names a different one after every
+   *  push, so anything cached by name would go stale; this does not. */
+  oid: string;
   message: string;
 }
 
@@ -429,14 +434,41 @@ export const api = {
   stage: (id: string, paths: string[]) => invoke<void>("stage_paths", { id, paths }),
   unstage: (id: string, paths: string[]) => invoke<void>("unstage_paths", { id, paths }),
   discard: (id: string, paths: string[]) => invoke<void>("discard_paths", { id, paths }),
-  commit: (id: string, message: string, amend: boolean) =>
-    invoke<string>("commit", { id, message, amend }),
+  commit: (id: string, message: string, amend: boolean, noVerify = false) =>
+    invoke<string>("commit", { id, message, amend, noVerify }),
 
   fetch: (id: string) => invoke<string>("fetch", { id }),
-  pull: (id: string) => invoke<string>("pull", { id }),
-  push: (id: string) => invoke<string>("push", { id }),
+  fetchRemote: (id: string, name: string) => invoke<string>("fetch_remote", { id, name }),
+  pull: (id: string, rebase = false) => invoke<string>("pull", { id, rebase }),
+  push: (id: string, force = false, tags = false) =>
+    invoke<string>("push", { id, force, tags }),
 
-  checkout: (id: string, name: string) => invoke<string>("checkout", { id, name }),
+  addRemote: (id: string, name: string, url: string) =>
+    invoke<string>("add_remote", { id, name, url }),
+  renameRemote: (id: string, name: string, newName: string) =>
+    invoke<string>("rename_remote", { id, name, newName }),
+  setRemoteUrl: (id: string, name: string, url: string) =>
+    invoke<string>("set_remote_url", { id, name, url }),
+  removeRemote: (id: string, name: string) => invoke<string>("remove_remote", { id, name }),
+
+  checkout: (id: string, name: string, force = false) =>
+    invoke<string>("checkout", { id, name, force }),
+  rebaseBranch: (id: string, onto: string) => invoke<string>("rebase_branch", { id, onto }),
+  cherryPick: (id: string, oid: string) => invoke<string>("cherry_pick", { id, oid }),
+  renameBranch: (id: string, name: string, newName: string) =>
+    invoke<string>("rename_branch", { id, name, newName }),
+  setUpstream: (id: string, branch: string, upstream: string | null) =>
+    invoke<string>("set_upstream", { id, branch, upstream }),
+
+  createTag: (id: string, name: string, target: string, message: string) =>
+    invoke<string>("create_tag", { id, name, target, message }),
+  deleteTag: (id: string, name: string, remote: string | null) =>
+    invoke<string>("delete_tag", { id, name, remote }),
+  pushTag: (id: string, name: string, remote: string) =>
+    invoke<string>("push_tag", { id, name, remote }),
+
+  ignorePath: (id: string, path: string, local: boolean) =>
+    invoke<string>("ignore_path", { id, path, local }),
   createBranch: (
     id: string,
     name: string,
@@ -447,8 +479,14 @@ export const api = {
     invoke<string>("delete_branch", { id, name, force }),
   mergeBranch: (id: string, name: string) => invoke<string>("merge_branch", { id, name }),
 
-  stashPush: (id: string, message: string, includeUntracked: boolean) =>
-    invoke<string>("stash_push", { id, message, includeUntracked }),
+  stashPush: (
+    id: string,
+    message: string,
+    includeUntracked: boolean,
+    stagedOnly = false,
+    keepIndex = false,
+  ) =>
+    invoke<string>("stash_push", { id, message, includeUntracked, stagedOnly, keepIndex }),
   stashApply: (id: string, selector: string, pop: boolean) =>
     invoke<string>("stash_apply", { id, selector, pop }),
   stashDrop: (id: string, selector: string) => invoke<string>("stash_drop", { id, selector }),
@@ -491,8 +529,13 @@ export const api = {
   terminalOptions: () => invoke<TerminalOption[]>("terminal_options"),
   /** `terminal` is which terminal hosts a terminal editor such as Neovim,
    *  which has no window of its own to open. */
-  openInEditor: (id: string, editor: string, command: string, terminal: string) =>
-    invoke<string>("open_in_editor", { id, editor, command, terminal }),
+  openInEditor: (
+    id: string,
+    editor: string,
+    command: string,
+    terminal: string,
+    path: string | null = null,
+  ) => invoke<string>("open_in_editor", { id, editor, command, terminal, path }),
   editorOptions: () => invoke<EditorOption[]>("editor_options"),
 
   fsmonitorState: (id: string) => invoke<string>("fsmonitor_state", { id }),

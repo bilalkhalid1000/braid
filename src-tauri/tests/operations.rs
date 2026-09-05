@@ -4,7 +4,7 @@ mod common;
 
 use braid_lib::git::flow::{FinishOptions, FlowConfig, FlowKind};
 use braid_lib::git::{
-    default_remote, flow, operation, refs, status, submodule, worktree, RepoState,
+    default_remote, flow, ignore, operation, refs, status, submodule, worktree, RepoState,
 };
 use common::TestRepo;
 
@@ -568,4 +568,37 @@ async fn finishing_a_hotfix_tags_it_by_default() {
     .unwrap();
 
     assert!(repo.git(&["tag", "--list"]).contains("1.0.2"));
+}
+
+// --- ignoring --------------------------------------------------------------
+
+#[tokio::test]
+async fn ignoring_a_path_hides_it_from_status() {
+    let repo = TestRepo::new();
+    repo.write("build.log", "noise\n");
+    repo.write("scratch.txt", "mine\n");
+
+    ignore::ignore(repo.git_api(), "build.log", false).await.unwrap();
+    ignore::ignore(repo.git_api(), "scratch.txt", true).await.unwrap();
+
+    // Anchored, so a build.log deeper in the tree is not swept up with it.
+    assert_eq!(repo.read(".gitignore"), "/build.log\n");
+
+    let result = status(repo.git_api()).await.unwrap();
+    let paths: Vec<&str> = result.entries.iter().map(|e| e.path.as_str()).collect();
+    assert!(!paths.contains(&"build.log"));
+    assert!(!paths.contains(&"scratch.txt"));
+    // The .gitignore itself is the one new file left.
+    assert_eq!(paths, vec![".gitignore"]);
+}
+
+#[tokio::test]
+async fn ignoring_twice_writes_once() {
+    let repo = TestRepo::new();
+    repo.write("build.log", "noise\n");
+
+    ignore::ignore(repo.git_api(), "build.log", false).await.unwrap();
+    ignore::ignore(repo.git_api(), "build.log", false).await.unwrap();
+
+    assert_eq!(repo.read(".gitignore"), "/build.log\n");
 }

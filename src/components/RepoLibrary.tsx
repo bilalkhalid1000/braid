@@ -2,10 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { displayName, samePath, type Bookmark } from '../lib/library'
 import { useCommands } from '../lib/useCommands'
-import { useSettings } from '../lib/settings'
-import { shortcutLabel } from '../lib/shortcutLabel'
 import { FilterInput, matchesFilter } from './FilterInput'
-import { Keys } from './Keys'
 import { useTip } from './Tip'
 
 interface Props {
@@ -86,7 +83,6 @@ export function RepoLibrary({
 }: Props) {
   const [filter, setFilter] = useState('')
   const [cursor, setCursor] = useState(0)
-  const { keymap } = useSettings()
   const tip = useTip()
 
   const shown = useMemo(
@@ -236,26 +232,6 @@ export function RepoLibrary({
         )}
       </div>
 
-      {keyboardActive && repos.length > 0 && (
-        <p className="pane-hint">
-          <Keys>
-            <kbd>{shortcutLabel(keymap['library.next'])}</kbd>
-            <kbd>{shortcutLabel(keymap['library.previous'])}</kbd> move
-          </Keys>{' '}
-          ·{' '}
-          <Keys>
-            <kbd>{shortcutLabel(keymap['library.open'])}</kbd> open
-          </Keys>{' '}
-          ·{' '}
-          <Keys>
-            <kbd>{shortcutLabel(keymap['library.edit'])}</kbd> edit
-          </Keys>{' '}
-          ·{' '}
-          <Keys>
-            <kbd>{shortcutLabel(keymap['library.remove'])}</kbd> remove
-          </Keys>
-        </p>
-      )}
     </div>
   )
 }

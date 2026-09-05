@@ -37,6 +37,9 @@ export interface CommandDef {
   binding: string[];
   /** Meaningless without a repository open. */
   needsRepo?: boolean;
+  /** How the hint strip names it: a verb or two, where the label is a
+   *  sentence. */
+  short?: string;
 }
 
 export const COMMANDS: CommandDef[] = [
@@ -45,7 +48,7 @@ export const COMMANDS: CommandDef[] = [
   { id: "app.settings", label: "Settings", category: "Application", scope: "global", binding: ["Mod+,"] },
   { id: "app.activityLog", label: "Toggle activity log", category: "Application", scope: "global", binding: ["@", "Mod+L"] },
   { id: "app.theme", label: "Cycle theme", category: "Application", scope: "global", binding: ["Mod+Shift+T"] },
-  { id: "app.keys", label: "Keyboard shortcuts", category: "Application", scope: "global", binding: ["?"] },
+  { id: "app.keys", label: "Keyboard shortcuts", category: "Application", scope: "global", binding: ["?"], short: "all keys" },
   { id: "app.refresh", label: "Refresh", category: "Application", scope: "global", binding: ["Shift+R"], needsRepo: true },
   { id: "app.quit", label: "Quit", category: "Application", scope: "global", binding: ["Q"] },
 
@@ -90,78 +93,90 @@ export const COMMANDS: CommandDef[] = [
   { id: "panel.stashes", label: "Stashes", category: "Panels", scope: "global", binding: ["5"], needsRepo: true },
   { id: "panel.worktrees", label: "Worktrees", category: "Panels", scope: "global", binding: ["6"], needsRepo: true },
   { id: "panel.submodules", label: "Submodules", category: "Panels", scope: "global", binding: ["7"], needsRepo: true },
-  { id: "view.filter", label: "Focus the filter box", category: "Panels", scope: "global", binding: ["/", "Mod+F"] },
+  { id: "view.filter", label: "Focus the filter box", category: "Panels", scope: "global", binding: ["/", "Mod+F"], short: "filter" },
 
   // --- Sidebar, live only while a sidebar panel has focus ---
   { id: "sidebar.next", label: "Next item", category: "Sidebar", scope: "sidebar", binding: ["J", "ArrowDown"] },
   { id: "sidebar.previous", label: "Previous item", category: "Sidebar", scope: "sidebar", binding: ["K", "ArrowUp"] },
-  { id: "sidebar.activate", label: "Use the selected item", category: "Sidebar", scope: "sidebar", binding: ["Space", "Enter"] },
-  { id: "sidebar.menu", label: "Open the item's menu", category: "Sidebar", scope: "sidebar", binding: ["Shift+Enter"] },
-  { id: "sidebar.delete", label: "Delete the selected item", category: "Sidebar", scope: "sidebar", binding: ["D"] },
-  { id: "sidebar.leave", label: "Return to the main panel", category: "Sidebar", scope: "sidebar", binding: ["Escape"] },
+  { id: "sidebar.activate", label: "Use the selected item", category: "Sidebar", scope: "sidebar", binding: ["Space", "Enter"], short: "use" },
+  { id: "sidebar.menu", label: "Open the item's menu", category: "Sidebar", scope: "sidebar", binding: ["Shift+Enter"], short: "menu" },
+  { id: "sidebar.delete", label: "Delete the selected item", category: "Sidebar", scope: "sidebar", binding: ["D"], short: "delete" },
+  { id: "sidebar.edit", label: "Edit or rename the selected item", category: "Sidebar", scope: "sidebar", binding: ["E"], short: "edit" },
+  { id: "sidebar.leave", label: "Return to the main panel", category: "Sidebar", scope: "sidebar", binding: ["Escape"], short: "back" },
 
   // --- Menus, live only while one is open. A menu takes the keyboard from
   //     whatever raised it, so these reuse the list keys rather than
   //     inventing a second set. ---
   { id: "menu.next", label: "Next entry", category: "Menu", scope: "menu", binding: ["J", "ArrowDown"] },
   { id: "menu.previous", label: "Previous entry", category: "Menu", scope: "menu", binding: ["K", "ArrowUp"] },
-  { id: "menu.activate", label: "Run the selected entry", category: "Menu", scope: "menu", binding: ["Enter"] },
-  { id: "menu.close", label: "Close the menu", category: "Menu", scope: "menu", binding: ["Escape"] },
+  { id: "menu.activate", label: "Run the selected entry", category: "Menu", scope: "menu", binding: ["Enter"], short: "run" },
+  { id: "menu.close", label: "Close the menu", category: "Menu", scope: "menu", binding: ["Escape"], short: "close" },
 
   // --- Blame, live only while a file is being blamed ---
   { id: "blame.next", label: "Next line", category: "Blame", scope: "blame", binding: ["J", "ArrowDown"] },
   { id: "blame.previous", label: "Previous line", category: "Blame", scope: "blame", binding: ["K", "ArrowUp"] },
-  { id: "blame.close", label: "Close the blame", category: "Blame", scope: "blame", binding: ["Escape"] },
+  { id: "blame.close", label: "Close the blame", category: "Blame", scope: "blame", binding: ["Escape"], short: "close" },
 
   // Mod+K first, so that is the key the hints and the menus teach.
   // Mod+Shift+F stays: it is what "find in files" is called in an editor,
   // and there is no cost to answering both.
-  { id: "view.search", label: "Search the repository", category: "Panels", scope: "global", binding: ["Mod+K", "Mod+Shift+F"], needsRepo: true },
+  { id: "view.search", label: "Search the repository", category: "Panels", scope: "global", binding: ["Mod+K", "Mod+Shift+F"], needsRepo: true, short: "search" },
 
   // --- Search results, live only while the search panel is showing ---
   { id: "search.next", label: "Next result", category: "Search", scope: "search", binding: ["J", "ArrowDown"] },
   { id: "search.previous", label: "Previous result", category: "Search", scope: "search", binding: ["K", "ArrowUp"] },
-  { id: "search.open", label: "Go to the selected result", category: "Search", scope: "search", binding: ["Enter"] },
-  { id: "search.close", label: "Close the search", category: "Search", scope: "search", binding: ["Escape"] },
+  { id: "search.open", label: "Go to the selected result", category: "Search", scope: "search", binding: ["Enter"], short: "open" },
+  { id: "search.close", label: "Close the search", category: "Search", scope: "search", binding: ["Escape"], short: "close" },
 
   // --- The repository list, live only while it is the tab in front ---
   { id: "library.next", label: "Next repository", category: "Repositories", scope: "library", binding: ["J", "ArrowDown"] },
   { id: "library.previous", label: "Previous repository", category: "Repositories", scope: "library", binding: ["K", "ArrowUp"] },
-  { id: "library.open", label: "Open the selected repository", category: "Repositories", scope: "library", binding: ["Enter"] },
-  { id: "library.edit", label: "Edit the selected repository", category: "Repositories", scope: "library", binding: ["E"] },
-  { id: "library.remove", label: "Remove the selected repository", category: "Repositories", scope: "library", binding: ["D"] },
+  { id: "library.open", label: "Open the selected repository", category: "Repositories", scope: "library", binding: ["Enter"], short: "open" },
+  { id: "library.edit", label: "Edit the selected repository", category: "Repositories", scope: "library", binding: ["E"], short: "edit" },
+  { id: "library.remove", label: "Remove the selected repository", category: "Repositories", scope: "library", binding: ["D"], short: "remove" },
 
   // --- Git, lazygit-style single letters ---
   { id: "git.fetch", label: "Fetch", category: "Git", scope: "global", binding: ["F"], needsRepo: true },
   { id: "git.pull", label: "Pull", category: "Git", scope: "global", binding: ["P"], needsRepo: true },
   { id: "git.push", label: "Push", category: "Git", scope: "global", binding: ["Shift+P"], needsRepo: true },
-  { id: "git.commit", label: "Write a commit message", category: "Git", scope: "global", binding: ["C"], needsRepo: true },
+  { id: "git.commit", label: "Write a commit message", category: "Git", scope: "global", binding: ["C"], needsRepo: true, short: "commit" },
   // One key, whose meaning follows the panel you are in -- which is how the
   // same key behaves in lazygit, where every context binds it separately.
-  { id: "git.new", label: "New branch, or worktree in that panel", category: "Git", scope: "global", binding: ["N"], needsRepo: true },
-  { id: "git.merge", label: "Merge a branch", category: "Git", scope: "global", binding: ["Shift+M"], needsRepo: true },
-  { id: "git.stash", label: "Stash changes", category: "Git", scope: "global", binding: ["S"], needsRepo: true },
-  { id: "git.discardAll", label: "Discard all changes", category: "Git", scope: "global", binding: ["Shift+D"], needsRepo: true },
+  { id: "git.new", label: "New branch, or worktree in that panel", category: "Git", scope: "global", binding: ["N"], needsRepo: true, short: "new branch" },
+  { id: "git.merge", label: "Merge a branch", category: "Git", scope: "global", binding: ["Shift+M"], needsRepo: true, short: "merge" },
+  { id: "git.stash", label: "Stash changes", category: "Git", scope: "global", binding: ["S"], needsRepo: true, short: "stash" },
+  { id: "git.discardAll", label: "Discard all changes", category: "Git", scope: "global", binding: ["Shift+D"], needsRepo: true, short: "discard all" },
   { id: "git.worktree", label: "Add a worktree", category: "Git", scope: "global", binding: ["Shift+W"], needsRepo: true },
   { id: "git.flow", label: "Git flow", category: "Git", scope: "global", binding: ["G F"], needsRepo: true },
+  // The variants of Pull and Push sit behind G, the way git flow does: the
+  // plain key is the common case and the sequence is the qualified one.
+  { id: "git.pullRebase", label: "Pull with rebase", category: "Git", scope: "global", binding: ["G P"], needsRepo: true, short: "pull with rebase" },
+  { id: "git.pushForce", label: "Force push, with lease", category: "Git", scope: "global", binding: ["G Shift+P"], needsRepo: true, short: "force push" },
+  { id: "git.pushTags", label: "Push tags", category: "Git", scope: "global", binding: ["G T"], needsRepo: true, short: "push tags" },
+  { id: "git.checkout", label: "Check out by name", category: "Git", scope: "global", binding: ["O"], needsRepo: true, short: "check out" },
+  { id: "git.tag", label: "New tag", category: "Git", scope: "global", binding: ["T"], needsRepo: true, short: "tag" },
+  { id: "git.remote", label: "Add a remote", category: "Git", scope: "global", binding: ["R"], needsRepo: true, short: "add remote" },
 
   // --- File Status ---
   { id: "status.next", label: "Next file", category: "File Status", scope: "status", binding: ["J", "ArrowDown"] },
   { id: "status.previous", label: "Previous file", category: "File Status", scope: "status", binding: ["K", "ArrowUp"] },
-  { id: "status.toggle", label: "Stage or unstage the selected file", category: "File Status", scope: "status", binding: ["Space"] },
-  { id: "status.stageAll", label: "Stage everything", category: "File Status", scope: "status", binding: ["A"] },
-  { id: "status.unstageAll", label: "Unstage everything", category: "File Status", scope: "status", binding: ["Shift+A"] },
-  { id: "status.discard", label: "Discard the selected file", category: "File Status", scope: "status", binding: ["D", "Delete"] },
-  { id: "status.commit", label: "Commit", category: "File Status", scope: "status", binding: ["Mod+Enter"] },
-  { id: "status.blame", label: "Blame the selected file", category: "File Status", scope: "status", binding: ["Shift+B"] },
+  { id: "status.toggle", label: "Stage or unstage the selected file", category: "File Status", scope: "status", binding: ["Space"], short: "stage" },
+  { id: "status.stageAll", label: "Stage everything", category: "File Status", scope: "status", binding: ["A"], short: "stage all" },
+  { id: "status.unstageAll", label: "Unstage everything", category: "File Status", scope: "status", binding: ["Shift+A"], short: "unstage all" },
+  { id: "status.discard", label: "Discard the selected file", category: "File Status", scope: "status", binding: ["D", "Delete"], short: "discard" },
+  { id: "status.commit", label: "Commit", category: "File Status", scope: "status", binding: ["Mod+Enter"], short: "commit" },
+  { id: "status.blame", label: "Blame the selected file", category: "File Status", scope: "status", binding: ["Shift+B"], short: "blame" },
+  { id: "status.menu", label: "Open the file's menu", category: "File Status", scope: "status", binding: ["Shift+Enter"], short: "menu" },
 
   // --- History ---
   { id: "history.next", label: "Next commit", category: "History", scope: "history", binding: ["J", "ArrowDown"] },
   { id: "history.previous", label: "Previous commit", category: "History", scope: "history", binding: ["K", "ArrowUp"] },
-  { id: "history.files", label: "Go to the commit's files", category: "History", scope: "history", binding: ["Enter"] },
-  { id: "history.back", label: "Back to the commit list", category: "History", scope: "history", binding: ["Escape"] },
-  { id: "history.top", label: "Jump to the newest commit", category: "History", scope: "history", binding: ["G G"] },
-  { id: "history.copyHash", label: "Copy the commit hash", category: "History", scope: "history", binding: ["Y"] },
+  { id: "history.files", label: "Go to the commit's files", category: "History", scope: "history", binding: ["Enter"], short: "files" },
+  { id: "history.back", label: "Back to the commit list", category: "History", scope: "history", binding: ["Escape"], short: "back" },
+  { id: "history.top", label: "Jump to the newest commit", category: "History", scope: "history", binding: ["G G"], short: "top" },
+  { id: "history.copyHash", label: "Copy the commit hash", category: "History", scope: "history", binding: ["Y"], short: "copy hash" },
+  // The same key as the sidebar's menu, so one habit covers every list.
+  { id: "history.menu", label: "Open the commit's menu", category: "History", scope: "history", binding: ["Shift+Enter"], short: "menu" },
 ];
 
 export const COMMANDS_BY_ID: Record<string, CommandDef> = Object.fromEntries(
@@ -178,6 +193,18 @@ export const chordsOf = (binding: string): string[] =>
   binding.trim().split(/\s+/).filter(Boolean);
 
 export const isSequence = (binding: string): boolean => chordsOf(binding).length > 1;
+
+/** Characters that take Shift on a US keyboard.
+ *
+ *  A binding written as "?" parses with Shift off, but the keystroke that
+ *  produces "?" has Shift held, and the library compares modifiers exactly --
+ *  so the bare form never fires. Registering "Shift+?" beside it covers that
+ *  keystroke; the bare form stays for a layout where the key is unshifted.
+ *  One event cannot match both. */
+const SHIFTED = new Set('~!@#$%^&*()_+{}|:"<>?');
+
+export const chordVariants = (chord: string): string[] =>
+  chord.length === 1 && SHIFTED.has(chord) ? [chord, `Shift+${chord}`] : [chord];
 
 /** Coerce whatever was stored into a binding list.
  *

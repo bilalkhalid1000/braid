@@ -124,6 +124,19 @@ pub fn run() {
             ipc::drop_impact,
             ipc::drop_commit,
             ipc::fsmonitor_state,
+            ipc::add_remote,
+            ipc::rename_remote,
+            ipc::set_remote_url,
+            ipc::remove_remote,
+            ipc::fetch_remote,
+            ipc::rebase_branch,
+            ipc::cherry_pick,
+            ipc::create_tag,
+            ipc::delete_tag,
+            ipc::push_tag,
+            ipc::rename_branch,
+            ipc::set_upstream,
+            ipc::ignore_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

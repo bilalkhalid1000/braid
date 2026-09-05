@@ -131,6 +131,8 @@ export function FileList({
             return (
               <div
                 key={item.key}
+                // Named, so a key can open the row's menu where the row is.
+                data-entry={`${staged ? "staged" : "unstaged"}:${entry.path}`}
                 className={`${ROW} ${
                   entry.path === selectedPath
                     ? "bg-select border-l-accent"

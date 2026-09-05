@@ -14,7 +14,7 @@ interface Props {
    *  keys are live: while you are typing, only Escape and the Mod combos are. */
   onEditing?: (editing: boolean) => void;
   /** Resolves false when the commit failed, so the message is not lost. */
-  onCommit: (message: string, amend: boolean) => Promise<boolean>;
+  onCommit: (message: string, amend: boolean, skipHooks: boolean) => Promise<boolean>;
 }
 
 const BOX = "grid flex-none gap-3 p-4 bg-surface-alt border-t border-t-border";
@@ -34,6 +34,7 @@ export const CommitBox = forwardRef<CommitBoxHandle, Props>(
   ({ stagedCount, busy, onCommit, onEditing }, ref) => {
     const [message, setMessage] = useState("");
     const [amend, setAmend] = useState(false);
+    const [skipHooks, setSkipHooks] = useState(false);
     const textarea = useRef<HTMLTextAreaElement>(null);
 
     const canCommit = message.trim().length > 0 && (stagedCount > 0 || amend) && !busy;
@@ -43,10 +44,11 @@ export const CommitBox = forwardRef<CommitBoxHandle, Props>(
 
       // A rejected commit — a failing hook, nothing staged, a bad signing key —
       // must not silently swallow what they typed.
-      if (!(await onCommit(message, amend))) return;
+      if (!(await onCommit(message, amend, skipHooks))) return;
 
       setMessage("");
       setAmend(false);
+      setSkipHooks(false);
     };
 
     const tip = useTip();
@@ -84,6 +86,21 @@ export const CommitBox = forwardRef<CommitBoxHandle, Props>(
               onChange={(e) => setAmend(e.target.checked)}
             />
             Amend
+          </label>
+
+          {/* Off again after each commit: skipping a hook is a decision about
+              one commit, not a mode. */}
+          <label
+            className="flex items-center gap-3 text-small text-text-dim"
+            {...tip("Skip hooks", undefined, "Commits with --no-verify, so pre-commit and commit-msg hooks do not run.")}
+          >
+            <input
+              type="checkbox"
+              className="accent-accent"
+              checked={skipHooks}
+              onChange={(e) => setSkipHooks(e.target.checked)}
+            />
+            Skip hooks
           </label>
 
           <span className="ml-auto text-micro text-text-faint">{stagedCount} staged</span>

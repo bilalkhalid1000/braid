@@ -15,9 +15,7 @@ import { ConflictBar } from "./ConflictBar";
 import { CommitBox, type CommitBoxHandle } from "./CommitBox";
 import { useCommands } from "../lib/useCommands";
 import { useSettings } from "../lib/settings";
-import { formatBinding, shortcutLabel } from "../lib/shortcutLabel";
 import { FilterInput, matchesFilter } from "./FilterInput";
-import { Keys } from "./Keys";
 import { Splitter, usePaneSize } from "./Splitter";
 
 interface Selection {
@@ -41,7 +39,7 @@ interface Props {
     staged: boolean,
     point: { x: number; y: number },
   ) => void;
-  onCommit: (message: string, amend: boolean) => Promise<boolean>;
+  onCommit: (message: string, amend: boolean, skipHooks: boolean) => Promise<boolean>;
   onHunk: (request: HunkRequest & { path: string }) => void;
   onResolve: (path: string, side: "ours" | "theirs") => void;
   onMarkResolved: (path: string) => void;
@@ -65,9 +63,8 @@ export function FileStatusView({
 }: Props) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [filter, setFilter] = useState("");
-  const [editingMessage, setEditingMessage] = useState(false);
   const [columnWidth, setColumnWidth] = usePaneSize("status-column", 380);
-  const { settings, keymap } = useSettings();
+  const { settings } = useSettings();
 
   const staged = useMemo(
     () => (status?.entries ?? []).filter(isStaged).filter((e) => matchesFilter(e.path, filter)),
@@ -150,6 +147,15 @@ export function FileStatusView({
       selected && !selected.staged && onDiscard([selected.entry.path]),
     "status.commit": () => commitRef.current?.submit(),
     "status.blame": () => selected && onBlame(selected.entry.path),
+    // The row's menu, opened under the row so it reads as belonging to it.
+    "status.menu": () => {
+      if (!selected) return;
+      const key = `${selected.staged ? "staged" : "unstaged"}:${selected.entry.path}`;
+      const box = document
+        .querySelector(`[data-entry="${CSS.escape(key)}"]`)
+        ?.getBoundingClientRect();
+      onMenu(selected.entry, selected.staged, box ? { x: box.left + 48, y: box.bottom } : { x: 240, y: 200 });
+    },
   }, keyboardActive);
 
   const total = (status?.entries ?? []).filter((e) => e.kind !== "ignored").length;
@@ -213,42 +219,8 @@ export function FileStatusView({
           stagedCount={status?.stagedCount ?? 0}
           busy={busy}
           onCommit={onCommit}
-          onEditing={setEditingMessage}
         />
 
-        {/* Lists the keys that are live right now, which is why it changes
-            while the message box has focus: there, a single key is a
-            character, and only Escape and the Mod combos still act. */}
-        {keyboardActive && (
-          <p className="pane-hint">
-            {editingMessage ? (
-              <>
-                <Keys>
-                  <kbd>{shortcutLabel(keymap["status.commit"])}</kbd> commit
-                </Keys>{" "}
-                ·{" "}
-                <Keys>
-                  <kbd>{formatBinding("Escape")}</kbd> leave the message
-                </Keys>
-              </>
-            ) : (
-              <>
-                <Keys>
-                  <kbd>{shortcutLabel(keymap["status.next"])}</kbd>
-                  <kbd>{shortcutLabel(keymap["status.previous"])}</kbd> move
-                </Keys>{" "}
-                ·{" "}
-                <Keys>
-                  <kbd>{shortcutLabel(keymap["status.toggle"])}</kbd> stage
-                </Keys>{" "}
-                ·{" "}
-                <Keys>
-                  <kbd>{shortcutLabel(keymap["status.discard"])}</kbd> discard
-                </Keys>
-              </>
-            )}
-          </p>
-        )}
       </div>
 
       <Splitter

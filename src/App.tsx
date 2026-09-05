@@ -14,6 +14,8 @@ import {
   type ResetMode,
   type BlameTarget,
   type BranchRef,
+  type RemoteGroup,
+  type StashEntry,
   type FlowKind,
   type StatusEntry,
   type RepoInfo,
@@ -31,6 +33,9 @@ import {
 import { ContextMenu, type MenuEntry, type MenuState } from "./components/ContextMenu";
 import { FileStatusView } from "./components/FileStatusView";
 import { HistoryView } from "./components/HistoryView";
+import { StashView } from "./components/StashView";
+import { KeyHints } from "./components/KeyHints";
+import type { CommandScope } from "./lib/commands";
 import { Dialog, type DialogSpec } from "./components/Dialog";
 import type { ComboOption } from "./components/Combo";
 import { cloneDestination, repoNameFromUrl } from "./lib/cloneTarget";
@@ -148,6 +153,9 @@ export default function App() {
   // rather than becoming a third workspace view, so the number keys and
   // the sidebar keep meaning exactly what they meant before.
   const [blameTarget, setBlameTarget] = useState<BlameTarget | null>(null);
+  /** The stash being read in the main panel, if any. Takes the panel over
+   *  the way a blame does, and for the same reason. */
+  const [stashShown, setStashShown] = useState<StashEntry | null>(null);
   /** The search panel is showing over the main panel. */
   const [searchOpen, setSearchOpen] = useState(false);
   /** A commit the history view should select, set by a search result. */
@@ -191,6 +199,7 @@ export default function App() {
     // otherwise pressing 2 would look like it did nothing.
     if (panel === "files" || panel === "history") {
       setBlameTarget(null);
+      setStashShown(null);
       setSearchOpen(false);
     }
     setFocusedPanel(panel);
@@ -1129,7 +1138,7 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
     ...(refs.data?.tags ?? []).map((tag) => ({ value: tag, note: "tag" })),
   ];
 
-  const openNewBranch = () => {
+  const openNewBranch = (from?: string) => {
     const current = head?.head ?? "HEAD";
 
     setDialog({
@@ -1141,8 +1150,9 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
           label: "Starting from",
           // Defaults to where you are, which is what git does when no start
           // point is given -- and what you want often enough that the field is
-          // there to be ignored as much as used.
-          value: current,
+          // there to be ignored as much as used. A menu on a commit or tag
+          // passes that instead.
+          value: from ?? current,
           placeholder: current,
           optional: true,
           options: refOptions(),
@@ -1164,6 +1174,203 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
         ),
     });
   };
+
+  /** `origin` where there is one, else the first remote. For actions that
+   *  name a remote without asking. */
+  const preferredRemote = (): string | undefined => {
+    const remotes = refs.data?.remotes ?? [];
+    return (remotes.find((r) => r.name === "origin") ?? remotes[0])?.name;
+  };
+
+  const remoteBranchOptions = (): ComboOption[] =>
+    (refs.data?.remotes ?? []).flatMap((remote) =>
+      remote.branches.map((branch) => ({ value: `${remote.name}/${branch}`, note: remote.name })),
+    );
+
+  const openNewRemote = () =>
+    setDialog({
+      title: "Add remote",
+      fields: [
+        {
+          key: "name",
+          label: "Name",
+          placeholder: "origin",
+          // The first remote is nearly always origin; a second one is not.
+          value: (refs.data?.remotes.length ?? 0) === 0 ? "origin" : "",
+        },
+        { key: "url", label: "URL", placeholder: "git@github.com:you/repo.git" },
+      ],
+      confirmLabel: "Add remote",
+      onConfirm: (v) =>
+        act(`Add remote ${v.name}`, () => api.addRemote(id!, v.name.trim(), v.url.trim())),
+    });
+
+  const openEditRemote = (remote: RemoteGroup) =>
+    setDialog({
+      title: `Edit remote ${remote.name}`,
+      fields: [
+        { key: "name", label: "Name", value: remote.name },
+        { key: "url", label: "URL", value: remote.url },
+      ],
+      confirmLabel: "Save",
+      onConfirm: (v) =>
+        act(`Edit remote ${remote.name}`, async () => {
+          const name = v.name.trim();
+          const url = v.url.trim();
+          const done: string[] = [];
+
+          // URL first, under the old name: a rename that then failed would
+          // otherwise leave the URL change addressed to a remote that no
+          // longer exists.
+          if (url !== remote.url) {
+            await api.setRemoteUrl(id!, remote.name, url);
+            done.push(`URL is now ${url}`);
+          }
+          if (name !== remote.name) {
+            await api.renameRemote(id!, remote.name, name);
+            done.push(`Renamed to ${name}`);
+          }
+
+          return done.join(" · ") || "Nothing changed";
+        }),
+    });
+
+  const confirmRemoveRemote = (remote: RemoteGroup) =>
+    setDialog({
+      title: `Remove remote ${remote.name}`,
+      message: `Forgets ${remote.url || remote.name} and every ${remote.name}/… branch fetched from it. Nothing on the remote itself changes.`,
+      confirmLabel: "Remove",
+      danger: true,
+      onConfirm: () =>
+        act(`Remove remote ${remote.name}`, () => api.removeRemote(id!, remote.name)),
+    });
+
+  const openNewTag = (at?: string) => {
+    const current = head?.head ?? "HEAD";
+
+    setDialog({
+      title: "New tag",
+      fields: [
+        { key: "name", label: "Tag name", placeholder: "v1.2.0" },
+        {
+          key: "target",
+          label: "At",
+          value: at ?? current,
+          placeholder: current,
+          optional: true,
+          options: refOptions(),
+        },
+        {
+          key: "message",
+          label: "Message",
+          placeholder: "Empty for a lightweight tag",
+          optional: true,
+          describe: (value) =>
+            value.trim() === ""
+              ? "A lightweight tag: a name for a commit, nothing more."
+              : "An annotated tag, with an author, a date and this message.",
+        },
+      ],
+      confirmLabel: "Create tag",
+      onConfirm: (v) =>
+        act(`Tag ${v.name}`, () => api.createTag(id!, v.name.trim(), v.target, v.message)),
+    });
+  };
+
+  const confirmDeleteTag = (tag: string) => {
+    const remote = preferredRemote();
+
+    setDialog({
+      title: `Delete tag ${tag}`,
+      message: remote
+        ? `Deleting it here leaves the copy on ${remote}; deleting it there removes it for everyone.`
+        : "Git keeps no record of a deleted tag.",
+      checkboxes: remote
+        ? [{ key: "remote", label: `Delete it on ${remote} as well`, value: false }]
+        : [],
+      confirmLabel: "Delete",
+      danger: true,
+      onConfirm: (v) =>
+        act(`Delete tag ${tag}`, () =>
+          api.deleteTag(id!, tag, v.remote === "true" && remote ? remote : null),
+        ),
+    });
+  };
+
+  const pushTag = (tag: string) => {
+    const remote = preferredRemote();
+    if (!remote) {
+      activity.note("Push tag", "This repository has no remote to push to.", "error");
+      return;
+    }
+    act(`Push ${tag} to ${remote}`, () => api.pushTag(id!, tag, remote), "push");
+  };
+
+  const openRenameBranch = (branch: BranchRef) =>
+    setDialog({
+      title: `Rename ${branch.name}`,
+      fields: [{ key: "name", label: "New name", value: branch.name }],
+      confirmLabel: "Rename",
+      onConfirm: (v) =>
+        act(`Rename ${branch.name} to ${v.name}`, () =>
+          api.renameBranch(id!, branch.name, v.name.trim()),
+        ),
+    });
+
+  const openSetUpstream = (branch: BranchRef) =>
+    setDialog({
+      title: `Upstream for ${branch.name}`,
+      message: "The remote branch Pull takes from and Push sends to.",
+      fields: [
+        {
+          key: "upstream",
+          label: "Upstream",
+          value: branch.upstream ?? "",
+          placeholder: "origin/main",
+          options: remoteBranchOptions(),
+        },
+      ],
+      confirmLabel: "Set upstream",
+      onConfirm: (v) =>
+        act(`Track ${v.upstream} with ${branch.name}`, () =>
+          api.setUpstream(id!, branch.name, v.upstream.trim()),
+        ),
+    });
+
+  const confirmForceCheckout = (name: string) =>
+    setDialog({
+      title: `Check out ${name}, discarding local changes`,
+      message:
+        "Uncommitted changes to tracked files are thrown away first. Git keeps no record of them.",
+      confirmLabel: "Discard and check out",
+      danger: true,
+      onConfirm: () => act(`Check out ${name}`, () => api.checkout(id!, name, true)),
+    });
+
+  const openCheckoutByName = () =>
+    setDialog({
+      title: "Check out",
+      fields: [
+        {
+          key: "ref",
+          label: "Branch, tag or commit",
+          placeholder: "main, v1.0, abc1234",
+          options: refOptions({ includeCurrent: false }),
+        },
+      ],
+      confirmLabel: "Check out",
+      onConfirm: (v) => act(`Check out ${v.ref}`, () => api.checkout(id!, v.ref.trim())),
+    });
+
+  const confirmForcePush = () =>
+    setDialog({
+      title: `Force push ${head?.head ?? "HEAD"}`,
+      message:
+        "Rewrites the remote branch to match this one. With a lease, git refuses if the remote has moved since your last fetch, so nobody else's work is overwritten unseen.",
+      confirmLabel: "Force push",
+      danger: true,
+      onConfirm: () => act("Force push", () => api.push(id!, true, false), "push"),
+    });
 
   /** The branch the sidebar cursor is on, if it is on one.
    *
@@ -1224,10 +1431,22 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
           optional: true,
         },
       ],
-      checkboxes: [{ key: "untracked", label: "Include untracked files", value: true }],
+      checkboxes: [
+        { key: "untracked", label: "Include untracked files", value: true },
+        { key: "staged", label: "Only what is staged", value: false },
+        { key: "keepIndex", label: "Leave staged changes in place as well", value: false },
+      ],
       confirmLabel: "Stash",
       onConfirm: (v) =>
-        act("Stash changes", () => api.stashPush(id!, v.message, v.untracked === "true")),
+        act("Stash changes", () =>
+          api.stashPush(
+            id!,
+            v.message,
+            v.untracked === "true",
+            v.staged === "true",
+            v.keepIndex === "true",
+          ),
+        ),
     });
 
   /** Take the next step a failed command suggested. */
@@ -1408,6 +1627,27 @@ The stashed changes are discarded.`,
         label: "Copy hash",
         onClick: () => void copy(commit.oid, commit.oid, commit.short),
       },
+      {
+        label: "Copy subject",
+        onClick: () => void copy(`subject:${commit.oid}`, commit.subject),
+      },
+      {
+        label: "Copy author",
+        onClick: () =>
+          void copy(`author:${commit.oid}`, `${commit.author} <${commit.email}>`),
+      },
+      "separator",
+      {
+        label: `Cherry-pick ${commit.short} onto ${branch ?? "HEAD"}`,
+        onClick: () =>
+          act(`Cherry-pick ${commit.short}`, () => api.cherryPick(id!, commit.oid)),
+      },
+      {
+        label: `Check out ${commit.short} (detached)`,
+        onClick: () => act(`Check out ${commit.short}`, () => api.checkout(id!, commit.oid)),
+      },
+      { label: `New branch from ${commit.short}…`, onClick: () => openNewBranch(commit.oid) },
+      { label: `Tag ${commit.short}…`, onClick: () => openNewTag(commit.oid) },
       "separator",
       {
         label: `Revert ${commit.short}…`,
@@ -1479,6 +1719,27 @@ The stashed changes are discarded.`,
         onClick: () => blameFile(entry.path),
       },
       "separator",
+      { label: "Open in editor", onClick: () => openFileInEditor(entry.path) },
+      { label: "Copy path", onClick: () => void copy(`path:${entry.path}`, entry.path) },
+      // Ignoring is for what git does not track yet. A tracked file stays
+      // tracked whatever .gitignore says, so offering it there would only
+      // produce a line that does nothing.
+      ...(entry.kind === "untracked"
+        ? [
+            "separator" as const,
+            {
+              label: "Add to .gitignore",
+              onClick: () =>
+                act(`Ignore ${entry.path}`, () => api.ignorePath(id, entry.path, false)),
+            },
+            {
+              label: "Exclude locally (.git/info/exclude)",
+              onClick: () =>
+                act(`Exclude ${entry.path}`, () => api.ignorePath(id, entry.path, true)),
+            },
+          ]
+        : []),
+      "separator",
       {
         label: "Discard changes…",
         danger: true,
@@ -1487,6 +1748,20 @@ The stashed changes are discarded.`,
       },
     ]);
   };
+
+  const openFileInEditor = (path: string) => {
+    if (!id) return;
+    act(`Open ${path}`, () =>
+      api.openInEditor(id, settings.editor, settings.editorCommand, settings.terminal, path),
+    );
+  };
+
+  /** Menu for a file of a commit or stash. */
+  const onCommitFileMenu = (path: string, at: Point) =>
+    openMenuAt(at.x, at.y, [
+      { label: "Open in editor", onClick: () => openFileInEditor(path) },
+      { label: "Copy path", onClick: () => void copy(`path:${path}`, path) },
+    ]);
 
   /** Delete whatever the sidebar cursor is on.
    *
@@ -1514,6 +1789,23 @@ The stashed changes are discarded.`,
    *  Every path answers, including the ones that cannot act. A key that does
    *  nothing and says nothing reads as a key that is not bound at all, which
    *  is worse than a refusal. */
+  /** Edit whatever the sidebar cursor is on: the one thing about it that
+   *  has a form, where there is one. */
+  const onSidebarEdit = (target: MenuTarget | null) => {
+    if (!id) return;
+
+    switch (target?.kind) {
+      case "remoteGroup":
+        openEditRemote(target.remote);
+        break;
+      case "branch":
+        openRenameBranch(target.branch);
+        break;
+      default:
+        activity.note("Edit", "Nothing here to edit. Move to a remote or a branch first.", "error");
+    }
+  };
+
   const onSidebarDelete = (target: MenuTarget | null) => {
     if (!id) return;
 
@@ -1550,7 +1842,11 @@ The stashed changes are discarded.`,
         break;
 
       case "tag":
-        refuse(`Deleting a tag is not supported yet (${target.tag}).`);
+        confirmDeleteTag(target.tag);
+        break;
+
+      case "remoteGroup":
+        confirmRemoveRemote(target.remote);
         break;
 
       case "submodule":
@@ -1628,13 +1924,55 @@ The stashed changes are discarded.`,
             onClick: () =>
               act(`Merge ${branch.name}`, () => api.mergeBranch(id, branch.name)),
           },
+          {
+            label: `Rebase ${current} onto ${branch.name}`,
+            disabled: branch.isHead || !head?.head,
+            onClick: () =>
+              act(`Rebase onto ${branch.name}`, () => api.rebaseBranch(id, branch.name)),
+          },
           "separator",
+          { label: "Rename…", onClick: () => openRenameBranch(branch) },
+          {
+            label: branch.upstream ? `Change upstream (${branch.upstream})…` : "Set upstream…",
+            onClick: () => openSetUpstream(branch),
+          },
+          ...(branch.upstream
+            ? [
+                {
+                  label: "Stop tracking upstream",
+                  onClick: () =>
+                    act(`Untrack ${branch.name}`, () => api.setUpstream(id, branch.name, null)),
+                },
+              ]
+            : []),
+          "separator",
+          {
+            label: `Check out ${branch.name}, discarding local changes…`,
+            danger: true,
+            disabled: branch.isHead,
+            onClick: () => confirmForceCheckout(branch.name),
+          },
           {
             label: "Delete branch…",
             danger: true,
             disabled: branch.isHead,
             onClick: () => confirmDeleteBranch(branch),
           },
+        ]);
+        break;
+      }
+
+      case "remoteGroup": {
+        const { remote } = target;
+        openMenuAt(at.x, at.y, [
+          {
+            label: `Fetch ${remote.name}`,
+            onClick: () =>
+              act(`Fetch ${remote.name}`, () => api.fetchRemote(id, remote.name), "fetch"),
+          },
+          { label: "Edit…", onClick: () => openEditRemote(remote) },
+          "separator",
+          { label: "Remove remote…", danger: true, onClick: () => confirmRemoveRemote(remote) },
         ]);
         break;
       }
@@ -1653,6 +1991,24 @@ The stashed changes are discarded.`,
                 api.mergeBranch(id, `${remote}/${branch}`),
               ),
           },
+          {
+            label: `Rebase ${current} onto ${remote}/${branch}`,
+            disabled: !head?.head,
+            onClick: () =>
+              act(`Rebase onto ${remote}/${branch}`, () =>
+                api.rebaseBranch(id, `${remote}/${branch}`),
+              ),
+          },
+          "separator",
+          { label: "New branch from here…", onClick: () => openNewBranch(`${remote}/${branch}`) },
+          {
+            label: `Set as upstream of ${current}`,
+            disabled: !head?.head,
+            onClick: () =>
+              act(`Track ${remote}/${branch}`, () =>
+                api.setUpstream(id, head!.head!, `${remote}/${branch}`),
+              ),
+          },
         ]);
         break;
       }
@@ -1668,6 +2024,18 @@ The stashed changes are discarded.`,
           {
             label: `Merge ${target.tag} into ${current}`,
             onClick: () => act(`Merge ${target.tag}`, () => api.mergeBranch(id, target.tag)),
+          },
+          { label: "New branch from here…", onClick: () => openNewBranch(target.tag) },
+          "separator",
+          {
+            label: `Push ${target.tag} to ${preferredRemote() ?? "a remote"}`,
+            disabled: !preferredRemote(),
+            onClick: () => pushTag(target.tag),
+          },
+          {
+            label: "Delete tag…",
+            danger: true,
+            onClick: () => confirmDeleteTag(target.tag),
           },
         ]);
         break;
@@ -1761,6 +2129,13 @@ The stashed changes are discarded.`,
             badge: head?.behind || undefined,
             onClick: () => act("Pull", () => api.pull(id), "pull"),
             busy: workingOn.has("pull"),
+            onContextMenu: (e) =>
+              openMenu(e, [
+                {
+                  label: "Pull with rebase",
+                  onClick: () => act("Pull with rebase", () => api.pull(id, true), "pull"),
+                },
+              ]),
           },
           {
             key: "push",
@@ -1770,6 +2145,14 @@ The stashed changes are discarded.`,
             badge: head?.ahead || undefined,
             onClick: () => act("Push", () => api.push(id), "push"),
             busy: workingOn.has("push"),
+            onContextMenu: (e) =>
+              openMenu(e, [
+                {
+                  label: "Push tags",
+                  onClick: () => act("Push tags", () => api.push(id, false, true), "push"),
+                },
+                { label: "Force push, with lease…", danger: true, onClick: confirmForcePush },
+              ]),
           },
           {
             key: "fetch",
@@ -1778,6 +2161,19 @@ The stashed changes are discarded.`,
             icon: <IconFetch />,
             onClick: () => act("Fetch", () => api.fetch(id), "fetch"),
             busy: workingOn.has("fetch"),
+            // One entry per remote, and no menu at all with none: an empty
+            // menu says less than no menu.
+            onContextMenu: refs.data?.remotes.length
+              ? (e) =>
+                  openMenu(
+                    e,
+                    refs.data!.remotes.map((remote) => ({
+                      label: `Fetch ${remote.name}`,
+                      onClick: () =>
+                        act(`Fetch ${remote.name}`, () => api.fetchRemote(id, remote.name), "fetch"),
+                    })),
+                  )
+              : undefined,
           },
         ],
         [
@@ -1786,7 +2182,7 @@ The stashed changes are discarded.`,
             commandId: "git.new",
             label: "Branch",
             icon: <IconBranch />,
-            onClick: openNewBranch,
+            onClick: () => openNewBranch(),
           },
           {
             key: "merge",
@@ -1967,6 +2363,14 @@ The stashed changes are discarded.`,
     "git.fetch": id ? () => act("Fetch", () => api.fetch(id), "fetch") : undefined,
     "git.pull": id ? () => act("Pull", () => api.pull(id), "pull") : undefined,
     "git.push": id ? () => act("Push", () => api.push(id), "push") : undefined,
+    "git.pullRebase": id
+      ? () => act("Pull with rebase", () => api.pull(id, true), "pull")
+      : undefined,
+    "git.pushForce": id ? confirmForcePush : undefined,
+    "git.pushTags": id ? () => act("Push tags", () => api.push(id, false, true), "push") : undefined,
+    "git.checkout": id ? openCheckoutByName : undefined,
+    "git.tag": id ? () => openNewTag() : undefined,
+    "git.remote": id ? openNewRemote : undefined,
     "git.commit": id
       ? () => {
           setView("status");
@@ -1988,6 +2392,31 @@ The stashed changes are discarded.`,
   // A menu counts: it owns the keyboard while it is up, or J would move the
   // list behind it instead of the menu's own cursor.
   const inputOpen = settingsOpen || paletteOpen || dialog !== null || menu !== null;
+
+  // A stash being read that is popped or dropped -- from its own menu, say
+  // -- has nothing left to read. The view goes with it rather than showing a
+  // commit the sidebar no longer lists.
+  useEffect(() => {
+    if (!stashShown || !refs.data) return;
+    if (!refs.data.stashes.some((stash) => stash.oid === stashShown.oid)) setStashShown(null);
+  }, [refs.data, stashShown]);
+
+  /** Which section's keys are live, for the strip above the status bar. */
+  const hintScope: CommandScope | null = !id
+    ? null
+    : menu
+      ? "menu"
+      : isSidebarPanel(focusedPanel)
+        ? "sidebar"
+        : searchOpen
+          ? "search"
+          : blameTarget
+            ? "blame"
+            : stashShown
+              ? null
+              : view === "status"
+                ? "status"
+                : "history";
   useCommands(handlers, !inputOpen);
 
   // Nothing here is usable until the session is known, and an empty tab strip
@@ -2124,6 +2553,13 @@ The stashed changes are discarded.`,
                 if (view === "history") setHistoryFocus(oid);
               }}
               onPublish={publishBranch}
+              onNewRemote={openNewRemote}
+              onNewTag={() => openNewTag()}
+              onShowStash={(stash) => {
+                setBlameTarget(null);
+                setSearchOpen(false);
+                setStashShown(stash);
+              }}
               onStash={(selector, action) =>
                 act(
                   action === "drop" ? `Drop ${selector}` : `${action} ${selector}`,
@@ -2147,6 +2583,10 @@ The stashed changes are discarded.`,
               onMenu={onSidebarMenu}
               onCursor={setSidebarCursor}
               onDelete={onSidebarDelete}
+              onEdit={onSidebarEdit}
+              onFetchRemote={(name) =>
+                act(`Fetch ${name}`, () => api.fetchRemote(id, name), "fetch")
+              }
             />
 
             <Splitter
@@ -2186,6 +2626,13 @@ The stashed changes are discarded.`,
                     setBlameTarget({ path, rev: null });
                   }}
                 />
+              ) : stashShown ? (
+                <StashView
+                  repoId={id}
+                  stash={stashShown}
+                  onClose={() => setStashShown(null)}
+                  onFileMenu={onCommitFileMenu}
+                />
               ) : blameTarget ? (
                 <BlameView
                   repoId={id}
@@ -2209,9 +2656,9 @@ The stashed changes are discarded.`,
                   onDiscard={(paths) => confirmDiscard(paths)}
                   onBlame={(path) => blameFile(path)}
                   onMenu={onFileMenu}
-                  onCommit={(message, amend) =>
+                  onCommit={(message, amend, skipHooks) =>
                     perform(amend ? "Amend commit" : "Commit", () =>
-                      api.commit(id, message, amend),
+                      api.commit(id, message, amend, skipHooks),
                     )
                   }
                   onResolve={(path, side) =>
@@ -2244,6 +2691,7 @@ The stashed changes are discarded.`,
                   onFocused={() => setHistoryFocus(null)}
                   keyboardActive={!isSidebarPanel(focusedPanel) && !inputOpen}
                   onCommitMenu={openCommitMenu}
+                  onFileMenu={onCommitFileMenu}
                 />
               )}
             </main>
@@ -2259,6 +2707,12 @@ The stashed changes are discarded.`,
           </div>
         </>
       )}
+
+      {/* The keys for whatever is active, pinned: a strip inside a pane
+          scrolls off with a long list and hides when the pane is not the one
+          holding the keyboard, which is exactly when you want to know what
+          the other one answers to. */}
+      <KeyHints scope={showLibrary ? "library" : hintScope} />
 
       <footer className={STATUSBAR}>
         {head && (

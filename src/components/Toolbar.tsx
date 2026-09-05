@@ -19,6 +19,8 @@ export interface ToolbarAction {
   busy?: boolean;
   /** Why the button is unavailable, when it is. */
   disabledReason?: string;
+  /** Right-click: the button's variants, for the ones that have any. */
+  onContextMenu?: (event: MouseEvent) => void;
 }
 
 interface Props {
@@ -63,6 +65,13 @@ export function Toolbar({ groups }: Props) {
                 .filter(Boolean)
                 .join(" ")}
               onClick={action.onClick}
+              onContextMenu={
+                action.onContextMenu &&
+                ((e) => {
+                  e.preventDefault();
+                  action.onContextMenu?.(e);
+                })
+              }
               // Disabled while it runs: a second Push before the first has
               // answered is never what was meant, and git would take the lock
               // and fail anyway.

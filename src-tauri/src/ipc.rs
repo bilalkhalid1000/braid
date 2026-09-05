@@ -351,12 +351,16 @@ pub async fn commit(
     id: String,
     message: String,
     amend: bool,
+    no_verify: bool,
 ) -> Result<String> {
     let session = registry.get(&id)?;
 
     let mut args = vec!["commit", "-m", &message];
     if amend {
         args.push("--amend");
+    }
+    if no_verify {
+        args.push("--no-verify");
     }
 
     // Git's own summary line ("[main abc1234] message, 2 files changed") is
@@ -374,9 +378,10 @@ pub async fn fetch(registry: State<'_, RepoRegistry>, id: String) -> Result<Stri
 }
 
 #[tauri::command]
-pub async fn pull(registry: State<'_, RepoRegistry>, id: String) -> Result<String> {
+pub async fn pull(registry: State<'_, RepoRegistry>, id: String, rebase: bool) -> Result<String> {
     let session = registry.get(&id)?;
-    session.git.run_reported(&["pull"]).await
+    let args: &[&str] = if rebase { &["pull", "--rebase"] } else { &["pull"] };
+    session.git.run_reported(args).await
 }
 
 /// Push, setting an upstream on the first push of a new branch.
@@ -385,10 +390,25 @@ pub async fn pull(registry: State<'_, RepoRegistry>, id: String) -> Result<Strin
 /// the user discover that through an error, retry once with the obvious
 /// intent, which is what they wanted by pressing Push.
 #[tauri::command]
-pub async fn push(registry: State<'_, RepoRegistry>, id: String) -> Result<String> {
+pub async fn push(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    force: bool,
+    tags: bool,
+) -> Result<String> {
     let session = registry.get(&id)?;
 
-    match session.git.run_reported(&["push"]).await {
+    // With a lease, never bare: it refuses when the remote has moved since
+    // the last fetch, which is the one case a force push destroys work.
+    let mut args = vec!["push"];
+    if force {
+        args.push("--force-with-lease");
+    }
+    if tags {
+        args.push("--tags");
+    }
+
+    match session.git.run_reported(&args).await {
         Ok(out) => Ok(out),
         Err(AppError::Git { stderr, code }) if stderr.contains("no upstream branch") => {
             let branch = session
@@ -403,10 +423,8 @@ pub async fn push(registry: State<'_, RepoRegistry>, id: String) -> Result<Strin
 
             let remote = git::default_remote(&session.git).await?;
 
-            session
-                .git
-                .run_reported(&["push", "--set-upstream", &remote, &branch])
-                .await
+            args.extend(["--set-upstream", &remote, &branch]);
+            session.git.run_reported(&args).await
         }
         Err(e) => Err(e),
     }
@@ -443,11 +461,17 @@ pub async fn checkout(
     registry: State<'_, RepoRegistry>,
     id: String,
     name: String,
+    force: bool,
 ) -> Result<String> {
     let session = registry.get(&id)?;
     // "Switched to branch 'x'" and any "Your branch is behind" hint both come
     // back on stderr, and both are worth showing.
-    session.git.run_reported(&["checkout", &name]).await
+    let args: &[&str] = if force {
+        &["checkout", "--force", &name]
+    } else {
+        &["checkout", &name]
+    };
+    session.git.run_reported(args).await
 }
 
 #[tauri::command]
@@ -530,12 +554,21 @@ pub async fn stash_push(
     id: String,
     message: String,
     include_untracked: bool,
+    staged_only: bool,
+    keep_index: bool,
 ) -> Result<String> {
     let session = registry.get(&id)?;
 
     let mut args = vec!["stash", "push"];
-    if include_untracked {
+    // Staged-only already names exactly what goes in; untracked files are
+    // never staged, so the two do not combine.
+    if staged_only {
+        args.push("--staged");
+    } else if include_untracked {
         args.push("--include-untracked");
+    }
+    if keep_index {
+        args.push("--keep-index");
     }
     if !message.is_empty() {
         args.push("-m");
@@ -837,10 +870,21 @@ pub async fn open_in_editor(
     editor: Option<String>,
     command: Option<String>,
     terminal: Option<String>,
+    path: Option<String>,
 ) -> Result<String> {
     let session = registry.get(&id)?;
+
+    // A file inside the repository, or the repository itself.
+    let target = match path.as_deref().map(str::trim) {
+        Some(p) if !p.is_empty() => std::path::Path::new(&session.info.root)
+            .join(p)
+            .to_string_lossy()
+            .into_owned(),
+        _ => session.info.root.clone(),
+    };
+
     system::open_editor(
-        &session.info.root,
+        &target,
         editor.as_deref().unwrap_or("auto"),
         command.as_deref().unwrap_or_default(),
         terminal.as_deref().unwrap_or("auto"),
@@ -895,4 +939,185 @@ async fn run_with_paths(git: &Git, base: &[&str], paths: &[String]) -> Result<()
 
     git.run(&args).await?;
     Ok(())
+}
+
+// --- tier 1 additions -----------------------------------------------------
+
+#[tauri::command]
+pub async fn add_remote(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    name: String,
+    url: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    session.git.run_reported(&["remote", "add", &name, &url]).await
+}
+
+#[tauri::command]
+pub async fn rename_remote(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    name: String,
+    new_name: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    session.git.run_reported(&["remote", "rename", &name, &new_name]).await
+}
+
+#[tauri::command]
+pub async fn set_remote_url(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    name: String,
+    url: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    session.git.run_reported(&["remote", "set-url", &name, &url]).await
+}
+
+#[tauri::command]
+pub async fn remove_remote(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    name: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    session.git.run_reported(&["remote", "remove", &name]).await
+}
+
+/// Fetch one remote, pruning branches it no longer has, as the all-remotes
+/// fetch does.
+#[tauri::command]
+pub async fn fetch_remote(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    name: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    session.git.run_reported(&["fetch", "--prune", &name]).await
+}
+
+/// Replay the current branch onto `onto`. A conflict leaves the repository
+/// rebasing, which the operation banner already knows how to finish.
+#[tauri::command]
+pub async fn rebase_branch(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    onto: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    session.git.run_reported(&["rebase", &onto]).await
+}
+
+#[tauri::command]
+pub async fn cherry_pick(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    oid: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    session.git.run_reported(&["cherry-pick", &oid]).await
+}
+
+/// Annotated when there is a message, lightweight otherwise: the message is
+/// what makes a tag an object rather than a pointer.
+#[tauri::command]
+pub async fn create_tag(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    name: String,
+    target: String,
+    message: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    let target = if target.trim().is_empty() { "HEAD" } else { target.trim() };
+
+    let args: Vec<&str> = if message.trim().is_empty() {
+        vec!["tag", &name, target]
+    } else {
+        vec!["tag", "-a", &name, "-m", &message, target]
+    };
+
+    session.git.run_reported(&args).await
+}
+
+/// Delete a tag here, and on `remote` when one is named.
+#[tauri::command]
+pub async fn delete_tag(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    name: String,
+    remote: Option<String>,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    let mut done = vec![session.git.run_reported(&["tag", "-d", &name]).await?];
+
+    if let Some(remote) = remote.filter(|r| !r.trim().is_empty()) {
+        done.push(
+            session
+                .git
+                .run_reported(&["push", &remote, "--delete", &format!("refs/tags/{name}")])
+                .await?,
+        );
+    }
+
+    Ok(done.join("\n"))
+}
+
+#[tauri::command]
+pub async fn push_tag(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    name: String,
+    remote: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    session.git.run_reported(&["push", &remote, "tag", &name]).await
+}
+
+#[tauri::command]
+pub async fn rename_branch(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    name: String,
+    new_name: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    session.git.run_reported(&["branch", "-m", &name, &new_name]).await
+}
+
+/// Point a branch at an upstream, or with none, at nothing.
+#[tauri::command]
+pub async fn set_upstream(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    branch: String,
+    upstream: Option<String>,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+
+    match upstream.filter(|u| !u.trim().is_empty()) {
+        Some(upstream) => {
+            let flag = format!("--set-upstream-to={upstream}");
+            session.git.run_reported(&["branch", &flag, &branch]).await
+        }
+        None => {
+            session
+                .git
+                .run_reported(&["branch", "--unset-upstream", &branch])
+                .await
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn ignore_path(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    path: String,
+    local: bool,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    git::ignore::ignore(&session.git, &path, local).await
 }

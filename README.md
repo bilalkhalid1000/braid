@@ -28,7 +28,7 @@ Working today:
 - Stage / unstage / discard by file, whole-section toggles, commit with amend
 - Unified diff viewer, virtualized, with binary and oversize-file handling
 - History browser, paged and virtualized, with commit details
-- Branches, tags, remotes, stashes; fetch, pull, push, merge, checkout
+- Branches, tags, remotes, stashes; fetch, pull, push, merge, rebase, cherry-pick, checkout
 - Worktrees: list, add, remove, prune, and open any worktree as its own tab
 - Submodules: state per submodule, init/update, and open one as its own tab
 - Light, dark, and follow-the-system themes

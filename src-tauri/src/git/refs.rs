@@ -1,6 +1,7 @@
 use serde::Serialize;
 
 use super::cli::Git;
+use super::remote;
 use crate::error::{AppError, Result};
 
 #[derive(Serialize, Clone, Debug)]
@@ -18,6 +19,10 @@ pub struct BranchRef {
 #[serde(rename_all = "camelCase")]
 pub struct RemoteGroup {
     pub name: String,
+    /// The fetch URL. Empty only for a remote git lists branches for but no
+    /// longer configures, which happens after `remote remove` until the stale
+    /// refs are pruned.
+    pub url: String,
     pub branches: Vec<String>,
 }
 
@@ -25,6 +30,9 @@ pub struct RemoteGroup {
 #[serde(rename_all = "camelCase")]
 pub struct StashEntry {
     pub selector: String,
+    /// The stash commit. `stash@{0}` names a different one after every push,
+    /// so the front end keys what it shows by this instead.
+    pub oid: String,
     pub message: String,
 }
 
@@ -46,7 +54,7 @@ const BRANCH_FORMAT: &str =
     "--format=%(refname:short)\t%(HEAD)\t%(upstream:short)\t%(upstream:track)\t%(objectname)";
 
 pub async fn refs(git: &Git) -> Result<RefsSnapshot> {
-    let (branches, remotes, tags, stashes) = tokio::try_join!(
+    let (branches, remotes, tags, stashes, remote_urls) = tokio::try_join!(
         git.run_str(&[
             "for-each-ref",
             "--sort=-committerdate",
@@ -64,12 +72,13 @@ pub async fn refs(git: &Git) -> Result<RefsSnapshot> {
             "--format=%(refname:short)",
             "refs/tags",
         ]),
-        git.run_str(&["stash", "list", "--format=%gd\t%s"]),
+        git.run_str(&["stash", "list", "--format=%gd\t%H\t%s"]),
+        git.run_str(&["remote", "-v"]),
     )?;
 
     Ok(RefsSnapshot {
         branches: parse_branches(&branches),
-        remotes: group_remotes(&remotes),
+        remotes: group_remotes(&remotes, &remote::parse_urls(&remote_urls)),
         tags: tags.lines().map(str::to_string).collect(),
         stashes: parse_stashes(&stashes),
     })
@@ -149,8 +158,19 @@ pub async fn default_remote(git: &Git) -> Result<String> {
 }
 
 /// Turn a flat `origin/main`, `origin/dev`, `upstream/main` list into groups.
-fn group_remotes(text: &str) -> Vec<RemoteGroup> {
-    let mut groups: Vec<RemoteGroup> = Vec::new();
+///
+/// Every configured remote gets a group, branches or not: a remote added a
+/// moment ago has nothing fetched yet and still has to be somewhere to fetch
+/// from.
+fn group_remotes(text: &str, urls: &[(String, String)]) -> Vec<RemoteGroup> {
+    let mut groups: Vec<RemoteGroup> = urls
+        .iter()
+        .map(|(name, url)| RemoteGroup {
+            name: name.clone(),
+            url: url.clone(),
+            branches: Vec::new(),
+        })
+        .collect();
 
     for full in text.lines() {
         // `origin/HEAD` is a symbolic pointer, not a branch anyone checks out.
@@ -166,6 +186,7 @@ fn group_remotes(text: &str) -> Vec<RemoteGroup> {
             Some(group) => group.branches.push(branch.to_string()),
             None => groups.push(RemoteGroup {
                 name: remote.to_string(),
+                url: String::new(),
                 branches: vec![branch.to_string()],
             }),
         }
@@ -177,9 +198,13 @@ fn group_remotes(text: &str) -> Vec<RemoteGroup> {
 fn parse_stashes(text: &str) -> Vec<StashEntry> {
     text.lines()
         .filter_map(|line| {
-            let (selector, message) = line.split_once('\t')?;
+            let mut fields = line.splitn(3, '\t');
+            let selector = fields.next()?;
+            let oid = fields.next()?;
+            let message = fields.next().unwrap_or_default();
             Some(StashEntry {
                 selector: selector.to_string(),
+                oid: oid.to_string(),
                 message: message.to_string(),
             })
         })
@@ -213,7 +238,7 @@ mod tests {
     #[test]
     fn groups_remotes_and_drops_head_pointers() {
         let text = "origin/main\norigin/dev\norigin/HEAD\nupstream/main";
-        let groups = group_remotes(text);
+        let groups = group_remotes(text, &[]);
 
         assert_eq!(groups.len(), 2);
         assert_eq!(groups[0].name, "origin");
@@ -223,16 +248,30 @@ mod tests {
 
     #[test]
     fn branch_names_with_slashes_stay_intact() {
-        let groups = group_remotes("origin/feature/deep/name");
+        let groups = group_remotes("origin/feature/deep/name", &[]);
         assert_eq!(groups[0].branches, vec!["feature/deep/name"]);
     }
 
     #[test]
+    fn a_configured_remote_without_branches_is_listed_first_with_its_url() {
+        let urls = vec![("upstream".to_string(), "https://x/y.git".to_string())];
+        let groups = group_remotes("origin/main", &urls);
+
+        assert_eq!(groups[0].name, "upstream");
+        assert_eq!(groups[0].url, "https://x/y.git");
+        assert!(groups[0].branches.is_empty());
+        assert_eq!(groups[1].name, "origin");
+    }
+
+    #[test]
     fn parses_stash_list() {
-        let stashes = parse_stashes("stash@{0}\tWIP on main: abc123 message\nstash@{1}\tOn dev: x");
+        let stashes = parse_stashes(
+            "stash@{0}\tdeadbeef\tWIP on main: abc123 message\nstash@{1}\tcafe\tOn dev: x",
+        );
 
         assert_eq!(stashes.len(), 2);
         assert_eq!(stashes[0].selector, "stash@{0}");
+        assert_eq!(stashes[0].oid, "deadbeef");
         assert_eq!(stashes[0].message, "WIP on main: abc123 message");
     }
 }

@@ -51,7 +51,41 @@ function Harness({ onActivate }: { onActivate: () => void }) {
 
 const tick = () => act(() => new Promise((r) => setTimeout(r, 5)));
 
+/** A list with one global key, live from the start. */
+function Bare({ onKeys }: { onKeys: () => void }) {
+  useCommands({ "app.keys": onKeys }, true);
+  return null;
+}
+
 describe("useCommands", () => {
+  it("fires a binding written as a shifted symbol on the keystroke that types it", async () => {
+    // "?" is Shift and "/" on a US keyboard. The catalog writes it as "?",
+    // and the event carries Shift; a registration that compares modifiers
+    // exactly would never see it.
+    const keys = vi.fn();
+    await act(async () => {
+      root.render(
+        <SettingsProvider>
+          <Bare onKeys={keys} />
+        </SettingsProvider>,
+      );
+    });
+    await tick();
+
+    act(() => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "?", shiftKey: true, code: "Slash", bubbles: true }),
+      );
+    });
+    expect(keys).toHaveBeenCalledTimes(1);
+
+    // And a keyboard where "?" is its own key, no Shift involved.
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "?", bubbles: true }));
+    });
+    expect(keys).toHaveBeenCalledTimes(2);
+  });
+
   it("does not let the keystroke that closed a dialog reach a binding it woke", async () => {
     const activate = vi.fn();
     await act(async () => {

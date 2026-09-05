@@ -12,6 +12,7 @@ import {
   isSequence,
   normalizeBindings,
   resolveKeymap,
+  chordVariants,
 } from "./commands";
 
 describe("the command catalog", () => {
@@ -224,6 +225,20 @@ describe("every default binding is a hotkey the library accepts", () => {
     for (const command of COMMANDS) {
       expect(command.binding.length, command.id).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("chordVariants", () => {
+  it("adds the Shift form for a symbol that needs Shift to type", () => {
+    expect(chordVariants("?")).toEqual(["?", "Shift+?"]);
+    expect(chordVariants("@")).toEqual(["@", "Shift+@"]);
+  });
+
+  it("leaves everything else alone", () => {
+    expect(chordVariants("/")).toEqual(["/"]);
+    expect(chordVariants("J")).toEqual(["J"]);
+    expect(chordVariants("Mod+P")).toEqual(["Mod+P"]);
+    expect(chordVariants("Shift+Enter")).toEqual(["Shift+Enter"]);
   });
 });
 

@@ -4,9 +4,6 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { api, type BlameCommit, type BlameTarget } from "../lib/api";
 import { useCommands } from "../lib/useCommands";
-import { useSettings } from "../lib/settings";
-import { shortcutLabel } from "../lib/shortcutLabel";
-import { Keys } from "./Keys";
 import { Code } from "./Code";
 import { highlightLines, languageOf } from "../lib/highlight";
 import { useTip } from "./Tip";
@@ -83,7 +80,6 @@ export function BlameView({ repoId, target, keyboardActive, onClose }: Props) {
   const tip = useTip();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState(0);
-  const { keymap } = useSettings();
 
   const blame = useQuery({
     queryKey: ["blame", repoId, target.path, target.rev],
@@ -272,18 +268,6 @@ export function BlameView({ repoId, target, keyboardActive, onClose }: Props) {
         </div>
       </div>
 
-      {keyboardActive && (
-        <p className="pane-hint">
-          <Keys>
-            <kbd>{shortcutLabel(keymap["blame.next"])}</kbd>
-            <kbd>{shortcutLabel(keymap["blame.previous"])}</kbd> move
-          </Keys>{" "}
-          ·{" "}
-          <Keys>
-            <kbd>{shortcutLabel(keymap["blame.close"])}</kbd> close
-          </Keys>
-        </p>
-      )}
     </div>
   );
 }

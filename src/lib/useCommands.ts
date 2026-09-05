@@ -10,7 +10,7 @@ import {
 
 import { useEffect, useState } from "react";
 
-import { chordsOf } from "./commands";
+import { chordVariants, chordsOf } from "./commands";
 import { useSettings } from "./settings";
 
 export type CommandHandlers = Record<string, (() => void) | undefined>;
@@ -83,7 +83,9 @@ export function useCommands(handlers: CommandHandlers, enabled = true) {
             options: { timeout: settings.sequenceTimeout },
           });
         } else {
-          chords.push({ hotkey: steps[0] as Hotkey, callback: () => handler() });
+          for (const variant of chordVariants(steps[0]!)) {
+            chords.push({ hotkey: variant as Hotkey, callback: () => handler() });
+          }
         }
       }
     }

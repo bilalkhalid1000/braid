@@ -54,6 +54,8 @@ interface Props {
   /** Right-click on a commit. The menu itself belongs to the app, which is
    *  what knows how to run the things on it. */
   onCommitMenu: (commit: Commit, at: { x: number; y: number }) => void;
+  /** Right-click on a file of the selected commit. */
+  onFileMenu?: (path: string, at: { x: number; y: number }) => void;
 }
 
 /** Commit history.
@@ -67,6 +69,7 @@ export function HistoryView({
   focusOid,
   onFocused,
   onCommitMenu,
+  onFileMenu,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<Commit | null>(null);
@@ -217,6 +220,18 @@ export function HistoryView({
       if (selected) void copy(selected.oid, selected.oid, selected.short);
     },
     "history.back": toCommits,
+    // The commit's menu, opened under its row by the subject rather than at
+    // the pointer, which is nowhere in particular when a key asked for it.
+    "history.menu": () => {
+      if (!selected) return;
+      const box = scrollRef.current
+        ?.querySelector(`[data-oid="${selected.oid}"]`)
+        ?.getBoundingClientRect();
+      onCommitMenu(
+        selected,
+        box ? { x: box.left + laneColumns * LANE_WIDTH + 48, y: box.bottom } : { x: 320, y: 200 },
+      );
+    },
   }, keyboardActive);
 
   return (
@@ -283,6 +298,7 @@ export function HistoryView({
               return (
                 <div
                   key={item.key}
+                  data-oid={commit.oid}
                   // The graph's casing follows the fill, so HEAD counts too.
                   data-selected={commit.oid === selected?.oid || commit.oid === headOid}
                   className={[
@@ -383,6 +399,7 @@ export function HistoryView({
             repoId={repoId}
             oid={selected.oid}
             focused={pane === "files"}
+            onFileMenu={onFileMenu}
           />
         ) : (
           <div className="pane-empty">Select a commit to see what it changed</div>

@@ -126,6 +126,10 @@ async fn tags_and_stashes_are_listed() {
     assert_eq!(snapshot.stashes.len(), 1);
     assert_eq!(snapshot.stashes[0].selector, "stash@{0}");
     assert!(snapshot.stashes[0].message.contains("my stash"));
+    // The commit itself, so a view of the stash survives the next push
+    // renumbering every selector.
+    assert_eq!(snapshot.stashes[0].oid.len(), 40);
+    assert_eq!(snapshot.stashes[0].oid, repo.git(&["rev-parse", "stash@{0}"]).trim());
 }
 
 #[tokio::test]

@@ -25,6 +25,8 @@ interface Props {
   /** True while the file list holds the keyboard rather than the commit list
    *  above it, so the cursor can look like a cursor rather than a leftover. */
   focused?: boolean;
+  /** Right-click on a file. What the menu offers is the app's business. */
+  onFileMenu?: (path: string, at: { x: number; y: number }) => void;
 }
 
 /** Driving the file list from the view that owns the keyboard.
@@ -89,7 +91,7 @@ const METER =
   "flex h-3 w-32 gap-[2px] overflow-hidden rounded-sm bg-border-soft";
 
 export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function CommitDetail(
-  { repoId, oid, focused }: Props,
+  { repoId, oid, focused, onFileMenu }: Props,
   ref,
 ) {
   const { settings } = useSettings();
@@ -233,6 +235,11 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
                     .join(" ")}
                   style={{ height: item.size, transform: `translateY(${item.start}px)` }}
                   onMouseDown={() => setSelected(file.path)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setSelected(file.path);
+                    onFileMenu?.(file.path, { x: e.clientX, y: e.clientY });
+                  }}
                   {...tip(
                     file.oldPath ? `${file.oldPath} → ${file.path}` : file.path,
                   )}
