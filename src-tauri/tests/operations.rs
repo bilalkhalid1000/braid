@@ -640,15 +640,20 @@ async fn writes_started_together_take_turns() {
 async fn a_shell_line_runs_in_the_working_tree_and_reports_both_streams() {
     let repo = TestRepo::new();
 
-    let out = repo
-        .git_api()
-        .run_shell("echo hello; echo there >&2; git rev-parse --show-toplevel")
-        .await
-        .unwrap();
+    // The line goes through sh on Unix and cmd on Windows, and the two do
+    // not share a separator or a redirection syntax.
+    #[cfg(windows)]
+    let line = "echo hello & echo there 1>&2 & git rev-parse --show-toplevel";
+    #[cfg(not(windows))]
+    let line = "echo hello; echo there >&2; git rev-parse --show-toplevel";
+
+    let out = repo.git_api().run_shell(line).await.unwrap();
 
     assert!(out.contains("hello"), "{out}");
     assert!(out.contains("there"), "{out}");
-    assert!(out.contains(&repo.path().to_string_lossy().to_string()), "{out}");
+    // git prints the top level with forward slashes on every platform.
+    let top = repo.path().to_string_lossy().replace('\\', "/");
+    assert!(out.replace('\\', "/").contains(&top), "{out}");
 
     assert!(repo.git_api().run_shell("exit 3").await.is_err());
 }

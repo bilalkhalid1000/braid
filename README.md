@@ -250,8 +250,8 @@ lazygit's do. Open the file from Settings, Commands, Edit the settings file.
 A command shows up where its context says: `global` ones in the command
 palette and on their key, the rest in the right-click menu of a branch,
 commit, file, remote, stash or tag, and on Shift+Enter over the row. The line
-runs through the shell in the repository's root, and its output goes to the
-activity log.
+runs through the shell in the repository's root, `sh` on Linux and macOS and
+`cmd` on Windows, and its output goes to the activity log.
 
 Placeholders: `{{branch}}`, `{{commit}}` with `{{short}}` and `{{subject}}`,
 `{{file}}`, `{{remote}}` with `{{url}}`, `{{stash}}`, `{{tag}}`, and always
