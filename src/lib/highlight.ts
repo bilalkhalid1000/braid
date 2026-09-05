@@ -1,26 +1,56 @@
 import Prism from "prismjs";
 
-// Order matters: a component that extends another has to come after it. Prism
-// core already carries markup, css, clike and javascript.
-import "prismjs/components/prism-typescript";
-import "prismjs/components/prism-jsx";
-import "prismjs/components/prism-tsx";
-import "prismjs/components/prism-rust";
-import "prismjs/components/prism-json";
-import "prismjs/components/prism-yaml";
-import "prismjs/components/prism-toml";
-import "prismjs/components/prism-bash";
-import "prismjs/components/prism-python";
-import "prismjs/components/prism-go";
-import "prismjs/components/prism-java";
-import "prismjs/components/prism-c";
-import "prismjs/components/prism-cpp";
-import "prismjs/components/prism-csharp";
-import "prismjs/components/prism-sql";
-import "prismjs/components/prism-scss";
-import "prismjs/components/prism-markdown";
-import "prismjs/components/prism-ini";
-import "prismjs/components/prism-docker";
+/** The grammars beyond the four Prism core carries -- markup, css, clike and
+ *  javascript -- each fetched the first time a file needs it. Loading all of
+ *  them at startup was a fifth of the bundle parsed and held for languages
+ *  most repositories never show. */
+const LOADERS: Record<string, () => Promise<unknown>> = {
+  typescript: () => import("prismjs/components/prism-typescript"),
+  jsx: () => import("prismjs/components/prism-jsx"),
+  tsx: () => import("prismjs/components/prism-tsx"),
+  rust: () => import("prismjs/components/prism-rust"),
+  json: () => import("prismjs/components/prism-json"),
+  yaml: () => import("prismjs/components/prism-yaml"),
+  toml: () => import("prismjs/components/prism-toml"),
+  bash: () => import("prismjs/components/prism-bash"),
+  python: () => import("prismjs/components/prism-python"),
+  go: () => import("prismjs/components/prism-go"),
+  java: () => import("prismjs/components/prism-java"),
+  c: () => import("prismjs/components/prism-c"),
+  cpp: () => import("prismjs/components/prism-cpp"),
+  csharp: () => import("prismjs/components/prism-csharp"),
+  sql: () => import("prismjs/components/prism-sql"),
+  scss: () => import("prismjs/components/prism-scss"),
+  markdown: () => import("prismjs/components/prism-markdown"),
+  ini: () => import("prismjs/components/prism-ini"),
+  docker: () => import("prismjs/components/prism-docker"),
+};
+
+/** A grammar that extends another has to come after it. */
+const NEEDS: Record<string, string[]> = {
+  tsx: ["jsx", "typescript"],
+  cpp: ["c"],
+};
+
+const loading = new Map<string, Promise<void>>();
+
+/** Make sure a language's grammar is present, fetching it if not. Resolves
+ *  at once for a core language or one already loaded, and for a language
+ *  there is no grammar for, which then highlights as nothing. */
+export function ensureGrammar(language: string): Promise<void> {
+  if (Prism.languages[language]) return Promise.resolve();
+  const load = LOADERS[language];
+  if (!load) return Promise.resolve();
+
+  let pending = loading.get(language);
+  if (!pending) {
+    pending = Promise.all((NEEDS[language] ?? []).map(ensureGrammar))
+      .then(load)
+      .then(() => undefined);
+    loading.set(language, pending);
+  }
+  return pending;
+}
 
 /** A run of characters that share a colour. `type` is Prism's own class name,
  *  or undefined for ordinary code. */
@@ -102,7 +132,7 @@ export function languageOf(path: string): string | null {
   if (dot <= 0) return null;
 
   const language = BY_EXTENSION[file.slice(dot + 1)];
-  return language && Prism.languages[language] ? language : null;
+  return language && (Prism.languages[language] || LOADERS[language]) ? language : null;
 }
 
 /** Tokenize a whole file and hand back one token list per line.

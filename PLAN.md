@@ -194,6 +194,26 @@ that to 765, at about 5 MB less per repository and no directory walk of
 node_modules at open. The ignore rules are asked of git once, when the
 repository opens; a directory created later is checked before it is watched.
 
+What the memory is, nine repositories open, by proportional share (shared
+library pages divided among the processes that map them):
+
+| Process | Proportional | Its own |
+| --- | --- | --- |
+| Backend, which is also the GTK window | 119 MB | 72 MB |
+| WebKit web process | 161 MB | 77 MB |
+| WebKit network process | 31 MB | 20 MB |
+| Total | 311 MB | 169 MB |
+
+With no repository open at all the total is within 15 MB of that: the floor is
+WebKitGTK, GTK and the JavaScript engine, and it is what every Tauri app on
+Linux pays. Braid's own data for nine repositories is about 15 MB.
+
+The one lever on the floor is how the two toolkits draw. With GPU compositing
+off in both, "Use less memory, draw with the CPU" in Settings, the total is
+257 MB proportional and 109 MB own, and the GPU holds nothing for the app.
+Scrolling then costs CPU rather than GPU, so it is a setting rather than the
+default.
+
 Still to measure: history scroll frame times, and the same set against
 SourceTree and lazygit.
 

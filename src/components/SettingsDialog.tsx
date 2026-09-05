@@ -417,6 +417,14 @@ function GeneralSection() {
     ),
 
     toggleRow(
+      "lowMemoryRendering",
+      "Use less memory, draw with the CPU",
+      "Linux only. Turns off GPU compositing in the window and the web view: measured at about 50 MB less, plus whatever the GPU was holding. Scrolling can be less smooth on a slow processor. Takes effect the next time the app starts.",
+      settings.lowMemoryRendering,
+      (lowMemoryRendering) => update({ lowMemoryRendering }),
+    ),
+
+    toggleRow(
       "confirmDiscard",
       "Ask before discarding changes",
       "Discarding cannot be undone; git keeps no record of it.",

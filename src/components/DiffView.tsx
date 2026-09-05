@@ -5,6 +5,7 @@ import type { DiffLine, FileDiff } from "../lib/api";
 import { useSettings } from "../lib/settings";
 import { pairLines, type Placed } from "../lib/splitDiff";
 import { highlightHunks, languageOf } from "../lib/highlight";
+import { useGrammar } from "../lib/useGrammar";
 import { Code } from "./Code";
 import { useTip } from "./Tip";
 
@@ -114,9 +115,11 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
   // Keyed on the diff alone, deliberately. This component re-renders on every
   // click while lines are being picked for partial staging, and a dependency
   // that moved with `picked` would re-tokenize the file on each one.
+  const language = diff ? languageOf(diff.path) : null;
+  const grammarReady = useGrammar(language);
   const highlighted = useMemo(
-    () => (diff ? highlightHunks(diff.hunks, languageOf(diff.path)) : null),
-    [diff],
+    () => (diff && grammarReady ? highlightHunks(diff.hunks, language) : null),
+    [diff, language, grammarReady],
   );
 
   const virtualizer = useVirtualizer({

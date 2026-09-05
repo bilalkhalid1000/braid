@@ -6,6 +6,7 @@ import { api, type BlameCommit, type BlameTarget } from "../lib/api";
 import { useCommands } from "../lib/useCommands";
 import { Code } from "./Code";
 import { highlightLines, languageOf } from "../lib/highlight";
+import { useGrammar } from "../lib/useGrammar";
 import { useTip } from "./Tip";
 
 const ROW_HEIGHT = 19;
@@ -126,9 +127,13 @@ export function BlameView({ repoId, target, keyboardActive, onClose }: Props) {
   // construct that spans more than one — a doc comment would colour its first
   // line and nothing else.
   const language = useMemo(() => languageOf(target.path), [target.path]);
+  const grammarReady = useGrammar(language);
   const highlighted = useMemo(
-    () => highlightLines(lines.map((line) => line.content).join(NEWLINE), language),
-    [lines, language],
+    () =>
+      grammarReady
+        ? highlightLines(lines.map((line) => line.content).join(NEWLINE), language)
+        : null,
+    [lines, language, grammarReady],
   );
 
   const virtualizer = useVirtualizer({

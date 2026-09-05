@@ -1,6 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
-import { highlightHunks, highlightLines, languageOf } from "./highlight";
+import { ensureGrammar, highlightHunks, highlightLines, languageOf } from "./highlight";
+
+// Grammars load on demand in the app; here every language a test speaks is
+// fetched up front, so tokenizing below is the synchronous thing it is there.
+beforeAll(async () => {
+  for (const language of ["typescript", "tsx", "rust", "json"]) {
+    await ensureGrammar(language);
+  }
+});
 
 const text = (tokens: { text: string }[]) => tokens.map((token) => token.text).join("");
 
