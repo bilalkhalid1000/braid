@@ -8,6 +8,8 @@ import {
   type UseHotkeySequenceDefinition,
 } from "@tanstack/react-hotkeys";
 
+import { useEffect, useState } from "react";
+
 import { chordsOf } from "./commands";
 import { useSettings } from "./settings";
 
@@ -41,10 +43,27 @@ export type CommandHandlers = Record<string, (() => void) | undefined>;
 export function useCommands(handlers: CommandHandlers, enabled = true) {
   const { keymap, settings } = useSettings();
 
+  // A binding that goes live during a keystroke must not answer that same
+  // keystroke. Enter confirming a dialog is a React event, and React re-renders
+  // and runs effects before the native event has finished bubbling to the
+  // document -- so the sidebar's Enter was registered in time to hear it, and
+  // checked out the branch the dialog had just been asked to delete. Going
+  // live a tick later puts the registration after the event. Going quiet stays
+  // immediate.
+  const [live, setLive] = useState(false);
+  useEffect(() => {
+    if (!enabled) {
+      setLive(false);
+      return;
+    }
+    const timer = setTimeout(() => setLive(true), 0);
+    return () => clearTimeout(timer);
+  }, [enabled]);
+
   const chords: UseHotkeyDefinition[] = [];
   const sequences: UseHotkeySequenceDefinition[] = [];
 
-  if (enabled) {
+  if (enabled && live) {
     for (const [id, handler] of Object.entries(handlers)) {
       if (!handler) continue;
 
