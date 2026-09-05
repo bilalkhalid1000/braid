@@ -651,9 +651,11 @@ async fn a_shell_line_runs_in_the_working_tree_and_reports_both_streams() {
 
     assert!(out.contains("hello"), "{out}");
     assert!(out.contains("there"), "{out}");
-    // git prints the top level with forward slashes on every platform.
-    let top = repo.path().to_string_lossy().replace('\\', "/");
-    assert!(out.replace('\\', "/").contains(&top), "{out}");
+    // The directory's own name, not the whole path: on Windows the test's
+    // path can carry a short 8.3 form of a parent, RUNNER~1, where git
+    // prints the long one, and the two never match textually.
+    let name = repo.path().file_name().unwrap().to_string_lossy().into_owned();
+    assert!(out.contains(&name), "{out}");
 
     assert!(repo.git_api().run_shell("exit 3").await.is_err());
 }
