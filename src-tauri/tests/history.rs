@@ -13,7 +13,7 @@ async fn a_log_page_reports_commits_newest_first() {
     repo.write("b.txt", "b\n");
     repo.commit_all("Third");
 
-    let page = log(repo.git_api(), 0, 10, "head").await.unwrap();
+    let page = log(repo.git_api(), 0, 10, "head", None).await.unwrap();
 
     assert_eq!(page.commits.len(), 3);
     assert_eq!(page.commits[0].subject, "Third");
@@ -29,11 +29,11 @@ async fn paging_skips_and_reports_whether_more_remain() {
         repo.commit_all(&format!("Commit {n}"));
     }
 
-    let first = log(repo.git_api(), 0, 2, "head").await.unwrap();
+    let first = log(repo.git_api(), 0, 2, "head", None).await.unwrap();
     assert_eq!(first.commits.len(), 2);
     assert!(first.has_more, "a full page means there may be more");
 
-    let second = log(repo.git_api(), 2, 2, "head").await.unwrap();
+    let second = log(repo.git_api(), 2, 2, "head", None).await.unwrap();
     assert_eq!(second.commits[0].subject, "Commit 3");
 
     // The pages must not overlap.
@@ -45,7 +45,7 @@ async fn an_empty_repository_produces_no_commits_rather_than_an_error() {
     let repo = TestRepo::empty();
 
     // `git log` exits 128 with no HEAD; an empty history is a real state.
-    let page = log(repo.git_api(), 0, 10, "head").await.unwrap();
+    let page = log(repo.git_api(), 0, 10, "head", None).await.unwrap();
     assert!(page.commits.is_empty());
 }
 
@@ -63,7 +63,7 @@ async fn a_merge_commit_reports_both_parents() {
 
     repo.git(&["merge", "--no-ff", "--no-edit", "feature"]);
 
-    let page = log(repo.git_api(), 0, 10, "head").await.unwrap();
+    let page = log(repo.git_api(), 0, 10, "head", None).await.unwrap();
     let merge = &page.commits[0];
 
     assert_eq!(merge.parents.len(), 2);
@@ -74,7 +74,7 @@ async fn decorations_are_reported_for_the_checked_out_branch() {
     let repo = TestRepo::new();
     repo.git(&["tag", "v1.0"]);
 
-    let page = log(repo.git_api(), 0, 10, "head").await.unwrap();
+    let page = log(repo.git_api(), 0, 10, "head", None).await.unwrap();
     let refs_on_head = &page.commits[0].refs;
 
     assert!(refs_on_head.iter().any(|r| r.contains("HEAD")));
@@ -88,7 +88,7 @@ async fn a_subject_containing_unusual_characters_survives() {
     repo.git(&["add", "-A"]);
     repo.git(&["commit", "-m", "feat: add | pipes, \"quotes\" and 'apostrophes'"]);
 
-    let page = log(repo.git_api(), 0, 1, "head").await.unwrap();
+    let page = log(repo.git_api(), 0, 1, "head", None).await.unwrap();
     assert_eq!(
         page.commits[0].subject,
         "feat: add | pipes, \"quotes\" and 'apostrophes'"
@@ -312,7 +312,7 @@ fn branched() -> TestRepo {
 async fn the_current_branch_alone_leaves_other_branches_out() {
     let repo = branched();
 
-    let page = log(repo.git_api(), 0, 50, "head").await.unwrap();
+    let page = log(repo.git_api(), 0, 50, "head", None).await.unwrap();
     let subjects: Vec<&str> = page.commits.iter().map(|c| c.subject.as_str()).collect();
 
     assert!(subjects.contains(&"Tagged commit"));
@@ -323,7 +323,7 @@ async fn the_current_branch_alone_leaves_other_branches_out() {
 async fn every_branch_and_tag_is_reachable_from_the_wide_scope() {
     let repo = branched();
 
-    let page = log(repo.git_api(), 0, 50, "all").await.unwrap();
+    let page = log(repo.git_api(), 0, 50, "all", None).await.unwrap();
     let subjects: Vec<&str> = page.commits.iter().map(|c| c.subject.as_str()).collect();
 
     assert!(subjects.contains(&"Only on side"));
@@ -345,7 +345,7 @@ async fn a_ref_in_its_own_namespace_stays_out_of_the_history() {
     repo.git(&["update-ref", "refs/private/checkpoint", &hidden]);
 
     for scope in ["all", "local", "head"] {
-        let page = log(repo.git_api(), 0, 50, scope).await.unwrap();
+        let page = log(repo.git_api(), 0, 50, scope, None).await.unwrap();
         let subjects: Vec<&str> = page.commits.iter().map(|c| c.subject.as_str()).collect();
 
         assert!(
@@ -369,7 +369,7 @@ async fn a_detached_head_is_still_in_the_walk() {
     repo.git(&["checkout", &tip]);
 
     for scope in ["all", "local"] {
-        let page = log(repo.git_api(), 0, 50, scope).await.unwrap();
+        let page = log(repo.git_api(), 0, 50, scope, None).await.unwrap();
         let subjects: Vec<&str> = page.commits.iter().map(|c| c.subject.as_str()).collect();
 
         assert!(
@@ -391,8 +391,8 @@ async fn the_remote_scope_shows_a_branch_only_the_remote_has() {
     repo.git(&["update-ref", "refs/remotes/origin/feature", &tip]);
     repo.git(&["reset", "--hard", "HEAD~1"]);
 
-    let wide = log(repo.git_api(), 0, 50, "all").await.unwrap();
-    let local = log(repo.git_api(), 0, 50, "local").await.unwrap();
+    let wide = log(repo.git_api(), 0, 50, "all", None).await.unwrap();
+    let local = log(repo.git_api(), 0, 50, "local", None).await.unwrap();
 
     let has = |page: &log::LogPage| {
         page.commits.iter().any(|c| c.subject == "On the remote only")
@@ -400,4 +400,22 @@ async fn the_remote_scope_shows_a_branch_only_the_remote_has() {
 
     assert!(has(&wide), "all should reach remote-tracking branches");
     assert!(!has(&local), "local is the scope that leaves the remotes out");
+}
+
+#[tokio::test]
+async fn a_path_narrows_the_log_to_the_commits_that_touched_it_across_a_rename() {
+    let repo = TestRepo::new();
+    repo.write("a.txt", "a\n");
+    repo.commit_all("Add a");
+    repo.write("b.txt", "b\n");
+    repo.commit_all("Add b");
+    repo.git(&["mv", "a.txt", "renamed.txt"]);
+    repo.commit_all("Rename a");
+    repo.write("b.txt", "bb\n");
+    repo.commit_all("Change b");
+
+    let page = log(repo.git_api(), 0, 10, "head", Some("renamed.txt")).await.unwrap();
+    let subjects: Vec<&str> = page.commits.iter().map(|c| c.subject.as_str()).collect();
+
+    assert_eq!(subjects, vec!["Rename a", "Add a"]);
 }

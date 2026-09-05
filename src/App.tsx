@@ -182,6 +182,8 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   /** A commit the history view should select, set by a search result. */
   const [historyFocus, setHistoryFocus] = useState<string | null>(null);
+  /** The file the history is narrowed to, if any. */
+  const [historyPath, setHistoryPath] = useState<string | null>(null);
   /** Whether the repository list has a tab in the strip. */
   const [libraryOpen, setLibraryOpen] = useState(false);
   /** What the sidebar's keyboard cursor is on, so Merge can act on it. */
@@ -1950,6 +1952,11 @@ The stashed changes are discarded.`,
         onClick: () => blameFile(entry.path),
       },
       "separator",
+      {
+        label: "History of this file",
+        disabled: entry.kind === "untracked",
+        onClick: () => showFileHistory(entry.path),
+      },
       { label: "Open in editor", onClick: () => openFileInEditor(entry.path) },
       { label: "Copy path", onClick: () => void copy(`path:${entry.path}`, entry.path) },
       // A tracked file stays tracked whatever .gitignore says, so for one of
@@ -1991,9 +1998,20 @@ The stashed changes are discarded.`,
     );
   };
 
+  /** The history of one file: the commits that touched it, in the history
+   *  view, with that file's diff shown first for each. */
+  const showFileHistory = (path: string) => {
+    setBlameTarget(null);
+    setStashShown(null);
+    setSearchOpen(false);
+    setView("history");
+    setHistoryPath(path);
+  };
+
   /** Menu for a file of a commit or stash. */
   const onCommitFileMenu = (path: string, at: Point) =>
     openMenuAt(at.x, at.y, [
+      { label: "History of this file", onClick: () => showFileHistory(path) },
       { label: "Open in editor", onClick: () => openFileInEditor(path) },
       { label: "Copy path", onClick: () => void copy(`path:${path}`, path) },
     ]);
@@ -2711,6 +2729,37 @@ The stashed changes are discarded.`,
     if (!refs.data.stashes.some((stash) => stash.oid === stashShown.oid)) setStashShown(null);
   }, [refs.data, stashShown]);
 
+  // A narrowed history belongs to one repository.
+  useEffect(() => setHistoryPath(null), [activeId]);
+
+  // Fetch the open repository on a timer, quietly: success shows only in the
+  // counts, and a failure is said once rather than every few minutes.
+  const autoFetchMinutes = settings.autoFetchMinutes;
+  useEffect(() => {
+    if (!id || autoFetchMinutes <= 0) return;
+
+    let lastError = "";
+    const tick = async () => {
+      try {
+        await api.fetch(id);
+        lastError = "";
+        for (const key of ["refs", "status", "log"]) {
+          void queryClient.invalidateQueries({ queryKey: [key, id] });
+        }
+      } catch (error) {
+        const message = messageOf(error);
+        if (message !== lastError) {
+          lastError = message;
+          activity.note("Background fetch", message, "error");
+        }
+      }
+    };
+
+    const timer = window.setInterval(() => void tick(), autoFetchMinutes * 60_000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, autoFetchMinutes]);
+
   /** Which section's keys are live, for the strip above the status bar. */
   const hintScope: CommandScope | null = !id
     ? null
@@ -3014,6 +3063,8 @@ The stashed changes are discarded.`,
                   onFileMenu={onCommitFileMenu}
                   bisect={bisect.data}
                   onBisectMenu={openBisectMenu}
+                  path={historyPath}
+                  onClearPath={() => setHistoryPath(null)}
                 />
               )}
             </main>

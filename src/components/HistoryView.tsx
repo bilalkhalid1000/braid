@@ -60,6 +60,9 @@ interface Props {
   bisect?: BisectStatus;
   /** B on a commit: the bisect choices for it, under its row. */
   onBisectMenu?: (commit: Commit, at: { x: number; y: number }) => void;
+  /** Only the commits that touched this file, when set. */
+  path?: string | null;
+  onClearPath?: () => void;
 }
 
 /** Commit history.
@@ -76,6 +79,8 @@ export function HistoryView({
   onFileMenu,
   bisect,
   onBisectMenu,
+  path,
+  onClearPath,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<Commit | null>(null);
@@ -92,9 +97,9 @@ export function HistoryView({
   const log = useInfiniteQuery({
     // The scope is part of the key: changing it is a different walk, not a
     // filter over the one already loaded.
-    queryKey: ["log", repoId, pageSize, scope],
+    queryKey: ["log", repoId, pageSize, scope, path ?? null],
     initialPageParam: 0,
-    queryFn: ({ pageParam }) => api.repoLog(repoId, pageParam, pageSize, scope),
+    queryFn: ({ pageParam }) => api.repoLog(repoId, pageParam, pageSize, scope, path ?? null),
     getNextPageParam: (last, pages) =>
       last.hasMore ? pages.length * pageSize : undefined,
     staleTime: Infinity,
@@ -278,6 +283,22 @@ export function HistoryView({
             {commits.length}
             {log.hasNextPage ? "+" : ""} commits
           </span>
+
+          {/* The file the walk is narrowed to, with the way back to all of
+              them. Followed across renames, which is why an old name can
+              appear in a commit's files under this one. */}
+          {path && (
+            <span className="ml-3 flex items-center gap-3 rounded-full bg-accent-soft px-4 py-[1px] text-small text-accent">
+              <span className="font-mono">{path}</span>
+              <button
+                className="border-0 bg-transparent p-0 text-accent cursor-pointer hover:brightness-125"
+                aria-label="Show every commit again"
+                onClick={onClearPath}
+              >
+                ×
+              </button>
+            </span>
+          )}
         </div>
 
         <header className={HEAD}>
@@ -427,6 +448,7 @@ export function HistoryView({
             oid={selected.oid}
             focused={pane === "files"}
             onFileMenu={onFileMenu}
+            initialPath={path}
           />
         ) : (
           <div className="pane-empty">Select a commit to see what it changed</div>

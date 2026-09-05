@@ -68,7 +68,15 @@ pub fn scope_args(scope: &str) -> &'static [&'static str] {
 ///
 /// Paging rather than reading the whole log is the point: opening a repo with
 /// 200k commits must cost the same as opening one with 20.
-pub async fn log(git: &Git, skip: usize, limit: usize, scope: &str) -> Result<LogPage> {
+/// `path` narrows the walk to the commits that touched one file, following
+/// it across renames.
+pub async fn log(
+    git: &Git,
+    skip: usize,
+    limit: usize,
+    scope: &str,
+    path: Option<&str>,
+) -> Result<LogPage> {
     let started = std::time::Instant::now();
 
     let skip_arg = format!("--skip={skip}");
@@ -86,6 +94,9 @@ pub async fn log(git: &Git, skip: usize, limit: usize, scope: &str) -> Result<Lo
         &limit_arg,
     ];
     args.extend_from_slice(scope_args(scope));
+    if let Some(path) = path {
+        args.extend_from_slice(&["--follow", "--", path]);
+    }
 
     let text = git
         .run_str_allowing(

@@ -429,8 +429,13 @@ export const api = {
   revertCommit: (id: string, oid: string) => invoke<string>("revert_commit", { id, oid }),
   dropImpact: (id: string, oid: string) => invoke<ResetImpact>("drop_impact", { id, oid }),
   dropCommit: (id: string, oid: string) => invoke<string>("drop_commit", { id, oid }),
-  repoLog: (id: string, skip: number, limit: number, scope: HistoryScope) =>
-    invoke<LogPage>("repo_log", { id, skip, limit, scope }),
+  repoLog: (
+    id: string,
+    skip: number,
+    limit: number,
+    scope: HistoryScope,
+    path: string | null = null,
+  ) => invoke<LogPage>("repo_log", { id, skip, limit, scope, path }),
   applyHunk: (
     id: string,
     request: {

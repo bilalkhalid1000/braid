@@ -486,6 +486,15 @@ function GeneralSection() {
     ),
 
     numberRow(
+      "autoFetchMinutes",
+      "Fetch in the background every",
+      "Minutes between fetches of the open repository, so ahead and behind stay true. 0 turns it off. A failure is reported once, not every time.",
+      settings.autoFetchMinutes,
+      { min: 0, max: 120, step: 1 },
+      (autoFetchMinutes) => update({ autoFetchMinutes }),
+    ),
+
+    numberRow(
       "sequenceTimeout",
       "Sequence timeout",
       "How long a two-key shortcut like G F waits for its second key, in milliseconds.",

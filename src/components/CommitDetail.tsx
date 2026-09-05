@@ -27,6 +27,8 @@ interface Props {
   focused?: boolean;
   /** Right-click on a file. What the menu offers is the app's business. */
   onFileMenu?: (path: string, at: { x: number; y: number }) => void;
+  /** A file to show first, when the commit was reached through one. */
+  initialPath?: string | null;
 }
 
 /** Driving the file list from the view that owns the keyboard.
@@ -91,7 +93,7 @@ const METER =
   "flex h-3 w-32 gap-[2px] overflow-hidden rounded-sm bg-border-soft";
 
 export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function CommitDetail(
-  { repoId, oid, focused, onFileMenu }: Props,
+  { repoId, oid, focused, onFileMenu, initialPath }: Props,
   ref,
 ) {
   const { settings } = useSettings();
@@ -109,6 +111,13 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
   });
 
   const files = useMemo(() => detail.data?.files ?? [], [detail.data]);
+
+  // Reached through a file, so that file's diff is what to show first.
+  useEffect(() => {
+    if (initialPath && files.some((file) => file.path === initialPath)) {
+      setSelected(initialPath);
+    }
+  }, [files, initialPath]);
 
   // Bars are scaled against the largest file in the commit, so a row's length
   // means something across the list rather than only within itself.
