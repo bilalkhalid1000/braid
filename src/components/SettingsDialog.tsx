@@ -28,7 +28,7 @@ import { Keys } from "./Keys";
 import { SCRIM } from "../lib/overlay";
 import { useTip } from "./Tip";
 
-type Section = "general" | "diff" | "shortcuts" | "updates" | "about";
+type Section = "general" | "diff" | "shortcuts" | "commands" | "updates" | "about";
 
 /** Numbered because the number is the key that gets you here, the same way the
  *  sidebar panels are numbered. Nothing here is a sequence, so the digits are
@@ -37,6 +37,7 @@ const SECTIONS: { id: Section; label: string; blurb: string }[] = [
   { id: "general", label: "General", blurb: "Appearance and what happens at launch" },
   { id: "diff", label: "Diff", blurb: "How changes are shown" },
   { id: "shortcuts", label: "Shortcuts", blurb: "Every key, and how to change it" },
+  { id: "commands", label: "Commands", blurb: "Your own, from the settings file" },
   { id: "updates", label: "Updates", blurb: "New versions, and when to look for them" },
   { id: "about", label: "About", blurb: "Where things are kept" },
 ];
@@ -329,6 +330,7 @@ export function SettingsDialog({
             {section === "general" && <GeneralSection />}
             {section === "diff" && <DiffSection />}
             {section === "shortcuts" && <ShortcutsSection />}
+            {section === "commands" && <CommandsSection />}
             {section === "updates" && <UpdatesSection />}
             {section === "about" && <AboutSection />}
           </SettingsCursor>
@@ -866,6 +868,57 @@ function UpdatesSection() {
       </p>
     </>
   );
+}
+
+/** The user's commands, read back so a typo in the file is visible here
+ *  rather than as a menu entry that never appears. Written in the file
+ *  itself: a form for a shell line with placeholders and prompts would be a
+ *  worse editor than the one they already have. */
+function CommandsSection() {
+  const { settings } = useSettings();
+
+  const rows: Row[] = settings.customCommands.map((command, index) =>
+    staticRow(
+      `custom-${index}`,
+      command.label,
+      <span className="font-mono">{command.command}</span>,
+      <span className="flex items-center gap-3 text-small text-text-dim">
+        {command.context}
+        {command.key && <kbd>{command.key}</kbd>}
+      </span>,
+    ),
+  );
+
+  if (rows.length === 0) {
+    rows.push(
+      staticRow(
+        "none",
+        "No commands yet",
+        <>
+          Add a <span className="font-mono">customCommands</span> list to the settings file. Each
+          entry has a label, a command line, a context -- global, branch, commit, file,
+          remote, stash or tag -- and may have a key, prompts and a confirm message.
+          Placeholders: <span className="font-mono">{"{{branch}} {{commit}} {{file}} {{remote}} {{stash}} {{tag}} {{head}} {{repo}} {{prompt.key}}"}</span>.
+        </>,
+        null,
+      ),
+    );
+  }
+
+  rows.push(
+    actionRow(
+      "edit",
+      "Edit the settings file",
+      "Opens settings.json in your editor. Changes are read the next time the app starts.",
+      {
+        label: "Open",
+        onPress: () =>
+          void api.openSettingsFile(settings.editor, settings.editorCommand, settings.terminal),
+      },
+    ),
+  );
+
+  return <SettingsRows rows={rows} />;
 }
 
 function AboutSection() {

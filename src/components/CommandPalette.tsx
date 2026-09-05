@@ -8,6 +8,8 @@ import { SCRIM_TOP } from "../lib/overlay";
 interface Props {
   /** Which commands are runnable right now, and how to run them. */
   handlers: Record<string, (() => void) | undefined>;
+  /** The user's own commands, listed beside the catalog's. */
+  custom?: CommandDef[];
   onClose: () => void;
 }
 
@@ -33,15 +35,15 @@ const CATEGORY =
   "overflow-hidden text-ellipsis whitespace-nowrap uppercase tracking-[0.06em] " +
   "text-micro text-text-faint";
 
-export function CommandPalette({ handlers, onClose }: Props) {
+export function CommandPalette({ handlers, onClose, custom }: Props) {
   const { keymap } = useSettings();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
   const available = useMemo(
-    () => COMMANDS.filter((command) => handlers[command.id]),
-    [handlers],
+    () => [...COMMANDS, ...(custom ?? [])].filter((command) => handlers[command.id]),
+    [handlers, custom],
   );
 
   const matches = useMemo(

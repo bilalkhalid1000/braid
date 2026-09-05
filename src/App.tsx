@@ -38,6 +38,8 @@ import { HistoryView } from "./components/HistoryView";
 import { StashView } from "./components/StashView";
 import { KeyHints } from "./components/KeyHints";
 import { RebaseEditor } from "./components/RebaseEditor";
+import { customId, fill, type CustomCommand, type CustomContext } from "./lib/customCommands";
+import type { CommandDef } from "./lib/commands";
 import type { CommandScope } from "./lib/commands";
 import { Dialog, type DialogSpec } from "./components/Dialog";
 import type { ComboOption } from "./components/Combo";
@@ -1656,6 +1658,75 @@ The stashed changes are discarded.`,
     });
   };
 
+  /** What every custom command can refer to, whatever it is about. */
+  const baseVars = (): Record<string, string> => ({
+    repo: activeRepo?.root ?? "",
+    head: head?.head ?? "",
+  });
+
+  /** Run one of the user's own commands: ask its questions first, if it has
+   *  any, then fill the line and run it in the repository. */
+  const runCustom = (command: CustomCommand, vars: Record<string, string>) => {
+    if (!id) return;
+    const all = { ...baseVars(), ...vars };
+
+    const go = (answers: Record<string, string>) => {
+      const withAnswers = { ...all };
+      for (const [key, value] of Object.entries(answers)) withAnswers[`prompt.${key}`] = value;
+      const line = fill(command.command, withAnswers);
+      act(command.label, () => api.runShell(id, line));
+    };
+
+    if (!command.prompts?.length && !command.confirm) {
+      go({});
+      return;
+    }
+
+    setDialog({
+      title: command.label,
+      message: command.confirm ? fill(command.confirm, all) : undefined,
+      fields: (command.prompts ?? []).map((prompt) => ({
+        key: prompt.key,
+        label: prompt.label,
+        value: fill(prompt.value ?? "", all),
+        optional: true,
+        options: prompt.options?.map((value) => ({ value })),
+      })),
+      confirmLabel: "Run",
+      onConfirm: go,
+    });
+  };
+
+  /** The user's commands for a context, as menu entries after a separator,
+   *  or nothing when there are none. */
+  const customEntries = (context: CustomContext, vars: Record<string, string>): MenuEntry[] => {
+    const own = settings.customCommands.filter((command) => command.context === context);
+    if (own.length === 0) return [];
+    return [
+      "separator",
+      ...own.map((command) => ({
+        label: command.label,
+        onClick: () => runCustom(command, vars),
+      })),
+    ];
+  };
+
+  /** Global custom commands, in the palette's shape. */
+  const customGlobals: CommandDef[] = settings.customCommands.flatMap((command, index) =>
+    command.context === "global"
+      ? [
+          {
+            id: customId(index),
+            label: command.label,
+            category: "Custom",
+            scope: "global" as const,
+            binding: command.key ? [command.key] : [],
+            needsRepo: true,
+          },
+        ]
+      : [],
+  );
+
   /** Plan an interactive rebase of everything from `from` to HEAD, with one
    *  commit's action already chosen when a menu entry named it. */
   const openRebase = async (from: string, preset?: { oid: string; action: RebaseAction }) => {
@@ -1758,6 +1829,7 @@ The stashed changes are discarded.`,
         danger: true,
         onClick: () => void confirmReset(commit, "hard"),
       },
+      ...customEntries("commit", { commit: commit.oid, short: commit.short, subject: commit.subject }),
     ]);
   };
 
@@ -1826,6 +1898,7 @@ The stashed changes are discarded.`,
         disabled: staged,
         onClick: () => confirmDiscard([entry.path]),
       },
+      ...customEntries("file", { file: entry.path }),
     ]);
   };
 
@@ -2038,6 +2111,7 @@ The stashed changes are discarded.`,
             disabled: branch.isHead,
             onClick: () => confirmDeleteBranch(branch),
           },
+          ...customEntries("branch", { branch: branch.name }),
         ]);
         break;
       }
@@ -2053,6 +2127,7 @@ The stashed changes are discarded.`,
           { label: "Edit…", onClick: () => openEditRemote(remote) },
           "separator",
           { label: "Remove remote…", danger: true, onClick: () => confirmRemoveRemote(remote) },
+          ...customEntries("remote", { remote: remote.name, url: remote.url }),
         ]);
         break;
       }
@@ -2117,6 +2192,7 @@ The stashed changes are discarded.`,
             danger: true,
             onClick: () => confirmDeleteTag(target.tag),
           },
+          ...customEntries("tag", { tag: target.tag }),
         ]);
         break;
 
@@ -2138,6 +2214,7 @@ The stashed changes are discarded.`,
             onClick: () =>
               act(`Drop ${selector} — ${message}`, () => api.stashDrop(id, selector)),
           },
+          ...customEntries("stash", { stash: selector }),
         ]);
         break;
       }
@@ -2486,6 +2563,12 @@ The stashed changes are discarded.`,
     "git.tag": id ? () => openNewTag() : undefined,
     "git.remote": id ? openNewRemote : undefined,
     "git.undo": id ? confirmUndo : undefined,
+    ...Object.fromEntries(
+      settings.customCommands.map((command, index) => [
+        customId(index),
+        id && command.context === "global" ? () => runCustom(command, {}) : undefined,
+      ]),
+    ),
     "git.commit": id
       ? () => {
           setView("status");
@@ -2967,7 +3050,11 @@ The stashed changes are discarded.`,
         />
       )}
       {paletteOpen && (
-        <CommandPalette handlers={handlers} onClose={() => setPaletteOpen(false)} />
+        <CommandPalette
+          handlers={handlers}
+          custom={customGlobals}
+          onClose={() => setPaletteOpen(false)}
+        />
       )}
     </div>
   );

@@ -11,6 +11,7 @@ import {
 
 import { api, type HistoryScope } from "./api";
 import { resolveKeymap, type Keymap } from "./commands";
+import { customKeymap, normalizeCustomCommands, type CustomCommand } from "./customCommands";
 
 export type ThemeChoice = "system" | "light" | "dark";
 
@@ -46,6 +47,8 @@ export interface Settings {
   /** Only the commands the user has actually rebound. Values are lists, so a
    *  command can answer to several keys. */
   keymap: Keymap;
+  /** The user's own commands, written into the settings file by hand. */
+  customCommands: CustomCommand[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -65,6 +68,7 @@ export const DEFAULT_SETTINGS: Settings = {
   editor: "auto",
   editorCommand: "",
   keymap: {},
+  customCommands: [],
 };
 
 interface SettingsContextValue {
@@ -93,7 +97,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
         // Merged field by field, so a file written before a setting existed
         // still yields a complete object rather than undefined holes.
-        setSettings({ ...DEFAULT_SETTINGS, ...stored });
+        setSettings({
+          ...DEFAULT_SETTINGS,
+          ...stored,
+          // Hand-written, so checked rather than trusted.
+          customCommands: normalizeCustomCommands(
+            (stored as Partial<Settings>).customCommands,
+          ),
+        });
       } finally {
         if (!cancelled) setLoaded(true);
       }
@@ -119,7 +130,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSettings((current) => ({ ...current, ...patch }));
   }, []);
 
-  const keymap = useMemo(() => resolveKeymap(settings.keymap), [settings.keymap]);
+  // Custom commands bring their own keys, by position in their list.
+  const keymap = useMemo(
+    () => ({ ...resolveKeymap(settings.keymap), ...customKeymap(settings.customCommands) }),
+    [settings.keymap, settings.customCommands],
+  );
 
   const value = useMemo(
     () => ({ settings, keymap, update, loaded }),

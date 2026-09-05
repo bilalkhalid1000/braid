@@ -633,3 +633,22 @@ async fn writes_started_together_take_turns() {
     let staged = repo.git(&["diff", "--cached", "--name-only"]);
     assert_eq!(staged.lines().count(), 8);
 }
+
+// --- custom commands ---------------------------------------------------------
+
+#[tokio::test]
+async fn a_shell_line_runs_in_the_working_tree_and_reports_both_streams() {
+    let repo = TestRepo::new();
+
+    let out = repo
+        .git_api()
+        .run_shell("echo hello; echo there >&2; git rev-parse --show-toplevel")
+        .await
+        .unwrap();
+
+    assert!(out.contains("hello"), "{out}");
+    assert!(out.contains("there"), "{out}");
+    assert!(out.contains(&repo.path().to_string_lossy().to_string()), "{out}");
+
+    assert!(repo.git_api().run_shell("exit 3").await.is_err());
+}

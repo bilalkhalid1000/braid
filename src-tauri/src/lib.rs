@@ -143,6 +143,8 @@ pub fn run() {
             ipc::reflog,
             ipc::undo,
             ipc::mergetool,
+            ipc::run_shell,
+            ipc::open_settings_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

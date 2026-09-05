@@ -301,6 +301,48 @@ impl Git {
         Ok(merged)
     }
 
+    /// Run a line of the user's own through the shell, in the working tree.
+    ///
+    /// Takes the write lock, because a custom command is nearly always a
+    /// write and there is no way to know otherwise. Output is what the user
+    /// sees, so both streams come back merged as `run_reported` does.
+    pub async fn run_shell(&self, line: &str) -> Result<String> {
+        let _turn = self.writes.lock().await;
+
+        #[cfg(windows)]
+        let (program, flag) = ("cmd", "/C");
+        #[cfg(not(windows))]
+        let (program, flag) = ("sh", "-c");
+
+        let mut cmd = crate::system::system_command(program);
+        cmd.arg(flag)
+            .arg(line)
+            .current_dir(&self.workdir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        cmd.env("GIT_TERMINAL_PROMPT", "0");
+        #[cfg(windows)]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
+        let run = trace::started(&[program, flag, line]);
+        let output = cmd.output().await?;
+        run.finished(output.status.code().unwrap_or(-1));
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let merged = join_output(stdout.trim(), stderr.trim());
+
+        if !output.status.success() {
+            return Err(AppError::Git {
+                code: output.status.code().unwrap_or(-1),
+                stderr: merged,
+            });
+        }
+
+        Ok(merged)
+    }
+
     /// Resolve any path inside a repo to that repo's worktree root.
     ///
     /// Returns `NotARepo` for a path that is not in one.

@@ -13,7 +13,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::error::{AppError, Result};
 
-fn store_path(app: &AppHandle) -> Result<PathBuf> {
+pub(crate) fn store_path(app: &AppHandle) -> Result<PathBuf> {
     let dir = app
         .path()
         .app_config_dir()

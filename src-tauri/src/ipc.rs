@@ -1186,3 +1186,39 @@ pub async fn mergetool(
         .run_reported(&["mergetool", "--no-prompt", "--", &path])
         .await
 }
+
+/// A command of the user's own, from their settings, run in the repository.
+#[tauri::command]
+pub async fn run_shell(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    command: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    session.git.run_shell(&command).await
+}
+
+/// Open settings.json in the editor: custom commands are written there.
+#[tauri::command]
+pub async fn open_settings_file(
+    app: AppHandle,
+    editor: Option<String>,
+    command: Option<String>,
+    terminal: Option<String>,
+) -> Result<String> {
+    let path = settings::store_path(&app)?;
+
+    // Created empty-but-valid if it does not exist yet, so the editor opens
+    // a file rather than asking whether to make one.
+    if !path.exists() {
+        settings::save(&app, &serde_json::json!({})).await?;
+    }
+
+    system::open_editor(
+        &path.to_string_lossy(),
+        editor.as_deref().unwrap_or("auto"),
+        command.as_deref().unwrap_or_default(),
+        terminal.as_deref().unwrap_or("auto"),
+    )
+    .await
+}

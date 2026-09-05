@@ -201,6 +201,47 @@ restarts without asking — an update that interrupts you mid-commit is worse th
 late one. It can also be checked on demand in *Settings → Updates*, and the
 launch check turned off there.
 
+## Custom commands
+
+Your own commands live in the settings file, under `customCommands`, the way
+lazygit's do. Open the file from Settings, Commands, Edit the settings file.
+
+```json
+{
+  "customCommands": [
+    {
+      "label": "Open pull request",
+      "command": "gh pr create --web --head {{branch}}",
+      "context": "branch"
+    },
+    {
+      "label": "Run the tests",
+      "command": "pnpm test",
+      "context": "global",
+      "key": "Shift+T"
+    },
+    {
+      "label": "Push a branch to a remote",
+      "command": "git push {{prompt.remote}} {{head}}",
+      "context": "global",
+      "prompts": [{ "key": "remote", "label": "Remote", "options": ["origin", "upstream"] }],
+      "confirm": "Push {{head}} to the remote you pick?"
+    }
+  ]
+}
+```
+
+A command shows up where its context says: `global` ones in the command
+palette and on their key, the rest in the right-click menu of a branch,
+commit, file, remote, stash or tag, and on Shift+Enter over the row. The line
+runs through the shell in the repository's root, and its output goes to the
+activity log.
+
+Placeholders: `{{branch}}`, `{{commit}}` with `{{short}}` and `{{subject}}`,
+`{{file}}`, `{{remote}}` with `{{url}}`, `{{stash}}`, `{{tag}}`, and always
+`{{head}}` for the checked-out branch and `{{repo}}` for its path. A prompt's
+answer is `{{prompt.key}}`. Changes to the file are read at the next launch.
+
 ## Notes on behaviour
 
 **Reads and writes take different paths.** Writes shell out to your own `git`,
