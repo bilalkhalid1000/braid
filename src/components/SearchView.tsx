@@ -226,7 +226,7 @@ export function SearchView({ repoId, keyboardActive, onClose, onCommit, onFile }
                 className={`${ROW} ${
                   item.index === cursor ? "bg-select shadow-[inset_0_0_0_1px_var(--color-accent)]" : ""
                 }`}
-                style={{ height: item.size, transform: `translateY(${item.start}px)` }}
+                style={{ height: item.size, top: item.start }}
                 onMouseEnter={() => setCursor(item.index)}
                 onMouseDown={() => row.go()}
               >

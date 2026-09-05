@@ -234,7 +234,7 @@ export function BlameView({ repoId, target, keyboardActive, onClose }: Props) {
                 ]
                   .filter(Boolean)
                   .join(" ")}
-                style={{ height: item.size, transform: `translateY(${item.start}px)` }}
+                style={{ height: item.size, top: item.start }}
                 onMouseDown={() => setSelected(item.index)}
               >
                 <span

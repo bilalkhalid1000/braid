@@ -200,7 +200,7 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
 
               const style = {
                 height: item.size,
-                transform: `translateY(${item.start}px)`,
+                top: item.start,
               };
 
               if (row.kind === "hunk") {

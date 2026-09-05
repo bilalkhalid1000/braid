@@ -242,7 +242,7 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
                   ]
                     .filter(Boolean)
                     .join(" ")}
-                  style={{ height: item.size, transform: `translateY(${item.start}px)` }}
+                  style={{ height: item.size, top: item.start }}
                   onMouseDown={() => setSelected(file.path)}
                   onContextMenu={(e) => {
                     e.preventDefault();

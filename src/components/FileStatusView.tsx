@@ -15,6 +15,7 @@ import { ConflictBar } from "./ConflictBar";
 import { CommitBox, type CommitBoxHandle } from "./CommitBox";
 import { nextConflict } from "../lib/conflicts";
 import { useCommands } from "../lib/useCommands";
+import { useSettled } from "../lib/useSettled";
 import { useSettings } from "../lib/settings";
 import { FilterInput, matchesFilter } from "./FilterInput";
 import { Splitter, usePaneSize } from "./Splitter";
@@ -109,25 +110,27 @@ export function FileStatusView({
   }, [selection, index]);
 
   const selected = index >= 0 ? ordered[index] : undefined;
+  /** The file whose diff is fetched: the selection, once it has rested. */
+  const shown = useSettled(selected, 120);
 
   const diff = useQuery({
     queryKey: [
       "diff",
       repoId,
-      selected?.entry.path,
-      selected?.staged,
+      shown?.entry.path,
+      shown?.staged,
       settings.diffContextLines,
       settings.ignoreWhitespace,
     ],
     queryFn: () =>
       api.fileDiff(
         repoId,
-        selected!.entry.path,
-        diffTargetFor(selected!.entry, selected!.staged),
+        shown!.entry.path,
+        diffTargetFor(shown!.entry, shown!.staged),
         settings.diffContextLines,
         settings.ignoreWhitespace,
       ),
-    enabled: Boolean(selected),
+    enabled: Boolean(shown),
     staleTime: Infinity,
   });
 

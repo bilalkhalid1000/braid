@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { api, type BisectStatus, type Commit, type HistoryScope } from "../lib/api";
-import { buildGraph } from "../lib/graph";
+import { buildGraph, type GraphRow } from "../lib/graph";
 import { CommitGraph, LANE_WIDTH } from "./CommitGraph";
 import { Splitter, usePaneSize } from "./Splitter";
 import { CommitDetail, type CommitDetailHandle } from "./CommitDetail";
@@ -12,6 +12,7 @@ import { useCopy } from "../lib/useCopy";
 import { CopyHash } from "./CopyHash";
 import { useTip } from "./Tip";
 import { useSettings } from "../lib/settings";
+import { useSettled } from "../lib/useSettled";
 
 const ROW_HEIGHT = 26;
 
@@ -84,6 +85,8 @@ export function HistoryView({
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<Commit | null>(null);
+  /** The commit whose detail is fetched: the selection, once it has rested. */
+  const shown = useSettled(selected, 120);
   const detailRef = useRef<CommitDetailHandle>(null);
   /** Which half of this view the keyboard is driving: the commits, or the files
    *  of the one selected. Two lists on screen, one cursor between them. */
@@ -148,6 +151,7 @@ export function HistoryView({
     }
   };
 
+
   // Reads the next page when a commit asked for is not loaded yet. History
   // reads newest first, so an old commit may be several pages down.
   // ponytail: walks up to REVEAL_PAGES pages, then gives up rather than
@@ -200,7 +204,23 @@ export function HistoryView({
 
   const toCommits = () => setPane("commits");
 
-  const { copied, copy } = useCopy();
+  // Stable across renders, so a row whose own props did not change is not
+  // re-rendered for a keystroke that moved the cursor elsewhere. The menu
+  // callback comes from the app and changes identity with it; a ref keeps
+  // the row's prop still while pointing at the latest.
+  const menuHandler = useRef(onCommitMenu);
+  menuHandler.current = onCommitMenu;
+  const selectRow = useCallback((commit: Commit) => {
+    setPane("commits");
+    setSelected(commit);
+  }, []);
+  const menuRow = useCallback((commit: Commit, at: { x: number; y: number }) => {
+    setPane("commits");
+    setSelected(commit);
+    menuHandler.current(commit, at);
+  }, []);
+
+  const { copy } = useCopy();
   const tip = useTip();
 
   /** Each marked commit's verdict, for the chip beside its subject. */
@@ -339,87 +359,20 @@ export function HistoryView({
               if (!commit || !row) return null;
 
               return (
-                <div
+                <HistoryRow
                   key={item.key}
-                  data-oid={commit.oid}
-                  // The graph's casing follows the fill, so HEAD counts too.
-                  data-selected={commit.oid === selected?.oid || commit.oid === headOid}
-                  className={[
-                    ROW,
-                    // The checked-out commit wears the same fill and edge as
-                    // the checked-out branch in the sidebar: that fill means
-                    // "current" there, and now here. The cursor is the inset
-                    // outline, in both places, so the two never collide.
-                    commit.oid === selected?.oid || commit.oid === headOid
-                      ? "bg-select border-l-accent"
-                      : "border-l-transparent hover:bg-surface-alt",
-                    commit.oid === selected?.oid &&
-                      pane === "commits" &&
-                      "shadow-[inset_0_0_0_1px_var(--color-accent)]",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  style={{ height: item.size, transform: `translateY(${item.start}px)` }}
-                  onMouseDown={() => {
-                    toCommits();
-                    setSelected(commit);
-                  }}
-                  // Select first, so the menu always acts on the row it was
-                  // raised over rather than on whatever was selected before.
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    toCommits();
-                    setSelected(commit);
-                    onCommitMenu(commit, { x: e.clientX, y: e.clientY });
-                  }}
-                >
-                  <CommitGraph
-                    row={row}
-                    lanes={laneColumns}
-                    height={ROW_HEIGHT}
-                    isHead={commit.oid === headOid}
-                  />
-
-                  {/* The column the splitter occupies in the header. Rows have
-                      to reserve it too, or every heading sits four pixels off
-                      the values under it. */}
-                  <span />
-
-                  {/* The checked-out commit is set in bold as well as ringed
-                      in the graph: the ring can sit in a folded lane. */}
-                  <span
-                    className={
-                      "overflow-hidden text-ellipsis whitespace-nowrap" +
-                      (commit.oid === headOid ? " font-semibold" : "")
-                    }
-                  >
-                    {bisectMarks.has(commit.oid) && (
-                      <span className={`ref-chip ref-bisect-${bisectMarks.get(commit.oid)}`}>
-                        {bisectMarks.get(commit.oid)}
-                      </span>
-                    )}
-                    {commit.refs.map((ref) => (
-                      <span
-                        key={ref}
-                        className={`ref-chip ${chipClass(ref)}`}
-                        {...(ref.startsWith("HEAD ->") ? tip("Current branch") : {})}
-                      >
-                        {ref.replace("HEAD -> ", "")}
-                      </span>
-                    ))}
-                    {commit.subject}
-                  </span>
-
-                  <span className="text-small text-text-dim">{formatDate(commit.timestamp)}</span>
-                  <span className="overflow-hidden text-ellipsis whitespace-nowrap text-small text-text-dim" {...tip(commit.author, undefined, commit.email)}>
-                    {commit.author}
-                  </span>
-                  <CopyHash
-                    short={commit.short}
-                    copied={copied === commit.oid}
-                    onCopy={() => void copy(commit.oid, commit.oid, commit.short)}
-                  />
-                </div>
+                  commit={commit}
+                  row={row}
+                  lanes={laneColumns}
+                  isHead={commit.oid === headOid}
+                  isSelected={commit.oid === selected?.oid}
+                  hasCursor={commit.oid === selected?.oid && pane === "commits"}
+                  bisectMark={bisectMarks.get(commit.oid)}
+                  top={item.start}
+                  height={item.size}
+                  onSelect={selectRow}
+                  onMenu={menuRow}
+                />
               );
             })}
           </div>
@@ -441,11 +394,11 @@ export function HistoryView({
       />
 
       <div className={DETAIL}>
-        {selected ? (
+        {shown ? (
           <CommitDetail
             ref={detailRef}
             repoId={repoId}
-            oid={selected.oid}
+            oid={shown.oid}
             focused={pane === "files"}
             onFileMenu={onFileMenu}
             initialPath={path}
@@ -457,6 +410,113 @@ export function HistoryView({
     </div>
   );
 }
+
+interface RowProps {
+  commit: Commit;
+  row: GraphRow;
+  lanes: number;
+  isHead: boolean;
+  isSelected: boolean;
+  /** Selected, and the keyboard is on the commit list rather than its files. */
+  hasCursor: boolean;
+  bisectMark?: "bad" | "good" | "skip";
+  top: number;
+  height: number;
+  onSelect: (commit: Commit) => void;
+  onMenu: (commit: Commit, at: { x: number; y: number }) => void;
+}
+
+/** One commit of the history.
+ *
+ *  Memoized on its props, all of them primitives or objects that live as long
+ *  as the page of commits does. Stepping the cursor therefore renders the
+ *  two rows it touched rather than the fifty on screen, which was the whole
+ *  cost of a keystroke. */
+const HistoryRow = memo(function HistoryRow({
+  commit,
+  row,
+  lanes,
+  isHead,
+  isSelected,
+  hasCursor,
+  bisectMark,
+  top,
+  height,
+  onSelect,
+  onMenu,
+}: RowProps) {
+  const tip = useTip();
+  const { copied, copy } = useCopy();
+
+  return (
+    <div
+      data-oid={commit.oid}
+      // The graph's casing follows the fill, so HEAD counts too.
+      data-selected={isSelected || isHead}
+      className={[
+        ROW,
+        // The checked-out commit wears the same fill and edge as the
+        // checked-out branch in the sidebar: that fill means "current"
+        // there, and now here. The cursor is the inset outline, in both
+        // places, so the two never collide.
+        isSelected || isHead
+          ? "bg-select border-l-accent"
+          : "border-l-transparent hover:bg-surface-alt",
+        hasCursor && "shadow-[inset_0_0_0_1px_var(--color-accent)]",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={{ height, top }}
+      onMouseDown={() => onSelect(commit)}
+      // Select first, so the menu always acts on the row it was raised over
+      // rather than on whatever was selected before.
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onMenu(commit, { x: e.clientX, y: e.clientY });
+      }}
+    >
+      <CommitGraph row={row} lanes={lanes} height={ROW_HEIGHT} isHead={isHead} />
+
+      {/* The column the splitter occupies in the header. Rows have to
+          reserve it too, or every heading sits four pixels off the values
+          under it. */}
+      <span />
+
+      {/* The checked-out commit is set in bold as well as ringed in the
+          graph: the ring can sit in a folded lane. */}
+      <span
+        className={
+          "overflow-hidden text-ellipsis whitespace-nowrap" + (isHead ? " font-semibold" : "")
+        }
+      >
+        {bisectMark && <span className={`ref-chip ref-bisect-${bisectMark}`}>{bisectMark}</span>}
+        {commit.refs.map((ref) => (
+          <span
+            key={ref}
+            className={`ref-chip ${chipClass(ref)}`}
+            {...(ref.startsWith("HEAD ->") ? tip("Current branch") : {})}
+          >
+            {ref.replace("HEAD -> ", "")}
+          </span>
+        ))}
+        {commit.subject}
+      </span>
+
+      <span className="text-small text-text-dim">{formatDate(commit.timestamp)}</span>
+      <span
+        className="overflow-hidden text-ellipsis whitespace-nowrap text-small text-text-dim"
+        {...tip(commit.author, undefined, commit.email)}
+      >
+        {commit.author}
+      </span>
+      <CopyHash
+        short={commit.short}
+        copied={copied === commit.oid}
+        onCopy={() => void copy(commit.oid, commit.oid, commit.short)}
+      />
+    </div>
+  );
+});
 
 function chipClass(ref: string) {
   if (ref.startsWith("HEAD ->")) return "ref-head";

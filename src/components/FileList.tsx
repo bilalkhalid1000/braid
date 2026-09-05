@@ -138,7 +138,7 @@ export function FileList({
                     ? "bg-select border-l-accent"
                     : "border-l-transparent hover:bg-surface-alt"
                 }`}
-                style={{ height: item.size, transform: `translateY(${item.start}px)` }}
+                style={{ height: item.size, top: item.start }}
                 onMouseDown={() => onSelect(entry)}
                 onDoubleClick={() => onToggle(entry)}
                 onContextMenu={(e) => {
