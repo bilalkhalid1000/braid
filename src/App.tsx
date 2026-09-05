@@ -14,6 +14,7 @@ import {
   type ResetMode,
   type BlameTarget,
   type BranchRef,
+  type BisectVerdict,
   type RebaseAction,
   type RebasePlan,
   type RemoteGroup,
@@ -40,6 +41,15 @@ import { KeyHints } from "./components/KeyHints";
 import { RebaseEditor } from "./components/RebaseEditor";
 import { customId, fill, type CustomCommand, type CustomContext } from "./lib/customCommands";
 import type { CommandDef } from "./lib/commands";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import {
+  branchUrl,
+  commitUrl,
+  hostingOf,
+  newPullRequestUrl,
+  pullRequestNoun,
+  type Hosting,
+} from "./lib/hosting";
 import type { CommandScope } from "./lib/commands";
 import { Dialog, type DialogSpec } from "./components/Dialog";
 import type { ComboOption } from "./components/Combo";
@@ -110,6 +120,7 @@ const REPO_QUERY_KEYS = [
   "submodules",
   "flow",
   "reflog",
+  "bisect",
 ];
 
 const TABS =
@@ -311,6 +322,15 @@ export default function App() {
     queryKey: ["refs", activeId],
     queryFn: () => api.repoRefs(activeId!),
     enabled: activeId !== null,
+    ...eventDriven,
+  });
+
+  const bisect = useQuery({
+    queryKey: ["bisect", activeId],
+    queryFn: () => api.bisectStatus(activeId!),
+    // Only while one runs: the marks are the whole point, and outside a
+    // bisect there are none.
+    enabled: activeId !== null && status.data?.state === "bisecting",
     ...eventDriven,
   });
 
@@ -1658,6 +1678,50 @@ The stashed changes are discarded.`,
     });
   };
 
+  /** Where a remote's repository lives on the web, if it can be told. */
+  const hostingFor = (remote?: string | null): Hosting | null => {
+    const name = remote ?? preferredRemote();
+    const url = refs.data?.remotes.find((r) => r.name === name)?.url;
+    return url ? hostingOf(url) : null;
+  };
+
+  const browse = (url: string) => {
+    void openUrl(url).catch((error: unknown) =>
+      activity.note("Open in browser", messageOf(error), "error"),
+    );
+  };
+
+  /** The bisect choices for a commit: the two ends first, then, once a
+   *  bisect runs, skip and stop. */
+  const bisectEntries = (commit: Pick<Commit, "oid" | "short">): MenuEntry[] => {
+    if (!id) return [];
+    const running = bisect.data?.active ?? false;
+    const mark = (verdict: BisectVerdict) =>
+      act(`Bisect: ${commit.short} is ${verdict === "skip" ? "skipped" : verdict}`, () =>
+        api.bisectMark(id, verdict, commit.oid),
+      );
+
+    return [
+      {
+        label: running ? `Mark ${commit.short} bad` : `Start bisect: ${commit.short} is bad`,
+        onClick: () => mark("bad"),
+      },
+      {
+        label: running ? `Mark ${commit.short} good` : `Start bisect: ${commit.short} is good`,
+        onClick: () => mark("good"),
+      },
+      ...(running
+        ? [
+            { label: `Skip ${commit.short}`, onClick: () => mark("skip") },
+            {
+              label: "Stop bisect and go back",
+              onClick: () => act("Stop bisect", () => api.bisectReset(id)),
+            },
+          ]
+        : []),
+    ];
+  };
+
   /** What every custom command can refer to, whatever it is about. */
   const baseVars = (): Record<string, string> => ({
     repo: activeRepo?.root ?? "",
@@ -1829,9 +1893,24 @@ The stashed changes are discarded.`,
         danger: true,
         onClick: () => void confirmReset(commit, "hard"),
       },
+      "separator",
+      ...bisectEntries(commit),
+      ...(hostingFor()
+        ? [
+            "separator" as const,
+            {
+              label: `Open ${commit.short} on ${hostingFor()!.name}`,
+              onClick: () => browse(commitUrl(hostingFor()!, commit.oid)),
+            },
+          ]
+        : []),
       ...customEntries("commit", { commit: commit.oid, short: commit.short, subject: commit.subject }),
     ]);
   };
+
+  /** B on a commit: bisect only. */
+  const openBisectMenu = (commit: Commit, at: { x: number; y: number }) =>
+    openMenuAt(at.x, at.y, bisectEntries(commit));
 
   const openMenuAt = (x: number, y: number, entries: MenuEntry[]) =>
     setMenu({ x, y, entries });
@@ -1873,19 +1952,22 @@ The stashed changes are discarded.`,
       "separator",
       { label: "Open in editor", onClick: () => openFileInEditor(entry.path) },
       { label: "Copy path", onClick: () => void copy(`path:${entry.path}`, entry.path) },
-      // Ignoring is for what git does not track yet. A tracked file stays
-      // tracked whatever .gitignore says, so offering it there would only
-      // produce a line that does nothing.
-      ...(entry.kind === "untracked"
+      // A tracked file stays tracked whatever .gitignore says, so for one of
+      // those the ignore also drops the tracking, and the label says so.
+      ...(entry.kind !== "ignored"
         ? [
             "separator" as const,
             {
-              label: "Add to .gitignore",
+              label:
+                entry.kind === "untracked" ? "Add to .gitignore" : "Add to .gitignore and stop tracking",
               onClick: () =>
                 act(`Ignore ${entry.path}`, () => api.ignorePath(id, entry.path, false)),
             },
             {
-              label: "Exclude locally (.git/info/exclude)",
+              label:
+                entry.kind === "untracked"
+                  ? "Exclude locally (.git/info/exclude)"
+                  : "Exclude locally and stop tracking",
               onClick: () =>
                 act(`Exclude ${entry.path}`, () => api.ignorePath(id, entry.path, true)),
             },
@@ -2111,6 +2193,23 @@ The stashed changes are discarded.`,
             disabled: branch.isHead,
             onClick: () => confirmDeleteBranch(branch),
           },
+          ...(() => {
+            const hosting = hostingFor(splitUpstream(branch.upstream)?.remote);
+            if (!hosting) return [];
+            return [
+              "separator" as const,
+              {
+                label: `Open ${branch.name} on ${hosting.name}`,
+                onClick: () => browse(branchUrl(hosting, branch.name)),
+              },
+              {
+                label: `Create ${pullRequestNoun(hosting)} from ${branch.name}…`,
+                // Nothing to request from until the branch is on the remote.
+                disabled: !branch.upstream,
+                onClick: () => browse(newPullRequestUrl(hosting, branch.name)),
+              },
+            ];
+          })(),
           ...customEntries("branch", { branch: branch.name }),
         ]);
         break;
@@ -2127,6 +2226,14 @@ The stashed changes are discarded.`,
           { label: "Edit…", onClick: () => openEditRemote(remote) },
           "separator",
           { label: "Remove remote…", danger: true, onClick: () => confirmRemoveRemote(remote) },
+          ...(hostingOf(remote.url)
+            ? [
+                {
+                  label: `Open on ${hostingOf(remote.url)!.name}`,
+                  onClick: () => browse(hostingOf(remote.url)!.web),
+                },
+              ]
+            : []),
           ...customEntries("remote", { remote: remote.name, url: remote.url }),
         ]);
         break;
@@ -2563,6 +2670,10 @@ The stashed changes are discarded.`,
     "git.tag": id ? () => openNewTag() : undefined,
     "git.remote": id ? openNewRemote : undefined,
     "git.undo": id ? confirmUndo : undefined,
+    "repo.browse":
+      id && hostingFor()
+        ? () => browse(hostingFor()!.web)
+        : undefined,
     ...Object.fromEntries(
       settings.customCommands.map((command, index) => [
         customId(index),
@@ -2806,6 +2917,11 @@ The stashed changes are discarded.`,
                   onAbort={() => act("Abort operation", () => api.abortOperation(id))}
                   onContinue={() => act("Continue operation", () => api.continueOperation(id))}
                   onSkip={() => act("Skip commit", () => api.skipOperation(id))}
+                  detail={
+                    head.state === "bisecting" && bisect.data?.remaining != null
+                      ? `${bisect.data.remaining} left to test, about ${bisect.data.steps ?? "?"} more ${bisect.data.steps === 1 ? "step" : "steps"}. HEAD is on the one to test now: mark it with B in the history.`
+                      : undefined
+                  }
                 />
               )}
 
@@ -2896,6 +3012,8 @@ The stashed changes are discarded.`,
                   keyboardActive={!isSidebarPanel(focusedPanel) && !inputOpen}
                   onCommitMenu={openCommitMenu}
                   onFileMenu={onCommitFileMenu}
+                  bisect={bisect.data}
+                  onBisectMenu={openBisectMenu}
                 />
               )}
             </main>

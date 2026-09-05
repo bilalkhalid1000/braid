@@ -119,6 +119,21 @@ export interface RefsSnapshot {
   stashes: StashEntry[];
 }
 
+// --- bisect ---------------------------------------------------------------
+
+export type BisectVerdict = "good" | "bad" | "skip";
+
+export interface BisectStatus {
+  active: boolean;
+  bad: string | null;
+  good: string[];
+  skipped: string[];
+  /** Commits still to test, once both ends are marked. */
+  remaining: number | null;
+  /** Roughly how many more marks that takes. */
+  steps: number | null;
+}
+
 // --- reflog ---------------------------------------------------------------
 
 export interface ReflogEntry {
@@ -509,6 +524,10 @@ export const api = {
     invoke<string>("rebase_run", { id, base, steps }),
   amendInto: (id: string, oid: string) => invoke<string>("amend_into", { id, oid }),
   reflog: (id: string, limit: number) => invoke<ReflogEntry[]>("reflog", { id, limit }),
+  bisectStatus: (id: string) => invoke<BisectStatus>("bisect_status", { id }),
+  bisectMark: (id: string, verdict: BisectVerdict, oid: string) =>
+    invoke<string>("bisect_mark", { id, verdict, oid }),
+  bisectReset: (id: string) => invoke<string>("bisect_reset", { id }),
   undo: (id: string) => invoke<string>("undo", { id }),
   createBranch: (
     id: string,

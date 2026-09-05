@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
-import { api, type Commit, type HistoryScope } from "../lib/api";
+import { api, type BisectStatus, type Commit, type HistoryScope } from "../lib/api";
 import { buildGraph } from "../lib/graph";
 import { CommitGraph, LANE_WIDTH } from "./CommitGraph";
 import { Splitter, usePaneSize } from "./Splitter";
@@ -56,6 +56,10 @@ interface Props {
   onCommitMenu: (commit: Commit, at: { x: number; y: number }) => void;
   /** Right-click on a file of the selected commit. */
   onFileMenu?: (path: string, at: { x: number; y: number }) => void;
+  /** Marks to draw while a bisect runs. */
+  bisect?: BisectStatus;
+  /** B on a commit: the bisect choices for it, under its row. */
+  onBisectMenu?: (commit: Commit, at: { x: number; y: number }) => void;
 }
 
 /** Commit history.
@@ -70,6 +74,8 @@ export function HistoryView({
   onFocused,
   onCommitMenu,
   onFileMenu,
+  bisect,
+  onBisectMenu,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<Commit | null>(null);
@@ -192,6 +198,26 @@ export function HistoryView({
   const { copied, copy } = useCopy();
   const tip = useTip();
 
+  /** Each marked commit's verdict, for the chip beside its subject. */
+  const bisectMarks = useMemo(() => {
+    const marks = new Map<string, "bad" | "good" | "skip">();
+    if (!bisect?.active) return marks;
+    for (const oid of bisect.good) marks.set(oid, "good");
+    for (const oid of bisect.skipped) marks.set(oid, "skip");
+    if (bisect.bad) marks.set(bisect.bad, "bad");
+    return marks;
+  }, [bisect]);
+
+  /** Where a menu opens when a key asked for it: under the selected row, by
+   *  the subject. */
+  const rowAnchor = () => {
+    if (!selected) return { x: 320, y: 200 };
+    const box = scrollRef.current
+      ?.querySelector(`[data-oid="${selected.oid}"]`)
+      ?.getBoundingClientRect();
+    return box ? { x: box.left + laneColumns * LANE_WIDTH + 48, y: box.bottom } : { x: 320, y: 200 };
+  };
+
   useCommands({
     "history.next": () => (pane === "files" ? detailRef.current?.move(1) : move(1)),
     "history.previous": () =>
@@ -223,14 +249,10 @@ export function HistoryView({
     // The commit's menu, opened under its row by the subject rather than at
     // the pointer, which is nowhere in particular when a key asked for it.
     "history.menu": () => {
-      if (!selected) return;
-      const box = scrollRef.current
-        ?.querySelector(`[data-oid="${selected.oid}"]`)
-        ?.getBoundingClientRect();
-      onCommitMenu(
-        selected,
-        box ? { x: box.left + laneColumns * LANE_WIDTH + 48, y: box.bottom } : { x: 320, y: 200 },
-      );
+      if (selected) onCommitMenu(selected, rowAnchor());
+    },
+    "history.bisect": () => {
+      if (selected) onBisectMenu?.(selected, rowAnchor());
     },
   }, keyboardActive);
 
@@ -350,6 +372,11 @@ export function HistoryView({
                       (commit.oid === headOid ? " font-semibold" : "")
                     }
                   >
+                    {bisectMarks.has(commit.oid) && (
+                      <span className={`ref-chip ref-bisect-${bisectMarks.get(commit.oid)}`}>
+                        {bisectMarks.get(commit.oid)}
+                      </span>
+                    )}
                     {commit.refs.map((ref) => (
                       <span
                         key={ref}

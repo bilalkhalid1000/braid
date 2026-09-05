@@ -41,12 +41,27 @@ pub async fn ignore(git: &Git, path: &str, local: bool) -> Result<String> {
     }
     fs::write(&file, out).await?;
 
+    // An ignore does nothing for a file git already tracks, so the tracking
+    // is dropped too: the file stays on disk, and its removal is staged.
+    let tracked = git
+        .run(&["ls-files", "--error-unmatch", "--", path])
+        .await
+        .is_ok();
+    if tracked {
+        git.run(&["rm", "--cached", "--quiet", "--", path]).await?;
+    }
+
     Ok(format!(
-        "Ignored {path} in {}",
+        "Ignored {path} in {}{}",
         if local {
             ".git/info/exclude"
         } else {
             ".gitignore"
+        },
+        if tracked {
+            " and stopped tracking it"
+        } else {
+            ""
         }
     ))
 }

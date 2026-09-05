@@ -1222,3 +1222,29 @@ pub async fn open_settings_file(
     )
     .await
 }
+
+#[tauri::command]
+pub async fn bisect_status(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+) -> Result<git::BisectStatus> {
+    let session = registry.get(&id)?;
+    git::bisect::status(&session.git).await
+}
+
+#[tauri::command]
+pub async fn bisect_mark(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    verdict: git::BisectVerdict,
+    oid: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    git::bisect::mark(&session.git, verdict, &oid).await
+}
+
+#[tauri::command]
+pub async fn bisect_reset(registry: State<'_, RepoRegistry>, id: String) -> Result<String> {
+    let session = registry.get(&id)?;
+    git::bisect::reset(&session.git).await
+}

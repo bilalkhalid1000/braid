@@ -145,6 +145,9 @@ pub fn run() {
             ipc::mergetool,
             ipc::run_shell,
             ipc::open_settings_file,
+            ipc::bisect_status,
+            ipc::bisect_mark,
+            ipc::bisect_reset,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

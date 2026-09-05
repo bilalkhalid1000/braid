@@ -8,6 +8,8 @@ interface Props {
   onAbort: () => void;
   onContinue: () => void;
   onSkip: () => void;
+  /** Replaces the stock line for the state, when the app knows more. */
+  detail?: string;
 }
 
 const BANNER =
@@ -32,6 +34,7 @@ export function OperationBanner({
   onAbort,
   onContinue,
   onSkip,
+  detail,
 }: Props) {
   const tip = useTip();
 
@@ -48,11 +51,12 @@ export function OperationBanner({
       <span className="font-semibold">{operationLabel[state]}</span>
 
       <span className={DETAIL}>
-        {conflictedCount > 0
-          ? `${conflictedCount} file${conflictedCount === 1 ? "" : "s"} still conflicted`
-          : state === "bisecting"
-            ? "Mark commits good or bad from your terminal"
-            : "Conflicts resolved — ready to continue"}
+        {detail ??
+          (conflictedCount > 0
+            ? `${conflictedCount} file${conflictedCount === 1 ? "" : "s"} still conflicted`
+            : state === "bisecting"
+              ? "Mark a good and a bad commit in the history: B on a commit"
+              : "Conflicts resolved — ready to continue")}
       </span>
 
       <div className="ml-auto flex gap-3">

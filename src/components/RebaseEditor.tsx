@@ -79,9 +79,10 @@ export function RebaseEditor({ plan, preset, onClose, onRun }: Props) {
   const setMessage = (index: number, message: string) =>
     setSteps((current) => current.map((step, i) => (i === index ? { ...step, message } : step)));
 
-  const move = (from: number, delta: number) => {
-    const to = from + delta;
-    if (to < 0 || to >= steps.length) return;
+  const [dragging, setDragging] = useState<number | null>(null);
+
+  const moveTo = (from: number, to: number) => {
+    if (from === to || to < 0 || to >= steps.length) return;
     setSteps((current) => {
       const next = [...current];
       const [row] = next.splice(from, 1);
@@ -90,6 +91,8 @@ export function RebaseEditor({ plan, preset, onClose, onRun }: Props) {
     });
     setCursor(to);
   };
+
+  const move = (from: number, delta: number) => moveTo(from, from + delta);
 
   const kept = steps.filter((step) => step.action !== "drop").length;
   const canRun = kept > 0 && !(steps[0] && foldsUp(steps[0].action));
@@ -203,6 +206,15 @@ export function RebaseEditor({ plan, preset, onClose, onRun }: Props) {
                   .filter(Boolean)
                   .join(" ")}
                 onMouseDown={() => setCursor(index)}
+                // Dragging a row is the same reorder J and K do, by mouse.
+                draggable
+                onDragStart={() => setDragging(index)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => {
+                  if (dragging !== null) moveTo(dragging, index);
+                  setDragging(null);
+                }}
+                onDragEnd={() => setDragging(null)}
               >
                 <select
                   className={SELECT}
@@ -272,7 +284,8 @@ export function RebaseEditor({ plan, preset, onClose, onRun }: Props) {
             ))}
             <Keys>
               <kbd>Ctrl+↵</kbd> rebase
-            </Keys>
+            </Keys>{" "}
+            · or drag a row
           </p>
 
           <button className="btn" onClick={onClose}>

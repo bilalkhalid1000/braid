@@ -62,6 +62,7 @@ export const COMMANDS: CommandDef[] = [
   { id: "repo.explorer", label: "Open in file manager", category: "Repository", scope: "global", binding: ["Mod+E"], needsRepo: true },
   { id: "repo.terminal", label: "Open in terminal", category: "Repository", scope: "global", binding: ["Mod+T"], needsRepo: true },
   { id: "repo.editor", label: "Open in code editor", category: "Repository", scope: "global", binding: ["Mod+Shift+E"], needsRepo: true },
+  { id: "repo.browse", label: "Open on GitHub, GitLab or wherever it is hosted", category: "Repository", scope: "global", binding: ["Mod+Shift+B"], needsRepo: true, short: "open on the web" },
 
   // --- Repository tabs ---
   //
@@ -185,6 +186,7 @@ export const COMMANDS: CommandDef[] = [
   { id: "history.copyHash", label: "Copy the commit hash", category: "History", scope: "history", binding: ["Y"], short: "copy hash" },
   // The same key as the sidebar's menu, so one habit covers every list.
   { id: "history.menu", label: "Open the commit's menu", category: "History", scope: "history", binding: ["Shift+Enter"], short: "menu" },
+  { id: "history.bisect", label: "Bisect: mark the commit good, bad or skipped", category: "History", scope: "history", binding: ["B"], short: "bisect" },
 ];
 
 export const COMMANDS_BY_ID: Record<string, CommandDef> = Object.fromEntries(

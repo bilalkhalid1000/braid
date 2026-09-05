@@ -348,6 +348,23 @@ kbd.key-live {
   color: var(--added);
 }
 
+/* Bisect marks: the two ends and the commits stepped over. */
+.ref-bisect-bad {
+  background: var(--removed);
+  color: #fff;
+}
+
+.ref-bisect-good {
+  background: var(--added);
+  color: #fff;
+}
+
+.ref-bisect-skip {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
 /* --- commit detail ------------------------------------------------------ */
 
 /* Same shape as the File Status view — list on the left, diff on the right —

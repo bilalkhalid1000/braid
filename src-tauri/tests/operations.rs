@@ -652,3 +652,18 @@ async fn a_shell_line_runs_in_the_working_tree_and_reports_both_streams() {
 
     assert!(repo.git_api().run_shell("exit 3").await.is_err());
 }
+
+#[tokio::test]
+async fn ignoring_a_tracked_file_stops_tracking_it_and_keeps_it() {
+    let repo = TestRepo::new();
+    repo.write("secrets.env", "KEY=1\n");
+    repo.commit_all("Add secrets by mistake");
+
+    let said = ignore::ignore(repo.git_api(), "secrets.env", false).await.unwrap();
+
+    assert!(said.contains("stopped tracking"), "{said}");
+    assert!(repo.exists("secrets.env"));
+    assert!(!repo.git(&["ls-files"]).lines().any(|l| l == "secrets.env"));
+    // Staged as a deletion, ready to commit; the file itself is now ignored.
+    assert!(repo.git(&["diff", "--cached", "--name-status"]).starts_with("D\t"));
+}

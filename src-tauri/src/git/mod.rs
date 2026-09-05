@@ -1,3 +1,4 @@
+pub mod bisect;
 pub mod blame;
 pub mod clone;
 pub mod cli;
@@ -19,6 +20,7 @@ pub mod trace;
 pub mod submodule;
 pub mod worktree;
 
+pub use bisect::{BisectStatus, Verdict as BisectVerdict};
 pub use blame::{blame, Blame};
 pub use clone::{clone, CloneProgress, CLONE_PROGRESS_EVENT};
 pub use cli::Git;
