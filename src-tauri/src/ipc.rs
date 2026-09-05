@@ -1153,3 +1153,19 @@ pub async fn amend_into(
     let session = registry.get(&id)?;
     git::rebase::amend_into(&session.git, &oid).await
 }
+
+#[tauri::command]
+pub async fn reflog(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    limit: usize,
+) -> Result<Vec<git::ReflogEntry>> {
+    let session = registry.get(&id)?;
+    git::reflog::reflog(&session.git, limit).await
+}
+
+#[tauri::command]
+pub async fn undo(registry: State<'_, RepoRegistry>, id: String) -> Result<String> {
+    let session = registry.get(&id)?;
+    git::reflog::undo(&session.git).await
+}

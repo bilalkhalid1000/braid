@@ -140,6 +140,8 @@ pub fn run() {
             ipc::rebase_plan,
             ipc::rebase_run,
             ipc::amend_into,
+            ipc::reflog,
+            ipc::undo,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -8,6 +8,7 @@ import { useTip } from "./Tip";
 import {
   submoduleLabel,
   type BranchRef,
+  type ReflogEntry,
   type RemoteGroup,
   type RefsSnapshot,
   type RepoStatus,
@@ -31,6 +32,7 @@ export const PANELS = [
   "stashes",
   "worktrees",
   "submodules",
+  "reflog",
 ] as const;
 
 export type PanelId = (typeof PANELS)[number];
@@ -41,6 +43,7 @@ export const SIDEBAR_PANELS: PanelId[] = [
   "stashes",
   "worktrees",
   "submodules",
+  "reflog",
 ];
 
 export const isSidebarPanel = (panel: PanelId) => SIDEBAR_PANELS.includes(panel);
@@ -52,6 +55,7 @@ export type MenuTarget =
   | { kind: "branch"; branch: BranchRef }
   | { kind: "remote"; remote: string; branch: string }
   | { kind: "remoteGroup"; remote: RemoteGroup }
+  | { kind: "reflog"; entry: ReflogEntry }
   | { kind: "tag"; tag: string }
   | { kind: "stash"; stash: StashEntry }
   | { kind: "worktree"; worktree: Worktree }
@@ -67,6 +71,7 @@ interface Props {
   status: RepoStatus | undefined;
   worktrees: Worktree[] | undefined;
   submodules: Submodule[] | undefined;
+  reflog: ReflogEntry[] | undefined;
   view: WorkspaceView;
   focusedPanel: PanelId;
   /** False while a dialog or the palette holds the keyboard. */
@@ -167,6 +172,7 @@ export function Sidebar({
   status,
   worktrees,
   submodules,
+  reflog,
   view,
   focusedPanel,
   keyboardActive,
@@ -311,6 +317,17 @@ export function Sidebar({
       }));
     }
 
+    if (focused === "reflog") {
+      // Enter opens the menu rather than checking out: an entry is a place
+      // to do something from, and none of the choices is the obvious one.
+      return (reflog ?? []).map((entry) => ({
+        key: `reflog:${entry.selector}`,
+        activate: () => onMenu({ kind: "reflog", entry }, anchorOf(`reflog:${entry.selector}`)),
+        menu: (at: Point) => onMenu({ kind: "reflog", entry }, at),
+        target: { kind: "reflog", entry },
+      }));
+    }
+
     if (focused === "worktrees") {
       return (worktrees ?? []).map((worktree) => ({
         key: `worktree:${worktree.path}`,
@@ -337,7 +354,7 @@ export function Sidebar({
     // which rows exist. Without them the cursor keeps walking a list from
     // before the fold and lands on branches that are no longer on screen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focused, shown, worktrees, submodules, branchTree, collapsed, open]);
+  }, [focused, shown, worktrees, submodules, reflog, branchTree, collapsed, open]);
 
   // Landing on a panel starts at the top, and a list that shrank under the
   // cursor pulls it back into range rather than leaving nothing selected.
@@ -729,6 +746,28 @@ export function Sidebar({
         ))}
       </Section>
 
+      <Section
+        title="Reflog"
+        count={reflog?.length}
+        forceOpen={focused === "reflog"}
+        number={panelNumber("reflog")}
+        focused={focused === "reflog"}
+      >
+        {(reflog ?? []).length === 0 && <Empty>HEAD has not moved yet</Empty>}
+        {(reflog ?? []).map((entry) => (
+          <Item
+            key={entry.selector}
+            {...rowProps(`reflog:${entry.selector}`)}
+            label={entry.subject}
+            sans
+            title={`${entry.short} – ${entry.selector}, ${entry.when}`}
+            onContextMenu={(e) =>
+              onMenu({ kind: "reflog", entry }, { x: e.clientX, y: e.clientY })
+            }
+            trailing={<span className={NOTE}>{entry.when}</span>}
+          />
+        ))}
+      </Section>
     </nav>
   );
 }

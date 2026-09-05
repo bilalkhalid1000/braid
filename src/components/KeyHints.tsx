@@ -9,8 +9,8 @@ import { Keys } from "./Keys";
  *  from that panel, not the whole catalog. */
 const GLOBALS: Partial<Record<CommandScope, string[]>> = {
   status: ["git.commit", "git.stash", "git.discardAll", "view.filter"],
-  history: ["git.checkout", "git.tag", "view.search"],
-  sidebar: ["git.new", "git.merge", "git.checkout", "git.tag", "git.remote", "view.filter"],
+  history: ["git.checkout", "git.tag", "git.undo", "view.search"],
+  sidebar: ["git.new", "git.merge", "git.checkout", "git.tag", "git.remote", "git.undo", "view.filter"],
 };
 
 /** The keys live in a scope, as a strip: every command the scope owns, the

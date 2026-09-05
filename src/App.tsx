@@ -107,6 +107,7 @@ const REPO_QUERY_KEYS = [
   "worktrees",
   "submodules",
   "flow",
+  "reflog",
 ];
 
 const TABS =
@@ -308,6 +309,15 @@ export default function App() {
     queryKey: ["refs", activeId],
     queryFn: () => api.repoRefs(activeId!),
     enabled: activeId !== null,
+    ...eventDriven,
+  });
+
+  const reflogQuery = useQuery({
+    queryKey: ["reflog", activeId],
+    // A screenful and some. The whole reflog runs to thousands of entries in
+    // an old repository, and the way back is nearly always near the top.
+    queryFn: () => api.reflog(activeId!, 200),
+    enabled: activeId !== null && status.data !== undefined,
     ...eventDriven,
   });
 
@@ -1370,6 +1380,28 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
       onConfirm: (v) => act(`Check out ${v.ref}`, () => api.checkout(id!, v.ref.trim())),
     });
 
+  /** Undo, said out loud before it happens: what moved HEAD, and where it
+   *  goes back to. The reflog is what makes this possible, and the dialog
+   *  quotes it so the answer is never a surprise. */
+  const confirmUndo = () => {
+    const [last, before] = reflogQuery.data ?? [];
+    if (!last || !before) {
+      activity.note("Undo", "Nothing to undo: HEAD has not moved yet.", "error");
+      return;
+    }
+
+    const checkout = last.subject.startsWith("checkout: moving from ");
+    setDialog({
+      title: "Undo",
+      message: checkout
+        ? `${last.subject}.\n\nGoes back to the branch you came from.`
+        : `${last.subject}.\n\n${head?.head ?? "HEAD"} moves back to ${before.short}, hard. Uncommitted changes to tracked files would go with it, so this refuses while there are any.`,
+      confirmLabel: "Undo",
+      danger: !checkout,
+      onConfirm: () => act("Undo", () => api.undo(id!)),
+    });
+  };
+
   const confirmForcePush = () =>
     setDialog({
       title: `Force push ${head?.head ?? "HEAD"}`,
@@ -1542,7 +1574,7 @@ The stashed changes are discarded.`,
    *  is the whole basis for deciding, and a confirmation that only repeats the
    *  verb is one people learn to click through.
    */
-  const confirmReset = async (commit: Commit, mode: ResetMode) => {
+  const confirmReset = async (commit: Pick<Commit, "oid" | "short">, mode: ResetMode) => {
     if (!id) return;
 
     const impact = await api.resetImpact(id, commit.oid);
@@ -2110,6 +2142,40 @@ The stashed changes are discarded.`,
         break;
       }
 
+      case "reflog": {
+        const { entry } = target;
+        openMenuAt(at.x, at.y, [
+          {
+            label: `Check out ${entry.short} (detached)`,
+            onClick: () => act(`Check out ${entry.short}`, () => api.checkout(id, entry.oid)),
+          },
+          { label: `New branch from ${entry.short}…`, onClick: () => openNewBranch(entry.oid) },
+          {
+            label: `Cherry-pick ${entry.short} onto ${current}`,
+            onClick: () => act(`Cherry-pick ${entry.short}`, () => api.cherryPick(id, entry.oid)),
+          },
+          { label: "Copy hash", onClick: () => void copy(entry.oid, entry.oid, entry.short) },
+          "separator",
+          {
+            label: `Reset ${current} here, keep changes staged…`,
+            disabled: !head?.head,
+            onClick: () => void confirmReset(entry, "soft"),
+          },
+          {
+            label: `Reset ${current} here, keep changes…`,
+            disabled: !head?.head,
+            onClick: () => void confirmReset(entry, "mixed"),
+          },
+          {
+            label: `Reset ${current} here, discard changes…`,
+            disabled: !head?.head,
+            danger: true,
+            onClick: () => void confirmReset(entry, "hard"),
+          },
+        ]);
+        break;
+      }
+
       case "worktree": {
         const { worktree } = target;
         openMenuAt(at.x, at.y, [
@@ -2419,6 +2485,7 @@ The stashed changes are discarded.`,
     "git.checkout": id ? openCheckoutByName : undefined,
     "git.tag": id ? () => openNewTag() : undefined,
     "git.remote": id ? openNewRemote : undefined,
+    "git.undo": id ? confirmUndo : undefined,
     "git.commit": id
       ? () => {
           setView("status");
@@ -2594,6 +2661,7 @@ The stashed changes are discarded.`,
               status={status.data}
               worktrees={worktrees.data}
               submodules={submodules.data}
+              reflog={reflogQuery.data}
               view={view}
               onCheckout={(name) => act(`Check out ${name}`, () => api.checkout(id, name))}
               // Only while history is showing: a click on a branch is not a

@@ -93,6 +93,7 @@ export const COMMANDS: CommandDef[] = [
   { id: "panel.stashes", label: "Stashes", category: "Panels", scope: "global", binding: ["5"], needsRepo: true },
   { id: "panel.worktrees", label: "Worktrees", category: "Panels", scope: "global", binding: ["6"], needsRepo: true },
   { id: "panel.submodules", label: "Submodules", category: "Panels", scope: "global", binding: ["7"], needsRepo: true },
+  { id: "panel.reflog", label: "Reflog", category: "Panels", scope: "global", binding: ["8"], needsRepo: true },
   { id: "view.filter", label: "Focus the filter box", category: "Panels", scope: "global", binding: ["/", "Mod+F"], short: "filter" },
 
   // --- Sidebar, live only while a sidebar panel has focus ---
@@ -156,6 +157,7 @@ export const COMMANDS: CommandDef[] = [
   { id: "git.checkout", label: "Check out by name", category: "Git", scope: "global", binding: ["O"], needsRepo: true, short: "check out" },
   { id: "git.tag", label: "New tag", category: "Git", scope: "global", binding: ["T"], needsRepo: true, short: "tag" },
   { id: "git.remote", label: "Add a remote", category: "Git", scope: "global", binding: ["R"], needsRepo: true, short: "add remote" },
+  { id: "git.undo", label: "Undo the last thing that moved HEAD", category: "Git", scope: "global", binding: ["Z"], needsRepo: true, short: "undo" },
 
   // --- File Status ---
   { id: "status.next", label: "Next file", category: "File Status", scope: "status", binding: ["J", "ArrowDown"] },

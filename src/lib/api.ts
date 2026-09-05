@@ -119,6 +119,19 @@ export interface RefsSnapshot {
   stashes: StashEntry[];
 }
 
+// --- reflog ---------------------------------------------------------------
+
+export interface ReflogEntry {
+  oid: string;
+  short: string;
+  /** `HEAD@{n}`, newest first from zero. */
+  selector: string;
+  /** What moved HEAD, in git's words. */
+  subject: string;
+  /** Relative: "3 minutes ago". */
+  when: string;
+}
+
 // --- rebase ---------------------------------------------------------------
 
 export type RebaseAction = "pick" | "reword" | "edit" | "squash" | "fixup" | "drop";
@@ -495,6 +508,8 @@ export const api = {
   rebaseRun: (id: string, base: string, steps: RebaseStep[]) =>
     invoke<string>("rebase_run", { id, base, steps }),
   amendInto: (id: string, oid: string) => invoke<string>("amend_into", { id, oid }),
+  reflog: (id: string, limit: number) => invoke<ReflogEntry[]>("reflog", { id, limit }),
+  undo: (id: string) => invoke<string>("undo", { id }),
   createBranch: (
     id: string,
     name: string,
