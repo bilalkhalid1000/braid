@@ -169,6 +169,12 @@ export const COMMANDS: CommandDef[] = [
   { id: "status.commit", label: "Commit", category: "File Status", scope: "status", binding: ["Mod+Enter"], short: "commit" },
   { id: "status.blame", label: "Blame the selected file", category: "File Status", scope: "status", binding: ["Shift+B"], short: "blame" },
   { id: "status.menu", label: "Open the file's menu", category: "File Status", scope: "status", binding: ["Shift+Enter"], short: "menu" },
+  { id: "status.edit", label: "Open the selected file in the editor", category: "File Status", scope: "status", binding: ["E"], short: "editor" },
+  // Conflicts are resolved in the editor, on purpose: every editor has a
+  // resolver, and the loop is one key there, one key back to mark it done.
+  { id: "status.mergetool", label: "Open the selected file in the merge tool", category: "File Status", scope: "status", binding: ["Shift+E"], short: "merge tool" },
+  { id: "status.nextConflict", label: "Next conflicted file", category: "File Status", scope: "status", binding: ["Shift+J"], short: "next conflict" },
+  { id: "status.previousConflict", label: "Previous conflicted file", category: "File Status", scope: "status", binding: ["Shift+K"], short: "previous conflict" },
 
   // --- History ---
   { id: "history.next", label: "Next commit", category: "History", scope: "history", binding: ["J", "ArrowDown"] },

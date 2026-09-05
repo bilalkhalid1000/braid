@@ -556,6 +556,7 @@ export const api = {
     invoke<string>("resolve_with_side", { id, path, side }),
   markResolved: (id: string, path: string) =>
     invoke<string>("mark_resolved", { id, path }),
+  mergetool: (id: string, path: string) => invoke<string>("mergetool", { id, path }),
 
   abortOperation: (id: string) => invoke<string>("abort_operation", { id }),
   continueOperation: (id: string) => invoke<string>("continue_operation", { id }),

@@ -71,6 +71,10 @@ const READS: &[&str] = &[
     "symbolic-ref",
     "version",
     "--version",
+    // Not a read, but interactive and long-lived: it opens the user's merge
+    // tool and waits. Holding the write lock for that would freeze every
+    // other action until the tool is closed.
+    "mergetool",
 ];
 
 /// Whether an invocation only reads. The first argument that is not an option

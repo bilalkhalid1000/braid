@@ -2787,6 +2787,10 @@ The stashed changes are discarded.`,
                   onMarkResolved={(path) =>
                     act(`Mark ${path} resolved`, () => api.markResolved(id, path))
                   }
+                  onEdit={openFileInEditor}
+                  onMergeTool={(path) =>
+                    act(`Merge tool for ${path}`, () => api.mergetool(id, path))
+                  }
                   onHunk={({ path, hunk, lines, action }) =>
                     act(hunkLabel(action, lines), () =>
                       api.applyHunk(id, {

@@ -1169,3 +1169,20 @@ pub async fn undo(registry: State<'_, RepoRegistry>, id: String) -> Result<Strin
     let session = registry.get(&id)?;
     git::reflog::undo(&session.git).await
 }
+
+/// Open one conflicted file in the merge tool git is configured with.
+///
+/// Waits for the tool to close; git then stages the result itself. With no
+/// tool configured, git says so and that message is the answer.
+#[tauri::command]
+pub async fn mergetool(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    path: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    session
+        .git
+        .run_reported(&["mergetool", "--no-prompt", "--", &path])
+        .await
+}

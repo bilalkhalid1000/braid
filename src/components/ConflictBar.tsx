@@ -1,4 +1,5 @@
 import type { RepoState } from "../lib/api";
+import { useTip } from "./Tip";
 
 interface Props {
   path: string;
@@ -6,6 +7,9 @@ interface Props {
   busy: boolean;
   onTake: (side: "ours" | "theirs") => void;
   onMarkResolved: () => void;
+  /** The editor is where conflicts are resolved; this is the way there. */
+  onEdit: () => void;
+  onMergeTool: () => void;
 }
 
 /** What "ours" and "theirs" mean, in words, for the operation actually running.
@@ -46,20 +50,45 @@ const ACTION = "px-4 py-[3px] text-small whitespace-nowrap";
  *  Sits above the diff so the choice is next to the thing being decided. Taking
  *  a side writes it into the working copy and stages it; editing by hand and
  *  pressing "Mark resolved" does the same with whatever you wrote. */
-export function ConflictBar({ path, state, busy, onTake, onMarkResolved }: Props) {
+export function ConflictBar({
+  path,
+  state,
+  busy,
+  onTake,
+  onMarkResolved,
+  onEdit,
+  onMergeTool,
+}: Props) {
   const labels = sideLabels(state);
+  const tip = useTip();
 
   return (
     <div className={BAR}>
       <div className="grid min-w-0 gap-1">
         <span className="font-semibold text-conflict">This file has conflicts</span>
         <span className="text-small leading-[1.45] text-text-dim">
-          Take one side whole, or edit {shortPath(path)} and mark it resolved.
+          Take one side whole, or resolve {shortPath(path)} in your editor and mark it done.
           {labels.note && ` ${labels.note}`}
         </span>
       </div>
 
       <div className="ml-auto flex flex-none gap-3">
+        <button
+          className={`btn ${ACTION}`}
+          disabled={busy}
+          onClick={onEdit}
+          {...tip("Open in your editor, which has a resolver of its own", "status.edit")}
+        >
+          Open in editor
+        </button>
+        <button
+          className={`btn ${ACTION}`}
+          disabled={busy}
+          onClick={onMergeTool}
+          {...tip("Run git mergetool on this file", "status.mergetool")}
+        >
+          Merge tool
+        </button>
         <button className={`btn ${ACTION}`} disabled={busy} onClick={() => onTake("ours")}>
           Take {labels.ours}
         </button>

@@ -13,6 +13,7 @@ import { FileList } from "./FileList";
 import { DiffView, type HunkRequest } from "./DiffView";
 import { ConflictBar } from "./ConflictBar";
 import { CommitBox, type CommitBoxHandle } from "./CommitBox";
+import { nextConflict } from "../lib/conflicts";
 import { useCommands } from "../lib/useCommands";
 import { useSettings } from "../lib/settings";
 import { FilterInput, matchesFilter } from "./FilterInput";
@@ -43,6 +44,8 @@ interface Props {
   onHunk: (request: HunkRequest & { path: string }) => void;
   onResolve: (path: string, side: "ours" | "theirs") => void;
   onMarkResolved: (path: string) => void;
+  onEdit: (path: string) => void;
+  onMergeTool: (path: string) => void;
 }
 
 export function FileStatusView({
@@ -60,6 +63,8 @@ export function FileStatusView({
   onHunk,
   onResolve,
   onMarkResolved,
+  onEdit,
+  onMergeTool,
 }: Props) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [filter, setFilter] = useState("");
@@ -132,6 +137,16 @@ export function FileStatusView({
     if (next) select(next.entry, next.staged);
   };
 
+  const jumpConflict = (delta: 1 | -1) => {
+    const at = nextConflict(
+      ordered.map((row) => row.entry.kind),
+      index,
+      delta,
+    );
+    const row = ordered[at];
+    if (row) select(row.entry, row.staged);
+  };
+
   const toggle = (entry: StatusEntry, isStagedSide: boolean) =>
     isStagedSide ? onUnstage([entry.path]) : onStage([entry.path]);
 
@@ -147,6 +162,11 @@ export function FileStatusView({
       selected && !selected.staged && onDiscard([selected.entry.path]),
     "status.commit": () => commitRef.current?.submit(),
     "status.blame": () => selected && onBlame(selected.entry.path),
+    "status.edit": () => selected && onEdit(selected.entry.path),
+    "status.mergetool": () =>
+      selected?.entry.kind === "unmerged" && onMergeTool(selected.entry.path),
+    "status.nextConflict": () => jumpConflict(1),
+    "status.previousConflict": () => jumpConflict(-1),
     // The row's menu, opened under the row so it reads as belonging to it.
     "status.menu": () => {
       if (!selected) return;
@@ -239,6 +259,8 @@ export function FileStatusView({
             busy={busy}
             onTake={(side) => onResolve(selected.entry.path, side)}
             onMarkResolved={() => onMarkResolved(selected.entry.path)}
+            onEdit={() => onEdit(selected.entry.path)}
+            onMergeTool={() => onMergeTool(selected.entry.path)}
           />
         )}
 
