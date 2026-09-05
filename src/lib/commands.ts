@@ -96,6 +96,7 @@ export const COMMANDS: CommandDef[] = [
   { id: "panel.submodules", label: "Submodules", category: "Panels", scope: "global", binding: ["7"], needsRepo: true },
   { id: "panel.reflog", label: "Reflog", category: "Panels", scope: "global", binding: ["8"], needsRepo: true },
   { id: "view.filter", label: "Focus the filter box", category: "Panels", scope: "global", binding: ["/", "Mod+F"], short: "filter" },
+  { id: "view.diffLayout", label: "Switch the diff between unified and side by side", category: "Panels", scope: "global", binding: ["Mod+\\"], short: "diff layout" },
 
   // --- Sidebar, live only while a sidebar panel has focus ---
   { id: "sidebar.next", label: "Next item", category: "Sidebar", scope: "sidebar", binding: ["J", "ArrowDown"] },

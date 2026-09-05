@@ -184,6 +184,8 @@ export default function App() {
   const [historyFocus, setHistoryFocus] = useState<string | null>(null);
   /** The file the history is narrowed to, if any. */
   const [historyPath, setHistoryPath] = useState<string | null>(null);
+  /** Commit messages made this session, per repository, newest first. */
+  const [messageHistory, setMessageHistory] = useState<Record<string, string[]>>({});
   /** Whether the repository list has a tab in the strip. */
   const [libraryOpen, setLibraryOpen] = useState(false);
   /** What the sidebar's keyboard cursor is on, so Merge can act on it. */
@@ -2688,6 +2690,8 @@ The stashed changes are discarded.`,
     "git.tag": id ? () => openNewTag() : undefined,
     "git.remote": id ? openNewRemote : undefined,
     "git.undo": id ? confirmUndo : undefined,
+    "view.diffLayout": () =>
+      updateSettings({ diffLayout: settings.diffLayout === "split" ? "unified" : "split" }),
     "repo.browse":
       id && hostingFor()
         ? () => browse(hostingFor()!.web)
@@ -3021,11 +3025,20 @@ The stashed changes are discarded.`,
                   onDiscard={(paths) => confirmDiscard(paths)}
                   onBlame={(path) => blameFile(path)}
                   onMenu={onFileMenu}
-                  onCommit={(message, amend, skipHooks) =>
-                    perform(amend ? "Amend commit" : "Commit", () =>
+                  onCommit={async (message, amend, skipHooks) => {
+                    const ok = await perform(amend ? "Amend commit" : "Commit", () =>
                       api.commit(id, message, amend, skipHooks),
-                    )
-                  }
+                    );
+                    if (ok) {
+                      // ponytail: kept for the session only, twenty deep.
+                      setMessageHistory((all) => ({
+                        ...all,
+                        [id]: [message, ...(all[id] ?? []).filter((m) => m !== message)].slice(0, 20),
+                      }));
+                    }
+                    return ok;
+                  }}
+                  messageHistory={messageHistory[id] ?? []}
                   onResolve={(path, side) =>
                     act(
                       `Take ${side === "ours" ? "this branch" : "the other side"} for ${path}`,

@@ -15,6 +15,9 @@ interface Props {
   onEditing?: (editing: boolean) => void;
   /** Resolves false when the commit failed, so the message is not lost. */
   onCommit: (message: string, amend: boolean, skipHooks: boolean) => Promise<boolean>;
+  /** Messages committed earlier this session, newest first. Ctrl+Up walks
+   *  back through them. */
+  history?: string[];
 }
 
 const BOX = "grid flex-none gap-3 p-4 bg-surface-alt border-t border-t-border";
@@ -31,8 +34,10 @@ const MESSAGE =
  *  keystroke that commits stays a setting like every other one instead of being
  *  hard-coded inside a textarea. */
 export const CommitBox = forwardRef<CommitBoxHandle, Props>(
-  ({ stagedCount, busy, onCommit, onEditing }, ref) => {
+  ({ stagedCount, busy, onCommit, onEditing, history = [] }, ref) => {
     const [message, setMessage] = useState("");
+    /** Which earlier message is showing, or -1 for one being written. */
+    const [recalled, setRecalled] = useState(-1);
     const [amend, setAmend] = useState(false);
     const [skipHooks, setSkipHooks] = useState(false);
     const textarea = useRef<HTMLTextAreaElement>(null);
@@ -49,6 +54,7 @@ export const CommitBox = forwardRef<CommitBoxHandle, Props>(
       setMessage("");
       setAmend(false);
       setSkipHooks(false);
+      setRecalled(-1);
     };
 
     const tip = useTip();
@@ -74,7 +80,17 @@ export const CommitBox = forwardRef<CommitBoxHandle, Props>(
             // text field has focus -- correctly, or typing "a" would stage
             // everything -- so without this the keyboard has no exit.
             if (e.key === "Escape") e.currentTarget.blur();
+
+            // Earlier messages, the way a shell recalls earlier commands.
+            if ((e.ctrlKey || e.metaKey) && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+              e.preventDefault();
+              const next = e.key === "ArrowUp" ? recalled + 1 : recalled - 1;
+              if (next >= history.length) return;
+              setRecalled(Math.max(next, -1));
+              setMessage(next < 0 ? "" : history[next]!);
+            }
           }}
+
         />
 
         <div className="flex items-center gap-6">
@@ -103,7 +119,14 @@ export const CommitBox = forwardRef<CommitBoxHandle, Props>(
             Skip hooks
           </label>
 
-          <span className="ml-auto text-micro text-text-faint">{stagedCount} staged</span>
+          <span className="ml-auto text-micro text-text-faint">
+            {history.length > 0 && (
+              <span className="mr-4" title="Ctrl+Up recalls an earlier message, Ctrl+Down comes back">
+                <kbd>Ctrl+↑</kbd> earlier message
+              </span>
+            )}
+            {stagedCount} staged
+          </span>
 
           <button
             className="btn-primary"

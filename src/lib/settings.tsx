@@ -24,6 +24,8 @@ export interface Settings {
   /** Lines of unchanged context around each diff hunk. */
   diffContextLines: number;
   ignoreWhitespace: boolean;
+  /** One column with + and -, or the old and new side by side. */
+  diffLayout: "unified" | "split";
   /** Commits fetched per page in the history view. */
   historyPageSize: number;
   /** Fetch the active repository in the background this often. 0 is never. */
@@ -59,6 +61,7 @@ export const DEFAULT_SETTINGS: Settings = {
   confirmDiscard: true,
   diffContextLines: 3,
   ignoreWhitespace: false,
+  diffLayout: "unified",
   historyPageSize: 300,
   autoFetchMinutes: 5,
   // Every branch and tag, which is what a history view is usually opened to

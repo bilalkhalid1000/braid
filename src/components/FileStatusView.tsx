@@ -46,6 +46,8 @@ interface Props {
   onMarkResolved: (path: string) => void;
   onEdit: (path: string) => void;
   onMergeTool: (path: string) => void;
+  /** Messages committed earlier this session, newest first. */
+  messageHistory: string[];
 }
 
 export function FileStatusView({
@@ -65,6 +67,7 @@ export function FileStatusView({
   onMarkResolved,
   onEdit,
   onMergeTool,
+  messageHistory,
 }: Props) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [filter, setFilter] = useState("");
@@ -239,6 +242,7 @@ export function FileStatusView({
           stagedCount={status?.stagedCount ?? 0}
           busy={busy}
           onCommit={onCommit}
+          history={messageHistory}
         />
 
       </div>

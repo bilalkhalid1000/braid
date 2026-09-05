@@ -522,6 +522,18 @@ function DiffSection() {
           (diffContextLines) => update({ diffContextLines }),
         ),
 
+        selectRow(
+          "diffLayout",
+          "Layout",
+          "Unified shows one column with + and - lines. Side by side shows the old text on the left and the new on the right.",
+          settings.diffLayout,
+          [
+            { value: "unified", label: "Unified" },
+            { value: "split", label: "Side by side" },
+          ],
+          (diffLayout) => update({ diffLayout: diffLayout as Settings["diffLayout"] }),
+        ),
+
         toggleRow(
           "ignoreWhitespace",
           "Ignore whitespace",

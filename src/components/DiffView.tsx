@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 
 import type { DiffLine, FileDiff } from "../lib/api";
 import { useSettings } from "../lib/settings";
+import { pairLines, type Placed } from "../lib/splitDiff";
 import { highlightHunks, languageOf } from "../lib/highlight";
 import { Code } from "./Code";
 import { useTip } from "./Tip";
@@ -11,7 +12,8 @@ const LINE_HEIGHT = 18;
 
 type DiffRow =
   | { kind: "hunk"; hunk: number; header: string }
-  | { kind: "line"; hunk: number; index: number; line: DiffLine };
+  | { kind: "line"; hunk: number; index: number; line: DiffLine }
+  | { kind: "pair"; hunk: number; left?: Placed; right?: Placed };
 
 /** What a hunk button does, phrased from the side of the index it moves. */
 export type HunkAction = "stage" | "unstage" | "discard";
@@ -67,6 +69,10 @@ const KIND: Record<string, string> = {
 
 const GUTTER = "w-22 flex-none pr-4 text-right text-text-faint select-none";
 
+/* One side of a split row. Clipped rather than scrolled: two columns that
+   each scrolled sideways would never line up. */
+const HALF = "flex min-w-0 flex-1 basis-0 items-center overflow-hidden";
+
 /* Lit when the line is picked, which the line above it announces with a class
    the marker can look up at. */
 const MARKER =
@@ -84,7 +90,7 @@ const HUNK_BUTTON =
 
 export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { settings } = useSettings();
+  const { settings, update } = useSettings();
   const tip = useTip();
 
   /** Selected lines, keyed "hunk:index". Cleared whenever the file changes. */
@@ -92,14 +98,18 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
 
   useEffect(() => setPicked(new Set()), [diff?.path, staged]);
 
+  const split = settings.diffLayout === "split";
+
   const rows = useMemo<DiffRow[]>(() => {
     if (!diff) return [];
 
     return diff.hunks.flatMap<DiffRow>((hunk, h) => [
       { kind: "hunk", hunk: h, header: hunk.header },
-      ...hunk.lines.map<DiffRow>((line, index) => ({ kind: "line", hunk: h, index, line })),
+      ...(split
+        ? pairLines(hunk.lines).map<DiffRow>((row) => ({ kind: "pair", hunk: h, ...row }))
+        : hunk.lines.map<DiffRow>((line, index) => ({ kind: "line", hunk: h, index, line }))),
     ]);
-  }, [diff]);
+  }, [diff, split]);
 
   // Keyed on the diff alone, deliberately. This component re-renders on every
   // click while lines are being picked for partial staging, and a dependency
@@ -162,7 +172,14 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
               <span className="added">+{diff.added}</span>
               <span className="removed">&minus;{diff.removed}</span>
             </span>
-            <span className="ml-auto font-mono text-text-faint">{diff.durationMs}ms</span>
+            <button
+              className="ml-auto border border-border bg-surface px-3 py-px rounded-sm text-micro text-text-dim cursor-pointer hover:text-text"
+              onClick={() => update({ diffLayout: split ? "unified" : "split" })}
+              {...tip(split ? "Show one column" : "Show old and new side by side", "view.diffLayout")}
+            >
+              {split ? "Unified" : "Side by side"}
+            </button>
+            <span className="font-mono text-text-faint">{diff.durationMs}ms</span>
           </>
         ) : (
           <span className="overflow-hidden text-ellipsis whitespace-nowrap font-sans text-text-faint">{loading ? "Loading…" : emptyMessage}</span>
@@ -217,6 +234,48 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
                         )}
                       </span>
                     )}
+                  </div>
+                );
+              }
+
+              if (row.kind === "pair") {
+                // Each side is its own line of the hunk, picked on its own;
+                // a context line is the same line on both and picks neither.
+                const side = (placed: Placed | undefined, which: "old" | "new") => {
+                  if (!placed) return <span className={`${HALF} bg-surface-alt/40`} />;
+                  const { line, index } = placed;
+                  const selectable =
+                    canApply && line.kind !== "context" && line.kind !== "meta";
+                  const isPicked = picked.has(key(row.hunk, index));
+                  return (
+                    <span
+                      className={[
+                        HALF,
+                        "group",
+                        KIND[line.kind],
+                        selectable ? "cursor-pointer" : "",
+                        isPicked ? "shadow-[inset_2px_0_0_var(--color-accent)] is-picked" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onMouseDown={() => toggleLine(row.hunk, index, line)}
+                    >
+                      <span className={GUTTER}>
+                        {(which === "old" ? line.oldLine : line.newLine) ?? ""}
+                      </span>
+                      <span className={MARKER}>{markerFor(line.kind)}</span>
+                      <span className="pr-8">
+                        <Code tokens={highlighted?.[row.hunk]?.[index]} text={line.content} />
+                      </span>
+                    </span>
+                  );
+                };
+
+                return (
+                  <div key={item.key} className={`${LINE} min-w-0 w-full`} style={style}>
+                    {side(row.left, "old")}
+                    <span className="w-px flex-none self-stretch bg-border-soft" />
+                    {side(row.right, "new")}
                   </div>
                 );
               }
