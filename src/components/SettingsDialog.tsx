@@ -418,8 +418,8 @@ function GeneralSection() {
 
     toggleRow(
       "lowMemoryRendering",
-      "Use less memory, draw with the CPU",
-      "Linux only. Turns off GPU compositing in the window and the web view: measured at about 50 MB less, plus whatever the GPU was holding. Scrolling can be less smooth on a slow processor. Takes effect the next time the app starts.",
+      "Draw with the CPU",
+      "Linux only. Leaves GPU compositing off in the window and the web view. Measured on an integrated GPU: about 50 MB less memory, 450 MB less held by the GPU, and a third less CPU while scrolling. Turn it off to hand drawing back to the GPU. Takes effect the next time the app starts.",
       settings.lowMemoryRendering,
       (lowMemoryRendering) => update({ lowMemoryRendering }),
     ),

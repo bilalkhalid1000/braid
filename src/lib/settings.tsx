@@ -26,8 +26,10 @@ export interface Settings {
   ignoreWhitespace: boolean;
   /** One column with + and -, or the old and new side by side. */
   diffLayout: "unified" | "split";
-  /** Linux only: draw with the CPU rather than the GPU, for less memory. Read
-   *  by the backend before the window exists, so it takes effect at launch. */
+  /** Linux only: draw with the CPU rather than the GPU. On by default, since
+   *  it measured better on every axis there -- memory, GPU memory, and CPU
+   *  while scrolling. Read by the backend before the window exists, so it
+   *  takes effect at launch. */
   lowMemoryRendering: boolean;
   /** Commits fetched per page in the history view. */
   historyPageSize: number;
@@ -65,7 +67,7 @@ export const DEFAULT_SETTINGS: Settings = {
   diffContextLines: 3,
   ignoreWhitespace: false,
   diffLayout: "unified",
-  lowMemoryRendering: false,
+  lowMemoryRendering: true,
   historyPageSize: 300,
   autoFetchMinutes: 5,
   // Every branch and tag, which is what a history view is usually opened to

@@ -209,10 +209,25 @@ WebKitGTK, GTK and the JavaScript engine, and it is what every Tauri app on
 Linux pays. Braid's own data for nine repositories is about 15 MB.
 
 The one lever on the floor is how the two toolkits draw. With GPU compositing
-off in both, "Use less memory, draw with the CPU" in Settings, the total is
-257 MB proportional and 109 MB own, and the GPU holds nothing for the app.
-Scrolling then costs CPU rather than GPU, so it is a setting rather than the
-default.
+off in both, the total is 257 MB proportional and 109 MB own. The driver's
+own accounting (DRM fdinfo) showed what the resident numbers cannot: in the
+default mode the web process held 285 MB and the window process 173 MB of GPU
+buffers, which on an integrated GPU is ordinary RAM, and 270 MB of it is there
+with no repository open. With the CPU drawing, about 1 MB. On this machine
+scrolling also cost less CPU that way, 63 % of a core against 99 %. So on
+Linux "Draw with the CPU" is on by default, with the setting there to hand
+drawing back to the GPU.
+
+Stepping through the history, release build, 160 rows in nine seconds:
+
+| | Web process | Window process |
+| --- | --- | --- |
+| Before: every step fetched the commit and re-rendered every row | 161 % | 27 % |
+| Fetch once the cursor rests, rows memoized, GPU drawing | 99 % | 20 % |
+| The same, CPU drawing | 63 % | 23 % |
+| Selection moving without scrolling, CPU drawing | 35 % | 14 % |
+
+What is left is WebKit laying out and painting the list as it scrolls.
 
 Still to measure: history scroll frame times, and the same set against
 SourceTree and lazygit.
