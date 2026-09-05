@@ -119,6 +119,20 @@ describe("the settings dialog, by keyboard alone", () => {
     expect(select.value).not.toBe(DEFAULT_SETTINGS.theme);
   });
 
+  it("keeps the cursor's row on screen as the keys move it", async () => {
+    await open();
+    const scrolled = Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>;
+    scrolled.mockClear();
+
+    press("ArrowDown");
+    press("ArrowDown");
+
+    // Once per move, asking for the nearest edge: a row below the fold comes
+    // up just far enough, and one already in view is left where it is.
+    expect(scrolled).toHaveBeenCalledWith({ block: "nearest" });
+    expect(scrolled.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
   it("changes a select further down the page, not the one at the top", async () => {
     // The first select is also the first row, so focus and the cursor agree by
     // accident. Reaching any other one is where they come apart.

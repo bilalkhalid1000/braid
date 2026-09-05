@@ -100,6 +100,14 @@ function SettingRow({
 }) {
   const id = useId();
   const hintId = `${id}-hint`;
+  const element = useRef<HTMLDivElement>(null);
+
+  // The cursor is what the keys act on, so it has to be on screen: a section
+  // is taller than the dialog, and an arrow key that moved the highlight
+  // below the fold left the keyboard changing something out of sight.
+  useEffect(() => {
+    if (at) element.current?.scrollIntoView({ block: "nearest" });
+  }, [at]);
 
   // The label and the control are in separate columns for layout, so they are
   // tied together by id rather than by nesting. Without it a checkbox is
@@ -119,6 +127,7 @@ function SettingRow({
     // row while the control's own handling was suppressed -- so the setting
     // being looked at never moved.
     <div
+      ref={element}
       className={`${ROW} ${at ? ROW_AT : ""}`}
       onMouseEnter={onPoint}
       onFocusCapture={onPoint}
