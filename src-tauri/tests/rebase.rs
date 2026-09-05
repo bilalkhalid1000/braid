@@ -24,7 +24,11 @@ fn subjects(repo: &TestRepo) -> Vec<String> {
 }
 
 fn step(action: Action, oid: &str) -> Step {
-    Step { action, oid: oid.to_string(), message: None }
+    Step {
+        action,
+        oid: oid.to_string(),
+        message: None,
+    }
 }
 
 #[tokio::test]
@@ -36,7 +40,10 @@ async fn the_plan_lists_the_run_oldest_first_from_the_parent() {
 
     assert_eq!(plan.base, oids[0]);
     let listed: Vec<&str> = plan.commits.iter().map(|c| c.oid.as_str()).collect();
-    assert_eq!(listed, vec![oids[1].as_str(), oids[2].as_str(), oids[3].as_str()]);
+    assert_eq!(
+        listed,
+        vec![oids[1].as_str(), oids[2].as_str(), oids[3].as_str()]
+    );
     assert_eq!(plan.commits[0].subject, "Add b");
     assert_eq!(plan.commits[0].message, "Add b");
     assert_eq!(plan.published, 0);
@@ -100,7 +107,10 @@ async fn rewords_without_an_editor() {
     .await
     .unwrap();
 
-    assert_eq!(subjects(&repo), vec!["Initial commit", "Add b", "Add c, properly", "Add d"]);
+    assert_eq!(
+        subjects(&repo),
+        vec!["Initial commit", "Add b", "Add c, properly", "Add d"]
+    );
     let body = repo.git(&["log", "-1", "--format=%b", "HEAD~1"]);
     assert_eq!(body.trim(), "With a body.");
 }
@@ -140,7 +150,11 @@ async fn dropping_everything_is_refused() {
     let result = run(
         repo.git_api(),
         &plan.base,
-        &[step(Action::Drop, &oids[1]), step(Action::Drop, &oids[2]), step(Action::Drop, &oids[3])],
+        &[
+            step(Action::Drop, &oids[1]),
+            step(Action::Drop, &oids[2]),
+            step(Action::Drop, &oids[3]),
+        ],
     )
     .await;
 
@@ -160,7 +174,10 @@ async fn staged_changes_fold_into_an_older_commit() {
 
     amend_into(repo.git_api(), &oids[1]).await.unwrap();
 
-    assert_eq!(subjects(&repo), vec!["Initial commit", "Add b", "Add c", "Add d"]);
+    assert_eq!(
+        subjects(&repo),
+        vec!["Initial commit", "Add b", "Add c", "Add d"]
+    );
     let b_then = repo.git(&["show", "HEAD~2:b.txt"]);
     assert_eq!(b_then, "b, improved\n");
     assert_eq!(repo.read("scratch.txt"), "not yet\n");

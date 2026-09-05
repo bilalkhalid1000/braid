@@ -12,7 +12,11 @@ async fn a_remote_with_no_branches_is_listed_with_its_url() {
 
     let snapshot = refs(repo.git_api()).await.unwrap();
 
-    let upstream = snapshot.remotes.iter().find(|r| r.name == "upstream").unwrap();
+    let upstream = snapshot
+        .remotes
+        .iter()
+        .find(|r| r.name == "upstream")
+        .unwrap();
     assert_eq!(upstream.url, "https://example.com/repo.git");
     assert!(upstream.branches.is_empty());
 }

@@ -233,7 +233,12 @@ export function Sidebar({
           matchesFilter(`${remote.name}/${b}`, filter),
         ),
       }))
-      .filter((remote) => remote.branches.length > 0);
+      // A remote with no branches is still a remote -- one just added, or
+      // never fetched -- and is hidden only by a filter it does not match.
+      .filter(
+        (remote) =>
+          remote.branches.length > 0 || (filter === "" || matchesFilter(remote.name, filter)),
+      );
 
     const count =
       branches.length +
@@ -369,7 +374,10 @@ export function Sidebar({
   // cursor is on. Null while no sidebar panel has focus, so those commands fall
   // back to asking rather than acting on a stale highlight.
   const cursorTarget = (focused ? rows[index]?.target : undefined) ?? null;
-  useEffect(() => onCursor?.(cursorTarget), [cursorTarget, onCursor]);
+  // Braced, so whatever the callback returns is not mistaken for a cleanup.
+  useEffect(() => {
+    onCursor?.(cursorTarget);
+  }, [cursorTarget, onCursor]);
 
   useEffect(() => {
     if (!selectedKey) return;

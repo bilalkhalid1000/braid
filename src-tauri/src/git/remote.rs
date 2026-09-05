@@ -41,7 +41,10 @@ mod tests {
             parse_urls(text),
             vec![
                 ("origin".to_string(), "git@github.com:a/b.git".to_string()),
-                ("upstream".to_string(), "https://github.com/c/d.git".to_string()),
+                (
+                    "upstream".to_string(),
+                    "https://github.com/c/d.git".to_string()
+                ),
             ]
         );
     }

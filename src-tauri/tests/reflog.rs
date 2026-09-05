@@ -15,7 +15,9 @@ async fn lists_moves_newest_first() {
     let entries = reflog(repo.git_api(), 10).await.unwrap();
 
     assert_eq!(entries[0].selector, "HEAD@{0}");
-    assert!(entries[0].subject.starts_with("checkout: moving from main to dev"));
+    assert!(entries[0]
+        .subject
+        .starts_with("checkout: moving from main to dev"));
     assert!(entries[1].subject.contains("Add a"));
     assert_eq!(entries[0].oid, repo.head());
 }

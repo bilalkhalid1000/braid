@@ -77,7 +77,10 @@ pub async fn plan(git: &Git, from: &str) -> Result<RebasePlan> {
     }
 
     let base = git
-        .run_str_allowing(&["rev-parse", "--verify", "--quiet", &format!("{from}^1")], &[1])
+        .run_str_allowing(
+            &["rev-parse", "--verify", "--quiet", &format!("{from}^1")],
+            &[1],
+        )
         .await?;
     if base.is_empty() {
         return Err(AppError::Git {
@@ -117,7 +120,12 @@ pub async fn plan(git: &Git, from: &str) -> Result<RebasePlan> {
             });
         }
 
-        commits.push(PlanCommit { oid, short, subject, message });
+        commits.push(PlanCommit {
+            oid,
+            short,
+            subject,
+            message,
+        });
     }
 
     let impact = super::reset::impact(git, &base).await?;
@@ -179,8 +187,9 @@ pub async fn run(git: &Git, base: &str, steps: &[Step]) -> Result<String> {
     if steps.iter().all(|step| step.action == Action::Drop) {
         return Err(AppError::Git {
             code: 1,
-            stderr: "Every commit is dropped. Reset to the base instead; that is what this would do."
-                .into(),
+            stderr:
+                "Every commit is dropped. Reset to the base instead; that is what this would do."
+                    .into(),
         });
     }
 
@@ -202,7 +211,10 @@ pub async fn run(git: &Git, base: &str, steps: &[Step]) -> Result<String> {
             // that never touches it; git puts it back afterwards.
             &["rebase", "--interactive", "--autostash", base],
             &[
-                ("GIT_SEQUENCE_EDITOR", format!("cp \"{}\"", shell_path(&todo))),
+                (
+                    "GIT_SEQUENCE_EDITOR",
+                    format!("cp \"{}\"", shell_path(&todo)),
+                ),
                 // A squash opens an editor on the joined messages; accepting
                 // them as they are is what "squash" means here.
                 ("GIT_EDITOR", "true".to_string()),
@@ -258,9 +270,17 @@ pub async fn amend_into(git: &Git, oid: &str) -> Result<String> {
 
     let mut steps = Vec::with_capacity(plan.commits.len() + 1);
     for commit in &plan.commits {
-        steps.push(Step { action: Action::Pick, oid: commit.oid.clone(), message: None });
+        steps.push(Step {
+            action: Action::Pick,
+            oid: commit.oid.clone(),
+            message: None,
+        });
         if commit.oid == oid {
-            steps.push(Step { action: Action::Fixup, oid: fixup.clone(), message: None });
+            steps.push(Step {
+                action: Action::Fixup,
+                oid: fixup.clone(),
+                message: None,
+            });
         }
     }
 

@@ -14,7 +14,9 @@ pub async fn ignore(git: &Git, path: &str, local: bool) -> Result<String> {
     let file = if local {
         // Asked rather than assumed: in a worktree `.git` is a file and the
         // real directory is elsewhere.
-        let relative = git.run_str(&["rev-parse", "--git-path", "info/exclude"]).await?;
+        let relative = git
+            .run_str(&["rev-parse", "--git-path", "info/exclude"])
+            .await?;
         git.workdir().join(relative.trim())
     } else {
         git.workdir().join(".gitignore")
@@ -41,6 +43,10 @@ pub async fn ignore(git: &Git, path: &str, local: bool) -> Result<String> {
 
     Ok(format!(
         "Ignored {path} in {}",
-        if local { ".git/info/exclude" } else { ".gitignore" }
+        if local {
+            ".git/info/exclude"
+        } else {
+            ".gitignore"
+        }
     ))
 }

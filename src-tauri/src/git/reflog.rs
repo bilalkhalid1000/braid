@@ -93,7 +93,10 @@ pub async fn undo(git: &Git) -> Result<String> {
     }
 
     git.run_reported(&["reset", "--hard", &before.oid]).await?;
-    Ok(format!("Undid \"{}\": back at {}", last.subject, before.short))
+    Ok(format!(
+        "Undid \"{}\": back at {}",
+        last.subject, before.short
+    ))
 }
 
 #[cfg(test)]
@@ -114,7 +117,10 @@ mod tests {
 
     #[test]
     fn reads_where_a_checkout_came_from() {
-        assert_eq!(checkout_origin("checkout: moving from main to dev"), Some("main"));
+        assert_eq!(
+            checkout_origin("checkout: moving from main to dev"),
+            Some("main")
+        );
         assert_eq!(checkout_origin("commit: Add x"), None);
     }
 }
