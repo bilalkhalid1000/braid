@@ -766,9 +766,9 @@ export function Sidebar({
           <Item
             key={entry.selector}
             {...rowProps(`reflog:${entry.selector}`)}
-            label={entry.subject}
+            label={reflogLabel(entry.subject)}
             sans
-            title={`${entry.short} – ${entry.selector}, ${entry.when}`}
+            title={`${entry.subject}\n${entry.short} – ${entry.selector}, ${entry.when}`}
             onContextMenu={(e) =>
               onMenu({ kind: "reflog", entry }, { x: e.clientX, y: e.clientY })
             }
@@ -778,6 +778,13 @@ export function Sidebar({
       </Section>
     </nav>
   );
+}
+
+/** Git's reflog subjects are sentences; the sidebar has room for a phrase.
+ *  "checkout: moving from a to b" becomes "checkout: a → b". */
+function reflogLabel(subject: string): string {
+  const moving = /^checkout: moving from (.+) to (.+)$/.exec(subject);
+  return moving ? `checkout: ${moving[1]} → ${moving[2]}` : subject;
 }
 
 function worktreeSubtitle(worktree: Worktree) {
