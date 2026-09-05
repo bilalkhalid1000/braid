@@ -137,6 +137,9 @@ pub fn run() {
             ipc::rename_branch,
             ipc::set_upstream,
             ipc::ignore_path,
+            ipc::rebase_plan,
+            ipc::rebase_run,
+            ipc::amend_into,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

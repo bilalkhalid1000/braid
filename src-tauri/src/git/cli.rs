@@ -268,9 +268,19 @@ impl Git {
     /// that gets parsed, where an interleaved stderr line would corrupt the
     /// result.
     pub async fn run_reported(&self, args: &[&str]) -> Result<String> {
+        self.run_reported_env(args, &[]).await
+    }
+
+    /// `run_reported`, with extra environment for git: how an interactive
+    /// rebase is told which editor to use.
+    pub async fn run_reported_env(&self, args: &[&str], envs: &[(&str, String)]) -> Result<String> {
         let _turn = self.turn(args).await;
         let run = trace::started(args);
-        let output = self.command(args).output().await?;
+        let mut command = self.command(args);
+        for (key, value) in envs {
+            command.env(key, value);
+        }
+        let output = command.output().await?;
         run.finished(output.status.code().unwrap_or(-1));
 
         let stdout = String::from_utf8_lossy(&output.stdout);

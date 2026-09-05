@@ -118,7 +118,7 @@ export function useActivity() {
 
 /** Tauri rejects with our serialized error string, but a thrown JS Error or a
  *  plain object can also reach here, so normalize all three. */
-function messageOf(error: unknown): string {
+export function messageOf(error: unknown): string {
   if (typeof error === "string") return error;
   if (error instanceof Error) return error.message;
   return JSON.stringify(error);

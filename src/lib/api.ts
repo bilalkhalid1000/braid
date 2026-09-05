@@ -119,6 +119,27 @@ export interface RefsSnapshot {
   stashes: StashEntry[];
 }
 
+// --- rebase ---------------------------------------------------------------
+
+export type RebaseAction = "pick" | "reword" | "edit" | "squash" | "fixup" | "drop";
+
+export interface RebaseStep {
+  action: RebaseAction;
+  oid: string;
+  /** The new message, for a reword. */
+  message?: string;
+}
+
+export interface RebasePlan {
+  /** What the run is replayed onto. */
+  base: string;
+  /** Oldest first. */
+  commits: { oid: string; short: string; subject: string; message: string }[];
+  upstream: string | null;
+  /** How many of the commits the upstream already has. */
+  published: number;
+}
+
 // --- log ------------------------------------------------------------------
 
 export interface Commit {
@@ -469,6 +490,11 @@ export const api = {
 
   ignorePath: (id: string, path: string, local: boolean) =>
     invoke<string>("ignore_path", { id, path, local }),
+
+  rebasePlan: (id: string, oid: string) => invoke<RebasePlan>("rebase_plan", { id, oid }),
+  rebaseRun: (id: string, base: string, steps: RebaseStep[]) =>
+    invoke<string>("rebase_run", { id, base, steps }),
+  amendInto: (id: string, oid: string) => invoke<string>("amend_into", { id, oid }),
   createBranch: (
     id: string,
     name: string,

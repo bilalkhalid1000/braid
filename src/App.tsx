@@ -14,6 +14,8 @@ import {
   type ResetMode,
   type BlameTarget,
   type BranchRef,
+  type RebaseAction,
+  type RebasePlan,
   type RemoteGroup,
   type StashEntry,
   type FlowKind,
@@ -35,6 +37,7 @@ import { FileStatusView } from "./components/FileStatusView";
 import { HistoryView } from "./components/HistoryView";
 import { StashView } from "./components/StashView";
 import { KeyHints } from "./components/KeyHints";
+import { RebaseEditor } from "./components/RebaseEditor";
 import type { CommandScope } from "./lib/commands";
 import { Dialog, type DialogSpec } from "./components/Dialog";
 import type { ComboOption } from "./components/Combo";
@@ -71,7 +74,7 @@ import { everHadTabs, mayWriteSession } from "./lib/session";
 import { useCopy } from "./lib/useCopy";
 import { useCommands } from "./lib/useCommands";
 import { shortcutLabel } from "./lib/shortcutLabel";
-import { useActivity } from "./lib/useActivity";
+import { messageOf, useActivity } from "./lib/useActivity";
 import { gitCommandLine, useGitLog } from "./lib/useGitLog";
 import { useUpdater } from "./lib/useUpdater";
 import { useAppVersion } from "./lib/useAppVersion";
@@ -147,6 +150,11 @@ export default function App() {
   // panel; the rest are sidebar lists.
   const [focusedPanel, setFocusedPanel] = useState<PanelId>("files");
   const [dialog, setDialog] = useState<DialogSpec | null>(null);
+  /** An interactive rebase being planned, and the action a menu asked for. */
+  const [rebase, setRebase] = useState<{
+    plan: RebasePlan;
+    preset?: { oid: string; action: RebaseAction };
+  } | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   // The file being blamed, if any. Blame takes over the main panel
@@ -1616,6 +1624,17 @@ The stashed changes are discarded.`,
     });
   };
 
+  /** Plan an interactive rebase of everything from `from` to HEAD, with one
+   *  commit's action already chosen when a menu entry named it. */
+  const openRebase = async (from: string, preset?: { oid: string; action: RebaseAction }) => {
+    if (!id) return;
+    try {
+      setRebase({ plan: await api.rebasePlan(id, from), preset });
+    } catch (error) {
+      activity.note("Rebase", messageOf(error), "error");
+    }
+  };
+
   /** Right-click on a commit in the history. */
   const openCommitMenu = (commit: Commit, at: { x: number; y: number }) => {
     const branch = head?.head;
@@ -1660,6 +1679,35 @@ The stashed changes are discarded.`,
         disabled: detached || commit.parents.length !== 1,
         danger: true,
         onClick: () => void confirmDrop(commit),
+      },
+      "separator",
+      {
+        label: `Rebase interactively from ${commit.short}…`,
+        disabled: detached,
+        onClick: () => void openRebase(commit.oid),
+      },
+      {
+        label: `Reword ${commit.short}…`,
+        disabled: detached,
+        onClick: () => void openRebase(commit.oid, { oid: commit.oid, action: "reword" }),
+      },
+      {
+        label: `Squash ${commit.short} into its parent…`,
+        disabled: detached || commit.parents.length !== 1,
+        onClick: () =>
+          void openRebase(commit.parents[0]!, { oid: commit.oid, action: "squash" }),
+      },
+      {
+        label: `Amend ${commit.short} with the staged changes`,
+        disabled: detached || !head?.stagedCount,
+        onClick: () =>
+          act(`Amend ${commit.short}`, () => api.amendInto(id!, commit.oid)),
+      },
+      {
+        label: `Fixup ${commit.short} into its parent…`,
+        disabled: detached || commit.parents.length !== 1,
+        onClick: () =>
+          void openRebase(commit.parents[0]!, { oid: commit.oid, action: "fixup" }),
       },
       "separator",
       {
@@ -2391,7 +2439,8 @@ The stashed changes are discarded.`,
 
   // A menu counts: it owns the keyboard while it is up, or J would move the
   // list behind it instead of the menu's own cursor.
-  const inputOpen = settingsOpen || paletteOpen || dialog !== null || menu !== null;
+  const inputOpen =
+    settingsOpen || paletteOpen || dialog !== null || menu !== null || rebase !== null;
 
   // A stash being read that is popped or dropped -- from its own menu, say
   // -- has nothing left to read. The view goes with it rather than showing a
@@ -2827,6 +2876,17 @@ The stashed changes are discarded.`,
       />
 
       {dialog && <Dialog spec={dialog} onClose={() => setDialog(null)} />}
+      {rebase && (
+        <RebaseEditor
+          plan={rebase.plan}
+          preset={rebase.preset}
+          onClose={() => setRebase(null)}
+          onRun={(base, steps) => {
+            setRebase(null);
+            act("Rebase", () => api.rebaseRun(id!, base, steps));
+          }}
+        />
+      )}
       {menu && <ContextMenu state={menu} onClose={() => setMenu(null)} />}
       {settingsOpen && (
         <SettingsDialog

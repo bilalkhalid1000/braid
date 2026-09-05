@@ -1121,3 +1121,35 @@ pub async fn ignore_path(
     let session = registry.get(&id)?;
     git::ignore::ignore(&session.git, &path, local).await
 }
+
+/// The commits an interactive rebase from `oid` would replay.
+#[tauri::command]
+pub async fn rebase_plan(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    oid: String,
+) -> Result<git::RebasePlan> {
+    let session = registry.get(&id)?;
+    git::rebase::plan(&session.git, &oid).await
+}
+
+#[tauri::command]
+pub async fn rebase_run(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    base: String,
+    steps: Vec<git::RebaseStep>,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    git::rebase::run(&session.git, &base, &steps).await
+}
+
+#[tauri::command]
+pub async fn amend_into(
+    registry: State<'_, RepoRegistry>,
+    id: String,
+    oid: String,
+) -> Result<String> {
+    let session = registry.get(&id)?;
+    git::rebase::amend_into(&session.git, &oid).await
+}
