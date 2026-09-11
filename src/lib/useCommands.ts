@@ -11,7 +11,26 @@ import {
 import { useEffect, useState } from "react";
 
 import { chordVariants, chordsOf } from "./commands";
+import { arm, disarm, isArmed, isPrefixPress, sequencePrefixes } from "./sequenceGuard";
 import { useSettings } from "./settings";
+
+/** How many hooks are mounted, so the prefix listener is installed once for
+ *  all of them rather than once each. */
+let listeners = 0;
+let prefixes = new Set<string>();
+let timeout = 0;
+
+function onKeyDown(event: KeyboardEvent) {
+  const target = event.target;
+  if (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    (target instanceof HTMLElement && target.isContentEditable)
+  ) {
+    return;
+  }
+  if (isPrefixPress(event, prefixes)) arm(timeout);
+}
 
 export type CommandHandlers = Record<string, (() => void) | undefined>;
 
@@ -50,6 +69,18 @@ export function useCommands(handlers: CommandHandlers, enabled = true) {
   // checked out the branch the dialog had just been asked to delete. Going
   // live a tick later puts the registration after the event. Going quiet stays
   // immediate.
+  // One listener for the whole window, watching for the first key of any
+  // sequence. Capture, so it runs before the hotkey library's own handlers
+  // and the guard is set by the time a chord asks about it.
+  useEffect(() => {
+    if (listeners++ === 0) document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      if (--listeners === 0) document.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, []);
+  prefixes = sequencePrefixes(keymap);
+  timeout = settings.sequenceTimeout;
+
   const [live, setLive] = useState(false);
   useEffect(() => {
     if (!enabled) {
@@ -79,12 +110,23 @@ export function useCommands(handlers: CommandHandlers, enabled = true) {
         if (steps.length > 1) {
           sequences.push({
             sequence: steps as HotkeySequence,
-            callback: () => handler(),
+            callback: () => {
+              disarm();
+              handler();
+            },
             options: { timeout: settings.sequenceTimeout },
           });
         } else {
           for (const variant of chordVariants(steps[0]!)) {
-            chords.push({ hotkey: variant as Hotkey, callback: () => handler() });
+            chords.push({
+              hotkey: variant as Hotkey,
+              // Quiet while a sequence prefix is fresh: the key is the
+              // sequence's second half, not a command of its own.
+              callback: () => {
+                if (isArmed()) return;
+                handler();
+              },
+            });
           }
         }
       }
