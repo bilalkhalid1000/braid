@@ -49,6 +49,11 @@
   --color-added-bg: #e7f6ec;
   --color-removed: #c9303c;
   --color-removed-bg: #fdebec;
+  /* The changed words inside a changed line: the same hue, one step deeper,
+     so a mark reads as "here, specifically" against a line that already
+     says "here". */
+  --color-added-mark: #b7e6c4;
+  --color-removed-mark: #f7c4c8;
   --color-modified: #9a6700;
   --color-modified-bg: #fff6e0;
   --color-conflict: #c9303c;
@@ -189,6 +194,8 @@
   --color-added-bg: #10261a;
   --color-removed: #f26a63;
   --color-removed-bg: #2c1517;
+  --color-added-mark: #1f4d30;
+  --color-removed-mark: #5a2528;
   --color-modified: #d5a03a;
   --color-modified-bg: #2a2314;
   --color-conflict: #f26a63;

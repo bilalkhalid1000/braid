@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import {
   api,
@@ -132,6 +132,9 @@ export function FileStatusView({
       ),
     enabled: Boolean(shown),
     staleTime: Infinity,
+    // The previous file's diff stays up, dimmed, while the next one loads:
+    // walking a list with J used to blink empty between every two files.
+    placeholderData: keepPreviousData,
   });
 
   const select = (entry: StatusEntry, isStagedSide: boolean) =>
@@ -242,6 +245,7 @@ export function FileStatusView({
 
         <CommitBox
           ref={commitRef}
+          repoId={repoId}
           stagedCount={status?.stagedCount ?? 0}
           busy={busy}
           onCommit={onCommit}

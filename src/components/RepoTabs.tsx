@@ -32,9 +32,21 @@ interface Geometry {
   max: number;
 }
 
+/** What a tab says about its repository without being opened. */
+export interface TabState {
+  /** Staged, unstaged and untracked together: work not yet committed. */
+  changed: number;
+  conflicted: number;
+  ahead: number;
+  behind: number;
+  branch: string | null;
+}
+
 interface Props {
   repos: RepoInfo[];
   activeId: string | null;
+  /** The state of a repository's tree, where it is known. */
+  stateFor?: (id: string) => TabState | undefined;
   /** True while a modifier is held, which reveals the jump numbers. */
   modHeld: boolean;
   digitFor: (index: number) => number | null;
@@ -76,9 +88,31 @@ const LIFTED =
 
 const KEY = "h-[14px] min-w-[14px] px-[3px] animate-tab-key-in";
 
+/* The mark for work in the tree. A dot rather than a count: the number is
+   in the status bar once the tab is in front, and here the question is only
+   whether there is anything to come back for. Conflicts are the one state
+   worth a colour of their own. */
+const DOT = "size-[6px] flex-none rounded-full";
+
+/* Unpushed and unpulled commits, as the arrows the status bar and the
+   branch list use for the same thing: green going out, red coming in. */
+const AHEAD = "flex-none font-mono text-micro text-added";
+const BEHIND = "flex-none font-mono text-micro text-removed";
+
+/** What the dot and the count mean, in words, for the tab's tip. */
+function describe(state: TabState): string {
+  const parts: string[] = [];
+  if (state.conflicted > 0) parts.push(`${state.conflicted} conflicted`);
+  if (state.changed > 0) parts.push(`${state.changed} changed`);
+  if (state.ahead > 0) parts.push(`${state.ahead} to push`);
+  if (state.behind > 0) parts.push(`${state.behind} to pull`);
+  return parts.join(" · ");
+}
+
 export function RepoTabs({
   repos,
   activeId,
+  stateFor,
   modHeld,
   digitFor,
   commandFor,
@@ -144,10 +178,16 @@ export function RepoTabs({
         // dismiss-on-press *and* its drag, and a bare spread would silently
         // replace one with the other.
         const shelf = repo.id === LIBRARY_TAB;
+        const state = shelf ? undefined : stateFor?.(repo.id);
+        const note = state && describe(state);
         // The list has no path to describe, so its tip says what it is.
         const tipProps = shelf
           ? tip("Every repository you have added", "repo.library")
-          : tip(repo.root, commandFor(index));
+          : tip(
+              state?.branch ? `${repo.root} — ${state.branch}` : repo.root,
+              commandFor(index),
+              note || undefined,
+            );
         const closeTip = tip("Close repository", "repo.close");
 
         return (
@@ -233,6 +273,14 @@ export function RepoTabs({
             )}
 
             <span className="overflow-hidden text-ellipsis">{repo.name}</span>
+
+            {state && state.conflicted > 0 ? (
+              <span className={`${DOT} bg-conflict`} aria-label="conflicts" />
+            ) : state && state.changed > 0 ? (
+              <span className={`${DOT} bg-modified`} aria-label="uncommitted changes" />
+            ) : null}
+            {state && state.ahead > 0 && <span className={AHEAD}>&uarr;{state.ahead}</span>}
+            {state && state.behind > 0 && <span className={BEHIND}>&darr;{state.behind}</span>}
 
             <span
               className="text-lead leading-none text-text-faint hover:cursor-pointer hover:text-removed"

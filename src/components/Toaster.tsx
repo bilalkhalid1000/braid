@@ -115,6 +115,18 @@ function Toast({
       )}
 
       <div className={`flex items-center gap-6 empty:hidden ${INDENT}`}>
+        {entry.undo && (
+          <button
+            className="btn btn-small"
+            onClick={() => {
+              entry.undo?.();
+              onDismiss();
+            }}
+          >
+            Undo
+          </button>
+        )}
+
         {hint?.action && (
           <button
             className="btn-primary btn-small"

@@ -515,6 +515,14 @@ function GeneralSection() {
       (autoFetchMinutes) => update({ autoFetchMinutes }),
     ),
 
+    toggleRow(
+      "showTimings",
+      "Show timings",
+      "How long the last status call and the current diff took, in milliseconds. A readout for finding a slow repository, not something to leave on.",
+      settings.showTimings,
+      (showTimings) => update({ showTimings }),
+    ),
+
     numberRow(
       "sequenceTimeout",
       "Sequence timeout",

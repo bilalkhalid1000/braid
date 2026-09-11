@@ -5,6 +5,7 @@ import type { DiffLine, FileDiff } from "../lib/api";
 import { useSettings } from "../lib/settings";
 import { pairLines, type Placed } from "../lib/splitDiff";
 import { highlightHunks, languageOf } from "../lib/highlight";
+import { markHunk, type Marks } from "../lib/intraline";
 import { useGrammar } from "../lib/useGrammar";
 import { Code } from "./Code";
 import { useTip } from "./Tip";
@@ -62,8 +63,8 @@ const LINE =
 /** Built from the line's kind, so every value it can take is spelled out --
  *  a class assembled at runtime is one Tailwind's scanner cannot see. */
 const KIND: Record<string, string> = {
-  added: "bg-added-bg text-added",
-  removed: "bg-removed-bg text-removed",
+  added: "bg-added-bg text-added [&_.diff-mark]:bg-added-mark [&_.diff-mark]:rounded-[2px]",
+  removed: "bg-removed-bg text-removed [&_.diff-mark]:bg-removed-mark [&_.diff-mark]:rounded-[2px]",
   meta: "text-text-faint",
   context: "",
 };
@@ -120,6 +121,13 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
   const highlighted = useMemo(
     () => (diff && grammarReady ? highlightHunks(diff.hunks, language) : null),
     [diff, language, grammarReady],
+  );
+
+  // Which words changed within a changed line. A one-word edit used to read
+  // as two whole coloured lines, and finding the word was the reader's job.
+  const marks = useMemo<Marks[] | null>(
+    () => (diff ? diff.hunks.map((hunk) => markHunk(hunk.lines)) : null),
+    [diff],
   );
 
   const virtualizer = useVirtualizer({
@@ -182,17 +190,34 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
             >
               {split ? "Unified" : "Side by side"}
             </button>
-            <span className="font-mono text-text-faint">{diff.durationMs}ms</span>
+            {settings.showTimings && (
+              <span className="font-mono text-text-faint">{diff.durationMs}ms</span>
+            )}
           </>
         ) : (
-          <span className="overflow-hidden text-ellipsis whitespace-nowrap font-sans text-text-faint">{loading ? "Loading…" : emptyMessage}</span>
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap font-sans text-text-faint">
+            {loading ? "Loading…" : "No file selected"}
+          </span>
         )}
       </header>
 
       {diff?.binary ? (
         <div className={NOTICE}>Binary file &mdash; no textual diff.</div>
+      ) : !diff ? (
+        // The empty state stands in the pane rather than in the header: the
+        // pane is what is empty, and a line of 11px text above a void said
+        // so from the wrong place.
+        <div className="relative bg-surface">
+          <div className="pane-empty">{loading ? "Loading…" : emptyMessage}</div>
+        </div>
       ) : (
-        <div className="overflow-auto bg-surface" ref={scrollRef}>
+        // Dimmed while the next file's diff is on its way and this one is
+        // standing in for it: the old text stays readable and nothing flashes
+        // empty between two selections.
+        <div
+          className={`overflow-auto bg-surface transition-opacity duration-100 ${loading ? "opacity-50" : ""}`}
+          ref={scrollRef}
+        >
           <div className="virtual-canvas" style={{ height: virtualizer.getTotalSize() }}>
             {virtualizer.getVirtualItems().map((item) => {
               const row = rows[item.index];
@@ -268,7 +293,11 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
                       </span>
                       <span className={MARKER}>{markerFor(line.kind)}</span>
                       <span className="pr-8">
-                        <Code tokens={highlighted?.[row.hunk]?.[index]} text={line.content} />
+                        <Code
+                          tokens={highlighted?.[row.hunk]?.[index]}
+                          text={line.content}
+                          marks={marks?.[row.hunk]?.get(index)}
+                        />
                       </span>
                     </span>
                   );
@@ -310,6 +339,7 @@ export function DiffView({ diff, loading, emptyMessage, onHunk, staged }: Props)
                     <Code
                       tokens={highlighted?.[row.hunk]?.[row.index]}
                       text={line.content}
+                      marks={marks?.[row.hunk]?.get(row.index)}
                     />
                   </span>
                 </div>

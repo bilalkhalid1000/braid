@@ -23,6 +23,10 @@ const TABLE = "grid grid-rows-[auto_auto_minmax(0,1fr)] min-h-0 outline-none";
 const COLUMNS =
   "grid grid-cols-[auto_4px_minmax(0,1fr)_92px_148px_74px] items-center gap-4 pr-6";
 
+/* Right-aligned and in figures of one width, so "3 h ago" and "yesterday"
+   and "2026-09-05" sit in a column that can be scanned rather than read. */
+const DATE = "text-right text-small text-text-dim tabular-nums whitespace-nowrap";
+
 const HEAD =
   COLUMNS + " h-12 pl-6 bg-surface-alt border-b border-b-border-soft " +
   "text-small font-semibold text-text-dim";
@@ -367,6 +371,9 @@ export function HistoryView({
                   isHead={commit.oid === headOid}
                   isSelected={commit.oid === selected?.oid}
                   hasCursor={commit.oid === selected?.oid && pane === "commits"}
+                  // Said once per run: the same name down forty rows says
+                  // nothing the first one did not, and hides where it changes.
+                  repeatsAuthor={commits[item.index - 1]?.author === commit.author}
                   bisectMark={bisectMarks.get(commit.oid)}
                   top={item.start}
                   height={item.size}
@@ -419,6 +426,8 @@ interface RowProps {
   isSelected: boolean;
   /** Selected, and the keyboard is on the commit list rather than its files. */
   hasCursor: boolean;
+  /** The row above has the same author, so this one leaves the name out. */
+  repeatsAuthor: boolean;
   bisectMark?: "bad" | "good" | "skip";
   top: number;
   height: number;
@@ -439,6 +448,7 @@ const HistoryRow = memo(function HistoryRow({
   isHead,
   isSelected,
   hasCursor,
+  repeatsAuthor,
   bisectMark,
   top,
   height,
@@ -502,12 +512,16 @@ const HistoryRow = memo(function HistoryRow({
         {commit.subject}
       </span>
 
-      <span className="text-small text-text-dim">{formatDate(commit.timestamp)}</span>
+      <span className={DATE} {...tip(fullDate(commit.timestamp))}>
+        {formatDate(commit.timestamp)}
+      </span>
       <span
-        className="overflow-hidden text-ellipsis whitespace-nowrap text-small text-text-dim"
+        className={`overflow-hidden text-ellipsis whitespace-nowrap text-small ${
+          repeatsAuthor ? "text-text-faint" : "text-text-dim"
+        }`}
         {...tip(commit.author, undefined, commit.email)}
       >
-        {commit.author}
+        {repeatsAuthor ? "″" : commit.author}
       </span>
       <CopyHash
         short={commit.short}
@@ -525,7 +539,29 @@ function chipClass(ref: string) {
   return "ref-local";
 }
 
-function formatDate(seconds: number, withTime = false) {
+const HOUR = 3_600;
+const DAY = 86_400;
+
+/** Recent commits by distance, older ones by date.
+ *
+ *  "3 h ago" answers what a person scanning this week's work is asking;
+ *  "2026-09-05" answers what someone reading last year's is. The switch is
+ *  at a week, past which relative counts stop being a thing anyone feels.
+ *  Absolute dates are written year first, so they sort the way they read. */
+function formatDate(seconds: number): string {
+  const delta = Date.now() / 1000 - seconds;
+
+  if (delta < 60) return "just now";
+  if (delta < HOUR) return `${Math.round(delta / 60)} min ago`;
+  if (delta < DAY) return `${Math.round(delta / HOUR)} h ago`;
+  if (delta < 2 * DAY) return "yesterday";
+  if (delta < 7 * DAY) return `${Math.round(delta / DAY)} days ago`;
+
   const date = new Date(seconds * 1000);
-  return withTime ? date.toLocaleString() : date.toLocaleDateString();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function fullDate(seconds: number): string {
+  return new Date(seconds * 1000).toLocaleString();
 }

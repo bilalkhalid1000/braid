@@ -30,7 +30,7 @@ interface Props {
   /** Show a commit in the history view. */
   onCommit: (oid: string) => void;
   /** Show a file, at a line where one is known. */
-  onFile: (path: string) => void;
+  onFile: (path: string, line?: number) => void;
 }
 
 /** Searching a repository: commits, code, or file paths.
@@ -102,7 +102,7 @@ export function SearchView({ repoId, keyboardActive, onClose, onCommit, onFile }
         key: `${hit.path}:${hit.line}:${index}`,
         primary: hit.text.trim(),
         secondary: `${hit.path}:${hit.line}`,
-        go: () => onFile(hit.path),
+        go: () => onFile(hit.path, hit.line),
       }));
     }
 

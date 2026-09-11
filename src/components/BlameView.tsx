@@ -80,7 +80,7 @@ interface Props {
 export function BlameView({ repoId, target, keyboardActive, onClose }: Props) {
   const tip = useTip();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [selected, setSelected] = useState(0);
+  const [selected, setSelected] = useState(Math.max((target.line ?? 1) - 1, 0));
 
   const blame = useQuery({
     queryKey: ["blame", repoId, target.path, target.rev],

@@ -35,6 +35,12 @@ export interface Settings {
    *  while scrolling. Read by the backend before the window exists, so it
    *  takes effect at launch. */
   lowMemoryRendering: boolean;
+  /** Show how long each git call took, in the status bar and the diff
+   *  header. A development readout; off unless asked for. */
+  showTimings: boolean;
+  /** The version whose update banner was put away. Shown again as a quiet
+   *  mark in the status bar, and as a banner only when a newer one turns up. */
+  dismissedUpdate: string;
   /** Commits fetched per page in the history view. */
   historyPageSize: number;
   /** Fetch the active repository in the background this often. 0 is never. */
@@ -73,6 +79,8 @@ export const DEFAULT_SETTINGS: Settings = {
   diffLayout: "unified",
   lowMemoryRendering: true,
   titleBar: "auto",
+  showTimings: false,
+  dismissedUpdate: "",
   historyPageSize: 300,
   autoFetchMinutes: 5,
   // Every branch and tag, which is what a history view is usually opened to

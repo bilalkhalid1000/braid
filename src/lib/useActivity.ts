@@ -13,10 +13,19 @@ export interface ActivityEntry {
   /** Which control started this, so that control can show it is working.
    *  Absent for anything not launched from a button. */
   source?: string;
+  /** Which repository it ran in. A fetch in one tab must not spin the Fetch
+   *  button of another, and it used to: the running list was one list. */
+  repo?: string;
+  /** A way to take it back, offered on the toast. Only for operations that
+   *  moved something -- a pull that brought commits in -- and only once the
+   *  result is known, which is why it is decided after the run. */
+  undo?: () => void;
 }
 
 const MAX_ENTRIES = 200;
 const SUCCESS_TOAST_MS = 3200;
+/** A toast with an undo on it stays up long enough to be taken. */
+const UNDO_TOAST_MS = 9000;
 
 /** Every git action the user triggers goes through here.
  *
@@ -43,13 +52,17 @@ export function useActivity() {
       label: string,
       action: () => Promise<unknown>,
       source?: string,
+      /** Given the result, a way to undo it -- or nothing, when there is
+       *  nothing to undo, as after a pull that was already up to date. */
+      undoFor?: (result: unknown) => (() => void) | undefined,
+      repo?: string,
     ): Promise<boolean> => {
       const id = nextId.current++;
       const startedAt = Date.now();
 
       setEntries((prev) =>
         [
-          { id, label, status: "running" as const, detail: "", startedAt, source },
+          { id, label, status: "running" as const, detail: "", startedAt, source, repo },
           ...prev,
         ].slice(
           0,
@@ -57,11 +70,11 @@ export function useActivity() {
         ),
       );
 
-      const finish = (status: ActivityStatus, detail: string) => {
+      const finish = (status: ActivityStatus, detail: string, undo?: () => void) => {
         setEntries((prev) =>
           prev.map((entry) =>
             entry.id === id
-              ? { ...entry, status, detail, durationMs: Date.now() - startedAt }
+              ? { ...entry, status, detail, durationMs: Date.now() - startedAt, undo }
               : entry,
           ),
         );
@@ -70,12 +83,14 @@ export function useActivity() {
 
         // Successes get out of the way on their own; failures stay until the
         // user has actually seen them.
-        if (status === "success") window.setTimeout(() => dismiss(id), SUCCESS_TOAST_MS);
+        if (status === "success") {
+          window.setTimeout(() => dismiss(id), undo ? UNDO_TOAST_MS : SUCCESS_TOAST_MS);
+        }
       };
 
       try {
         const result = await action();
-        finish("success", typeof result === "string" ? result.trim() : "");
+        finish("success", typeof result === "string" ? result.trim() : "", undoFor?.(result));
         return true;
       } catch (error) {
         finish("error", messageOf(error));

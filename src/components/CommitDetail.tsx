@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { api, type FileStat } from "../lib/api";
@@ -108,6 +108,10 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
     queryFn: () => api.commitDetail(repoId, oid),
     enabled: Boolean(oid),
     staleTime: Infinity,
+    // The last commit's detail stands in, dimmed, until this one arrives.
+    // Stepping through history used to flash "Reading commit…" on every
+    // row, which made the list feel slower than the git call behind it.
+    placeholderData: keepPreviousData,
   });
 
   const files = useMemo(() => detail.data?.files ?? [], [detail.data]);
@@ -178,6 +182,7 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
       ),
     enabled: Boolean(selected),
     staleTime: Infinity,
+    placeholderData: keepPreviousData,
   });
 
   if (!detail.data) {
@@ -188,7 +193,7 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
 
   return (
     <div
-      className={FRAME}
+      className={`${FRAME} transition-opacity duration-100 ${detail.isPlaceholderData ? "opacity-50" : ""}`}
       style={{ gridTemplateColumns: `${listWidth}px 4px minmax(0, 1fr)` }}
     >
       <div className="flex min-h-0 flex-col border-r border-r-border">

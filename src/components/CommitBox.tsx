@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useTip } from "./Tip";
 
 export interface CommitBoxHandle {
@@ -8,6 +8,9 @@ export interface CommitBoxHandle {
 }
 
 interface Props {
+  /** Whose draft this is. A message half-written is kept per repository,
+   *  so switching to History or another tab and back does not lose it. */
+  repoId: string;
   stagedCount: number;
   busy: boolean;
   /** Whether the message box holds the keyboard, so the panel can say which
@@ -22,6 +25,30 @@ interface Props {
 
 const BOX = "grid flex-none gap-3 p-4 bg-surface-alt border-t border-t-border";
 
+/** Where a subject line stops being one. Fifty is the convention git's own
+ *  documentation gives; seventy-two is where `git log` starts wrapping. */
+const SUBJECT_SOFT = 50;
+const SUBJECT_HARD = 72;
+
+const draftKey = (repoId: string) => `draft:${repoId}`;
+
+function readDraft(repoId: string): string {
+  try {
+    return localStorage.getItem(draftKey(repoId)) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeDraft(repoId: string, message: string) {
+  try {
+    if (message) localStorage.setItem(draftKey(repoId), message);
+    else localStorage.removeItem(draftKey(repoId));
+  } catch {
+    // Storage full or unavailable: the draft lives in the box until then.
+  }
+}
+
 /* Resizable vertically and capped: a long message is worth room, and a box
    that can grow without limit is one that can hide the file list entirely. */
 const MESSAGE =
@@ -34,8 +61,26 @@ const MESSAGE =
  *  keystroke that commits stays a setting like every other one instead of being
  *  hard-coded inside a textarea. */
 export const CommitBox = forwardRef<CommitBoxHandle, Props>(
-  ({ stagedCount, busy, onCommit, onEditing, history = [] }, ref) => {
-    const [message, setMessage] = useState("");
+  ({ repoId, stagedCount, busy, onCommit, onEditing, history = [] }, ref) => {
+    const [message, setMessageState] = useState(() => readDraft(repoId));
+
+    const setMessage = (next: string) => {
+      setMessageState(next);
+      writeDraft(repoId, next);
+    };
+
+    // The box outlives a tab switch -- the status view is the same component
+    // with a different repository in it -- so the draft has to be swapped by
+    // hand: this repository's, not whatever the last one left in the state.
+    useEffect(() => {
+      setMessageState(readDraft(repoId));
+      setRecalled(-1);
+    }, [repoId]);
+
+    // The first line, which is the subject whether or not a blank line
+    // follows it, and how long it has grown.
+    const subjectLength = (message.split("\n", 1)[0] ?? "").length;
+    const secondLine = message.split("\n")[1];
     /** Which earlier message is showing, or -1 for one being written. */
     const [recalled, setRecalled] = useState(-1);
     const [amend, setAmend] = useState(false);
@@ -118,6 +163,34 @@ export const CommitBox = forwardRef<CommitBoxHandle, Props>(
             />
             Skip hooks
           </label>
+
+          {/* Said only once it matters: a counter on an empty box is noise,
+              and one that turns amber at fifty and red at seventy-two says
+              what the number means without a sentence. */}
+          {subjectLength > SUBJECT_SOFT && (
+            <span
+              className={`font-mono text-micro ${
+                subjectLength > SUBJECT_HARD ? "text-removed" : "text-modified"
+              }`}
+              {...tip(
+                `Subject is ${subjectLength} characters`,
+                undefined,
+                subjectLength > SUBJECT_HARD
+                  ? "Past 72, git log wraps it. Keep the first line short and put the rest after a blank line."
+                  : "Over 50. Fine, but shorter subjects read better in a log.",
+              )}
+            >
+              {subjectLength}/{SUBJECT_SOFT}
+            </span>
+          )}
+          {secondLine !== undefined && secondLine.trim() !== "" && (
+            <span
+              className="text-micro text-modified"
+              {...tip("No blank line after the subject", undefined, "Git treats everything up to the first blank line as the subject.")}
+            >
+              blank line?
+            </span>
+          )}
 
           <span className="ml-auto text-micro text-text-faint">
             {history.length > 0 && (

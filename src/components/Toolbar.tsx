@@ -21,6 +21,10 @@ export interface ToolbarAction {
   disabledReason?: string;
   /** Right-click: the button's variants, for the ones that have any. */
   onContextMenu?: (event: MouseEvent) => void;
+  /** Draws the small caret that says a menu is behind this button. Set for
+   *  one that opens a menu on click, and for one whose right-click has
+   *  variants -- which is otherwise a thing nobody finds. */
+  hasMenu?: boolean;
 }
 
 interface Props {
@@ -47,6 +51,10 @@ const BUSY = "disabled:opacity-100 disabled:text-text-dim";
 const BADGE =
   "absolute -top-[5px] -right-[9px] min-w-[15px] px-2 rounded-full " +
   "font-mono text-micro leading-[15px] text-center";
+
+/* The caret sits on the label's right, small and faint: a mark that there
+   is more, not a second control. */
+const CARET = "ml-1 text-[8px] leading-none text-text-faint";
 
 export function Toolbar({ groups }: Props) {
   const tip = useTip();
@@ -81,7 +89,11 @@ export function Toolbar({ groups }: Props) {
               {...tip(
                 action.label,
                 action.commandId,
-                action.disabled ? action.disabledReason : undefined,
+                action.disabled
+                  ? action.disabledReason
+                  : action.hasMenu && action.onContextMenu
+                    ? "Right-click for more"
+                    : undefined,
               )}
             >
               <span
@@ -104,7 +116,10 @@ export function Toolbar({ groups }: Props) {
                   </span>
                 ) : null}
               </span>
-              <span className="text-small">{action.label}</span>
+              <span className="flex items-center text-small">
+                {action.label}
+                {action.hasMenu && <span className={CARET} aria-hidden>&#9662;</span>}
+              </span>
             </button>
           ))}
         </div>

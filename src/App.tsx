@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useKeyHold } from "@tanstack/react-hotkeys";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
@@ -63,7 +63,7 @@ import {
   LIBRARY_TAB,
 } from "./lib/library";
 import { RepoLibrary } from "./components/RepoLibrary";
-import { RepoTabs } from "./components/RepoTabs";
+import { RepoTabs, type TabState } from "./components/RepoTabs";
 import { splitUpstream } from "./lib/upstream";
 import { FlowPlan, FlowStartPlan, type FlowPlanTarget } from "./components/FlowPlan";
 import { BlameView } from "./components/BlameView";
@@ -103,12 +103,21 @@ import {
   IconPull,
   IconPush,
   IconStash,
-  IconTerminal,
-  IconCode,
   IconSubmodule,
   IconWorktree,
 } from "./components/icons";
 import "./styles.css";
+
+/** How long the splash waits on the work before the restore proper — reading
+ *  the settings file and the session file. Neither touches git, so anything
+ *  near this long means the call is not coming back. */
+const BOOT_BUDGET_MS = 8000;
+
+/** How long it waits once repositories are actually being opened. Discovering
+ *  a repository and starting its watcher is real work against a possibly cold
+ *  disk, and several at once can take a while on Windows without anything
+ *  being wrong. */
+const RESTORE_BUDGET_MS = 45_000;
 
 /** Cache keys invalidated when a repo reports that its state changed. */
 const REPO_QUERY_KEYS = [
@@ -190,7 +199,7 @@ export default function App() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   /** What the sidebar's keyboard cursor is on, so Merge can act on it. */
   const [sidebarCursor, setSidebarCursor] = useState<MenuTarget | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState<false | "general" | "shortcuts">(false);
+  const [settingsOpen, setSettingsOpen] = useState<false | "general" | "shortcuts" | "updates">(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Nothing may be written back until the restore has finished, or the first
   // save would overwrite the stored session with an empty list.
@@ -242,10 +251,20 @@ export default function App() {
   // A hung IPC call must not strand the window on a splash. The shell appears
   // regardless after this; the restore keeps running and tabs arrive when they
   // do. The backend shows the window on a similar backstop for the same reason.
+  //
+  // The clock restarts once repositories are actually being opened, with a
+  // budget to match. Firing mid-restore revealed the repository list with an
+  // empty tab strip and a git command still running in the status bar, and the
+  // tabs then appeared underneath it -- which reads as the window having
+  // finished and got it wrong, rather than as still working. A backstop is for
+  // when nothing is happening, and during the restore something is.
   useEffect(() => {
-    const timer = window.setTimeout(() => setBootTimedOut(true), 8000);
+    const timer = window.setTimeout(
+      () => setBootTimedOut(true),
+      restoring > 0 ? RESTORE_BUDGET_MS : BOOT_BUDGET_MS,
+    );
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [restoring]);
 
   // A clone reports many times a second; this only ever holds the latest, so
   // the render cost is one short string however large the repository is.
@@ -256,7 +275,8 @@ export default function App() {
     return () => void stop.then((off) => off());
   }, []);
 
-  const themeResolved = useTheme(settings.theme);
+  // Called for its effect: it is what puts the theme on the document.
+  useTheme(settings.theme);
 
   /** Re-read everything for the open repository.
    *
@@ -503,6 +523,32 @@ export default function App() {
     [repos.data, tabOrder, library.repos],
   );
 
+  // Every open repository's status, not only the one in front, so a tab can
+  // say whether its repository has work in it. Shares the front tab's cache
+  // entry, and refetches only on that repository's own change events -- a
+  // background tab costs a status call when its tree changes, and nothing
+  // while it sits still.
+  const tabStatuses = useQueries({
+    queries: repoTabs.map((repo) => ({
+      queryKey: ["status", repo.id],
+      queryFn: () => api.repoStatus(repo.id),
+      ...eventDriven,
+    })),
+  });
+
+  const tabStateFor = (repoId: string): TabState | undefined => {
+    const at = repoTabs.findIndex((repo) => repo.id === repoId);
+    const data = at === -1 ? undefined : tabStatuses[at]?.data;
+    if (!data) return undefined;
+    return {
+      changed: data.stagedCount + data.unstagedCount + data.untrackedCount,
+      conflicted: data.conflictedCount,
+      ahead: data.ahead,
+      behind: data.behind,
+      branch: data.head,
+    };
+  };
+
   /** Everything in the strip, which is the repositories plus the list itself
    *  when it has been opened. It closes like any other tab. */
   const tabs = useMemo(
@@ -566,7 +612,10 @@ export default function App() {
   // Null while the repository list is the tab in front: everything scoped to a
   // repository has none, which is exactly true.
   const id = activeId === LIBRARY_TAB ? null : activeId;
-  const busy = activity.running.length > 0;
+  // Busy means this repository is: a pull in another tab is that tab's
+  // business, and greying every commit box in the window for it made the
+  // app feel single-threaded when the backend is anything but.
+  const busy = activity.running.some((entry) => entry.repo === id);
 
   /** Run a git action with a name attached.
    *
@@ -577,8 +626,11 @@ export default function App() {
     label: string,
     action: () => Promise<unknown>,
     source?: string,
+    undoFor?: (result: unknown) => (() => void) | undefined,
   ) => {
-    const ok = await activity.run(label, action, source);
+    // Stamped with the repository in front when it started, not when it
+    // ends: the user may well have switched tabs by then.
+    const ok = await activity.run(label, action, source, undoFor, id ?? undefined);
 
     // Refresh straight away rather than waiting on the filesystem watcher.
     // Some operations (fetch, in particular) change refs without touching
@@ -592,13 +644,21 @@ export default function App() {
     return ok;
   };
 
-  const act = (label: string, action: () => Promise<unknown>, source?: string) => {
-    void perform(label, action, source);
+  const act = (
+    label: string,
+    action: () => Promise<unknown>,
+    source?: string,
+    undoFor?: (result: unknown) => (() => void) | undefined,
+  ) => {
+    void perform(label, action, source, undoFor);
   };
 
   /** Toolbar buttons whose operation is running right now. */
   const workingOn = new Set(
-    activity.running.map((entry) => entry.source).filter(Boolean),
+    activity.running
+      .filter((entry) => entry.repo === id)
+      .map((entry) => entry.source)
+      .filter(Boolean),
   );
 
   const addRepo = (path: string) =>
@@ -1533,6 +1593,21 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
     });
   };
 
+  /** Pull, with the way back on the toast.
+   *
+   *  A single key runs this with no question asked, which is the lazygit
+   *  bargain -- and the reason the toast has to offer more than "Done": the
+   *  undo is what makes a stray P survivable. Offered only when the pull
+   *  brought something in; an "Already up to date" has nothing to take back. */
+  const pull = (rebase: boolean) =>
+    act(
+      rebase ? "Pull with rebase" : "Pull",
+      () => api.pull(id!, rebase),
+      "pull",
+      (result) =>
+        typeof result === "string" && /already up to date/i.test(result) ? undefined : confirmUndo,
+    );
+
   const confirmForcePush = () =>
     setDialog({
       title: `Force push ${head?.head ?? "HEAD"}`,
@@ -1626,7 +1701,7 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
 
     switch (kind) {
       case "pull":
-        act("Pull", () => api.pull(id));
+        pull(false);
         break;
       case "fetch":
         act("Fetch", () => api.fetch(id));
@@ -2028,7 +2103,15 @@ The stashed changes are discarded.`,
     openMenuAt(event.clientX, event.clientY, entries);
 
   /** Where a menu opens when it was triggered by a key rather than a click. */
-  const menuAnchor = (): [number, number] => [window.innerWidth / 2 - 100, 120];
+  /** Under the toolbar button that would have opened it by mouse, so a menu
+   *  raised by a key appears where the eye already knows to look. Falls back
+   *  to the top of the main panel when the button is not on screen. */
+  const menuAnchor = (label: string): [number, number] => {
+    const box = document
+      .querySelector<HTMLElement>(`button[aria-label="${CSS.escape(label)}"]`)
+      ?.getBoundingClientRect();
+    return box ? [box.left, box.bottom + 2] : [window.innerWidth / 2 - 100, 120];
+  };
 
   const blameFile = (path: string, rev: string | null = null) =>
     setBlameTarget({ path, rev });
@@ -2550,13 +2633,14 @@ The stashed changes are discarded.`,
             label: "Pull",
             icon: <IconPull />,
             badge: head?.behind || undefined,
-            onClick: () => act("Pull", () => api.pull(id), "pull"),
+            hasMenu: true,
+            onClick: () => pull(false),
             busy: workingOn.has("pull"),
             onContextMenu: (e) =>
               openMenu(e, [
                 {
                   label: "Pull with rebase",
-                  onClick: () => act("Pull with rebase", () => api.pull(id, true), "pull"),
+                  onClick: () => pull(true),
                 },
               ]),
           },
@@ -2566,6 +2650,7 @@ The stashed changes are discarded.`,
             label: "Push",
             icon: <IconPush />,
             badge: head?.ahead || undefined,
+            hasMenu: true,
             onClick: () => act("Push", () => api.push(id), "push"),
             busy: workingOn.has("push"),
             onContextMenu: (e) =>
@@ -2584,6 +2669,7 @@ The stashed changes are discarded.`,
             icon: <IconFetch />,
             onClick: () => act("Fetch", () => api.fetch(id), "fetch"),
             busy: workingOn.has("fetch"),
+            hasMenu: (refs.data?.remotes.length ?? 0) > 1,
             // One entry per remote, and no menu at all with none: an empty
             // menu says less than no menu.
             onContextMenu: refs.data?.remotes.length
@@ -2640,6 +2726,7 @@ The stashed changes are discarded.`,
             // A dot marks a repository already using git flow, so the button
             // says whether there is anything set up before you press it.
             badge: flow.data?.current ? 1 : undefined,
+            hasMenu: true,
             onClick: (e) => openFlowMenu(e.clientX, e.clientY),
           },
           {
@@ -2650,15 +2737,20 @@ The stashed changes are discarded.`,
             commandId: "git.worktree",
             onClick: openAddWorktree,
           },
-          {
-            key: "submodule",
-            label: "Submodule",
-            icon: <IconSubmodule />,
-            badge: submodules.data?.length || undefined,
-            disabled: (submodules.data?.length ?? 0) === 0,
-            disabledReason: "This repository has no submodules",
-            onClick: openUpdateSubmodules,
-          },
+          // Only where there are any. A disabled button saying "this
+          // repository has no submodules" took the width of one that did
+          // something; the sidebar already says the same thing in its place.
+          ...((submodules.data?.length ?? 0) > 0
+            ? [
+                {
+                  key: "submodule",
+                  label: "Submodule",
+                  icon: <IconSubmodule />,
+                  badge: submodules.data?.length,
+                  onClick: openUpdateSubmodules,
+                },
+              ]
+            : []),
         ],
         [
           {
@@ -2671,37 +2763,59 @@ The stashed changes are discarded.`,
             onClick: () => setSearchOpen(true),
           },
           {
-            key: "explorer",
-            commandId: "repo.explorer",
-            label: "Explorer",
+            // One button for the three places a repository can be opened
+            // in, and the fourth when it has a web page. Three buttons said
+            // the same thing three times, at the width of the whole diff.
+            key: "open",
+            label: "Open in",
             icon: <IconFolder />,
-            onClick: () => act("Open in Explorer", () => api.openInFileManager(id)),
-          },
-          {
-            key: "terminal",
-            commandId: "repo.terminal",
-            label: "Terminal",
-            icon: <IconTerminal />,
-            onClick: () =>
-              act("Open in terminal", () =>
-                api.openInTerminal(id, settings.terminal, settings.terminalCommand),
-              ),
-          },
-          {
-            key: "editor",
-            commandId: "repo.editor",
-            label: "Editor",
-            icon: <IconCode />,
-            disabled: !editorReady,
-            disabledReason: "No code editor was found. Set one in Settings.",
-            onClick: () =>
-              act("Open in code editor", () =>
-                api.openInEditor(id, settings.editor, settings.editorCommand, settings.terminal),
-              ),
+            hasMenu: true,
+            onClick: (e) => openMenu(e, openInEntries()),
           },
         ],
       ]
     : [];
+
+  /** The places a repository opens in, as a menu. Shared by the toolbar
+   *  button and its right-click, so the two cannot drift. */
+  function openInEntries(): MenuEntry[] {
+    if (!id) return [];
+    const hosting = hostingFor();
+    return [
+      {
+        label: "File manager",
+        hint: shortcutLabel(keymap["repo.explorer"]),
+        onClick: () => act("Open in Explorer", () => api.openInFileManager(id)),
+      },
+      {
+        label: "Terminal",
+        hint: shortcutLabel(keymap["repo.terminal"]),
+        onClick: () =>
+          act("Open in terminal", () =>
+            api.openInTerminal(id, settings.terminal, settings.terminalCommand),
+          ),
+      },
+      {
+        label: editorReady ? "Code editor" : "Code editor (none found; set one in Settings)",
+        hint: shortcutLabel(keymap["repo.editor"]),
+        disabled: !editorReady,
+        onClick: () =>
+          act("Open in code editor", () =>
+            api.openInEditor(id, settings.editor, settings.editorCommand, settings.terminal),
+          ),
+      },
+      ...(hosting
+        ? [
+            "separator" as const,
+            {
+              label: `${hosting.name}, in the browser`,
+              hint: shortcutLabel(keymap["repo.browse"]),
+              onClick: () => browse(hosting.web),
+            },
+          ]
+        : []),
+    ];
+  }
 
   /** Everything reachable from a key or the palette.
    *
@@ -2784,10 +2898,10 @@ The stashed changes are discarded.`,
     ),
 
     "git.fetch": id ? () => act("Fetch", () => api.fetch(id), "fetch") : undefined,
-    "git.pull": id ? () => act("Pull", () => api.pull(id), "pull") : undefined,
+    "git.pull": id ? () => pull(false) : undefined,
     "git.push": id ? () => act("Push", () => api.push(id), "push") : undefined,
     "git.pullRebase": id
-      ? () => act("Pull with rebase", () => api.pull(id, true), "pull")
+      ? () => pull(true)
       : undefined,
     "git.pushForce": id ? confirmForcePush : undefined,
     "git.pushTags": id ? () => act("Push tags", () => api.push(id, false, true), "push") : undefined,
@@ -2822,7 +2936,7 @@ The stashed changes are discarded.`,
     "git.stash": id ? openStash : undefined,
     "git.discardAll": id ? () => confirmDiscard(discardablePaths()) : undefined,
     "git.worktree": id ? openAddWorktree : undefined,
-    "git.flow": id ? () => openFlowMenu(...menuAnchor()) : undefined,
+    "git.flow": id ? () => openFlowMenu(...menuAnchor("Git Flow")) : undefined,
   };
 
   // A menu counts: it owns the keyboard while it is up, or J would move the
@@ -2868,6 +2982,19 @@ The stashed changes are discarded.`,
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, autoFetchMinutes]);
+
+  // The title bar names the repository and branch in front, so the window is
+  // one of six in a taskbar or an alt-tab rather than six called "Braid".
+  useEffect(() => {
+    const name = activeRepo?.name;
+    const branch = status.data?.head;
+    const title = name ? `${name}${branch ? ` — ${branch}` : ""} — Braid` : "Braid";
+    void getCurrentWindow().setTitle(title).catch(() => {});
+  }, [activeRepo?.name, status.data?.head]);
+
+  /** An update that was put away with "Not now": still there, said quietly. */
+  const updateDismissed =
+    updater.stage.state === "available" && settings.dismissedUpdate === updater.stage.version;
 
   /** Which section's keys are live, for the strip above the status bar. */
   const hintScope: CommandScope | null = !id
@@ -2919,6 +3046,7 @@ The stashed changes are discarded.`,
                 ? "tab.last"
                 : undefined
           }
+          stateFor={tabStateFor}
           onAdd={openAddRepoMenu}
           onSelect={setActiveId}
           onClose={(repoId) => void closeRepo(repoId)}
@@ -2993,10 +3121,17 @@ The stashed changes are discarded.`,
           <Toolbar groups={actions} />
 
           <UpdateBanner
-            stage={updater.stage}
+            stage={updateDismissed ? { state: "idle" } : updater.stage}
             onInstall={() => void updater.install()}
             onRestart={() => void updater.restart()}
-            onDismiss={updater.dismiss}
+            onDismiss={() => {
+              // Remembered, so "Not now" means not this version rather than
+              // not this launch. It comes back as a mark in the status bar.
+              if (updater.stage.state === "available") {
+                updateSettings({ dismissedUpdate: updater.stage.version });
+              }
+              updater.dismiss();
+            }}
           />
 
           <div
@@ -3095,9 +3230,14 @@ The stashed changes are discarded.`,
                     setView("history");
                     setHistoryFocus(oid);
                   }}
-                  onFile={(path) => {
+                  // A line hit opens the file at that line, in the blame:
+                  // the view that shows a line with its context and who
+                  // wrote it. A path hit is a question about the file over
+                  // time, which is what its history answers.
+                  onFile={(path, line) => {
                     setSearchOpen(false);
-                    setBlameTarget({ path, rev: null });
+                    if (line !== undefined) setBlameTarget({ path, rev: null, line });
+                    else showFileHistory(path);
                   }}
                 />
               ) : stashShown ? (
@@ -3280,13 +3420,23 @@ The stashed changes are discarded.`,
 
         <span className="ml-auto" />
 
-        {head && (
+        {head && settings.showTimings && (
           <span
             className="font-mono text-micro text-text-faint"
             {...tip("Time the last git status call took")}
           >
             status {head.durationMs}ms
           </span>
+        )}
+
+        {updateDismissed && updater.stage.state === "available" && (
+          <button
+            className={`${STATUS_BUTTON} text-accent`}
+            {...tip(`Version ${updater.stage.version} is available`, undefined, "Put away earlier. Install it from Settings.")}
+            onClick={() => setSettingsOpen("updates")}
+          >
+            &uarr; {updater.stage.version}
+          </button>
         )}
 
         <button
@@ -3299,16 +3449,6 @@ The stashed changes are discarded.`,
             <span className={ERROR_COUNT}>{activity.errorCount}</span>
           )}
         </button>
-
-        <button
-          className={STATUS_BUTTON}
-          {...tip("Switch between system, light and dark", "app.theme")}
-          onClick={cycleTheme}
-        >
-          Theme: {settings.theme}
-          {settings.theme === "system" && ` (${themeResolved})`}
-        </button>
-
       </footer>
 
       <Toaster
