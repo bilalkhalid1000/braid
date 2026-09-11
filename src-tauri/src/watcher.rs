@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -56,6 +56,11 @@ const GIT_DIR_WATCHED: &[&str] = &[
 /// changed. Dropping this stops the watch.
 pub struct RepoWatcher {
     _watcher: Arc<Mutex<RecommendedWatcher>>,
+    /// The ignored directories the filter drops events under. Shared with
+    /// the filter so it can be filled in after the watch has started: on a
+    /// tree with a large node_modules, asking git for the list takes seconds
+    /// that the window used to spend waiting on a splash.
+    ignored: Arc<RwLock<Vec<PathBuf>>>,
 }
 
 /// The directories git ignores in this repository, as absolute paths.
@@ -93,16 +98,18 @@ impl RepoWatcher {
     {
         let (tx, mut rx) = mpsc::unbounded_channel::<Event>();
         let filter_root = root.clone();
-        let ignored = Arc::new(ignored);
+        let ignored = Arc::new(RwLock::new(ignored));
         let filter_ignored = Arc::clone(&ignored);
+        let ignored_for_self = Arc::clone(&ignored);
 
         let watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
             let Ok(event) = res else { return };
 
+            let dropped = filter_ignored.read().unwrap();
             if event
                 .paths
                 .iter()
-                .any(|p| is_relevant(p, &filter_root) && !under_any(p, &filter_ignored))
+                .any(|p| is_relevant(p, &filter_root) && !under_any(p, &dropped))
             {
                 // Send failure just means the app is shutting down.
                 let _ = tx.send(event);
@@ -121,7 +128,8 @@ impl RepoWatcher {
             // per-user limit with several open.
             let mut w = watcher.lock().unwrap();
             let mut first = true;
-            for dir in dirs_to_watch(&root, &ignored) {
+            let skip = ignored.read().unwrap();
+            for dir in dirs_to_watch(&root, &skip) {
                 let result = w.watch(&dir, RecursiveMode::NonRecursive);
                 if first {
                     result.map_err(|e| AppError::Watch(e.to_string()))?;
@@ -180,7 +188,8 @@ impl RepoWatcher {
                         }
 
                         let mut w = adder.lock().unwrap();
-                        for dir in dirs_to_watch(&path, &ignored) {
+                        let skip = ignored.read().unwrap();
+                        for dir in dirs_to_watch(&path, &skip) {
                             let _ = w.watch(&dir, RecursiveMode::NonRecursive);
                         }
                     }
@@ -190,7 +199,16 @@ impl RepoWatcher {
             }
         });
 
-        Ok(Self { _watcher: watcher })
+        Ok(Self {
+            _watcher: watcher,
+            ignored: ignored_for_self,
+        })
+    }
+
+    /// Replace the ignored directories the filter drops. Events already in
+    /// flight are judged by the old list; everything after by the new one.
+    pub fn set_ignored(&self, dirs: Vec<PathBuf>) {
+        *self.ignored.write().unwrap() = dirs;
     }
 }
 

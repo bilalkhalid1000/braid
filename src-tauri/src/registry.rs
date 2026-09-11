@@ -66,10 +66,23 @@ impl RepoRegistry {
         // lock inside it is what keeps the two from stepping on each other.
         let git = Git::new(&root);
 
+        // Which directories git ignores decides what the watcher drops. On
+        // Linux the list is also what stops the directory walk, so it has to
+        // be known before the watch starts. Elsewhere the watch is one
+        // recursive handle and the list only filters events, so the watch
+        // starts at once and the list arrives when git has it -- which on a
+        // tree with a large node_modules is the difference between a tab
+        // that opens now and one that opens in four seconds. Until then the
+        // noisy-name backstop in the filter does the work.
+        let ignored = if cfg!(target_os = "linux") {
+            crate::watcher::ignored_dirs(&git).await
+        } else {
+            Vec::new()
+        };
+
         let watcher = {
             let app = app.clone();
             let id = id.clone();
-            let ignored = crate::watcher::ignored_dirs(&git).await;
             RepoWatcher::start(root.clone(), git.clone(), ignored, move || {
                 let _ = app.emit(REPO_CHANGED_EVENT, &id);
             })?
@@ -80,6 +93,14 @@ impl RepoRegistry {
             git,
             _watcher: watcher,
         });
+
+        if !cfg!(target_os = "linux") {
+            let session = Arc::clone(&session);
+            tauri::async_runtime::spawn(async move {
+                let dirs = crate::watcher::ignored_dirs(&session.git).await;
+                session._watcher.set_ignored(dirs);
+            });
+        }
 
         self.repos.insert(id, session);
         Ok(info)
