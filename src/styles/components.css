@@ -608,6 +608,75 @@ kbd.key-live {
 
 /* --- git flow plan ----------------------------------------------------- */
 
+/* The new branch draws itself, the way the splash draws the app's mark:
+   its line grows out of the trunk, holds, fades, and goes again. Only the
+   branch -- the trunk is already there. The links are normalised to one
+   unit by the graph, so the dash is 1 whatever the shape; the offset runs
+   from -1 rather than 1 so the line appears from the end that touches the
+   trunk and reaches outward, not the other way round. The curve leads, the
+   run above it follows, and the node arrives once the line has. */
+.flow-preview path[data-color="1"] {
+  stroke-dasharray: 1;
+  stroke-dashoffset: -1;
+  animation: plan-grow 2.4s ease-in-out infinite;
+}
+
+.flow-preview path[data-color="1"]:not([data-turn]) {
+  animation-delay: 0.3s;
+}
+
+.flow-preview circle[data-color="1"] {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: plan-arrive 2.4s ease-in-out infinite;
+}
+
+@keyframes plan-grow {
+  0% {
+    stroke-dashoffset: -1;
+    opacity: 1;
+  }
+  /* Drawn by 40%, then held: a loop with no pause reads as a machine
+     rather than as something completing. Same shape as the splash. */
+  40%,
+  82% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes plan-arrive {
+  0%,
+  22% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  34%,
+  82% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+/* Held complete under reduced motion: the branch still has to be seen. */
+@media (prefers-reduced-motion: reduce) {
+  .flow-preview path[data-color="1"],
+  .flow-preview circle[data-color="1"] {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
 /* The diagram in the finish dialog. Chrome is sans and data is mono
    everywhere else in the app, and a branch name is data. */
 

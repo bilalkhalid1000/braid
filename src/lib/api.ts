@@ -333,6 +333,8 @@ export interface Blame {
 export interface BlameTarget {
   path: string;
   rev: string | null;
+  /** A line to land on, one-based, when the file was reached through one. */
+  line?: number;
 }
 
 export interface FlowStatus {
@@ -347,11 +349,22 @@ export interface FlowFinishOptions {
   deleteBranch: boolean;
   /** Delete even where git says the branch is not fully merged. */
   forceDelete: boolean;
+  /** Also delete the branch on this remote. Null leaves the remote copy. */
+  deleteRemote: string | null;
   push: boolean;
+  /** Where to push. Null means origin. */
+  remote: string | null;
   /** Whether to tag at all. Release and hotfix only; ignored for a feature,
    *  which git flow never tags. */
   tag: boolean;
   tagMessage: string;
+  /** Rebase onto develop before merging. Feature and bugfix only. */
+  rebase: boolean;
+  /** Land as a single commit rather than a merge. */
+  squash: boolean;
+  /** After landing on production, merge into develop too. Release and
+   *  hotfix only; a feature has nowhere else to go. */
+  backMerge: boolean;
 }
 
 /** Releases and hotfixes land on the production branch and get a tag; the
@@ -571,8 +584,9 @@ export const api = {
 
   flowStatus: (id: string) => invoke<FlowStatus>("flow_status", { id }),
   flowInit: (id: string, config: FlowConfig) => invoke<string>("flow_init", { id, config }),
-  flowStart: (id: string, kind: FlowKind, name: string) =>
-    invoke<string>("flow_start", { id, kind, name }),
+  /** `base` is where to cut it from, or null for the kind's own base. */
+  flowStart: (id: string, kind: FlowKind, name: string, base: string | null) =>
+    invoke<string>("flow_start", { id, kind, name, base }),
   flowFinish: (id: string, kind: FlowKind, name: string, options: FlowFinishOptions) =>
     invoke<string>("flow_finish", { id, kind, name, options }),
 

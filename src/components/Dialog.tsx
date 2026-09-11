@@ -24,13 +24,17 @@ export interface DialogCheckbox {
   key: string;
   label: string;
   value?: boolean;
+  /** A line under the label: what ticking it will do, where the label alone
+   *  cannot say. */
+  note?: string;
 }
 
 export interface DialogSpec {
   title: string;
   message?: string;
-  /** Drawn under the message: what the action is about to do. */
-  graphic?: ReactNode;
+  /** Drawn under the message: what the action is about to do. Given the
+   *  field values when it is a function, so it can follow what is typed. */
+  graphic?: ReactNode | ((values: Record<string, string>) => ReactNode);
   fields?: DialogField[];
   checkboxes?: DialogCheckbox[];
   confirmLabel: string;
@@ -157,7 +161,7 @@ export function Dialog({ spec, onClose }: { spec: DialogSpec; onClose: () => voi
         {spec.message && (
           <p className="m-0 leading-[1.5] whitespace-pre-wrap text-text-dim">{spec.message}</p>
         )}
-        {spec.graphic}
+        {typeof spec.graphic === "function" ? spec.graphic(values) : spec.graphic}
 
         {spec.fields?.map((field, index) => (
           <label className="grid gap-2 text-small text-text-dim" key={field.key}>
@@ -200,15 +204,24 @@ export function Dialog({ spec, onClose }: { spec: DialogSpec; onClose: () => voi
         ))}
 
         {spec.checkboxes?.map((box) => (
-          <label className="flex items-center gap-3 text-small text-text-dim" key={box.key}>
+          <label
+            className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 text-small text-text-dim"
+            key={box.key}
+          >
             <input
               type="checkbox"
+              className="mt-[2px]"
               checked={values[box.key] === "true"}
               onChange={(e) =>
                 setValues((v) => ({ ...v, [box.key]: String(e.target.checked) }))
               }
             />
-            {box.label}
+            <span>{box.label}</span>
+            {box.note && (
+              <span className="col-start-2 text-micro leading-[1.45] text-text-faint">
+                {box.note}
+              </span>
+            )}
           </label>
         ))}
 

@@ -49,6 +49,9 @@ interface Props {
   height: number;
   /** Drawn as a filled ring rather than a dot, marking where HEAD sits. */
   isHead: boolean;
+  /** Not a real commit: a lane carrying on past what is shown. The node is
+   *  drawn hollow and faint, the way an ellipsis is written. */
+  ghost?: boolean;
 }
 
 /** One row of the commit graph.
@@ -57,7 +60,7 @@ interface Props {
  *  node at the vertical centre, and the links leaving continue to the bottom
  *  edge, where the next row picks them up. Rows therefore stay independent,
  *  which is what lets the list stay virtualized. */
-export const CommitGraph = memo(function CommitGraph({ row, lanes, height, isHead }: Props) {
+export const CommitGraph = memo(function CommitGraph({ row, lanes, height, isHead, ghost }: Props) {
   const width = Math.max(lanes, 1) * LANE_WIDTH;
   const middle = height / 2;
   const x = (lane: number) => laneX(lane, lanes, LANE_WIDTH);
@@ -80,7 +83,20 @@ export const CommitGraph = memo(function CommitGraph({ row, lanes, height, isHea
     return (
       <g key={key}>
         <path className={CASING} d={d} fill="none" strokeWidth={4.5} />
-        <path d={d} stroke={laneColor(link.color)} fill="none" strokeWidth={1.5} />
+        {/* pathLength normalises every link to one unit, so a stylesheet can
+            draw one in from either end without knowing whether it is a
+            straight run or a curve. Which lane it belongs to and whether it
+            turns are on it too, for the same reason: the git flow preview
+            animates the new branch's lines and leaves the trunk alone. */}
+        <path
+          d={d}
+          pathLength={1}
+          data-color={link.color}
+          data-turn={link.from !== link.to || undefined}
+          stroke={laneColor(link.color)}
+          fill="none"
+          strokeWidth={1.5}
+        />
       </g>
     );
   };
@@ -110,10 +126,13 @@ export const CommitGraph = memo(function CommitGraph({ row, lanes, height, isHea
         cx={x(row.lane)}
         cy={middle}
         r={NODE_RADIUS}
-        // A merge is hollow: it is a join, not a new piece of work.
-        fill={row.isMerge ? "var(--surface)" : laneColor(row.color)}
+        data-color={row.color}
+        // A merge is hollow: it is a join, not a new piece of work. A ghost
+        // is hollow too, and faint: it is no piece of work at all.
+        fill={row.isMerge || ghost ? "var(--surface)" : laneColor(row.color)}
         stroke={laneColor(row.color)}
-        strokeWidth={row.isMerge ? 2 : 0}
+        strokeWidth={row.isMerge || ghost ? 1.5 : 0}
+        opacity={ghost ? 0.5 : 1}
       />
     </svg>
   );

@@ -332,7 +332,7 @@ async fn starting_a_feature_branches_from_develop_and_checks_it_out() {
     let repo = TestRepo::new();
     flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
 
-    flow::start(repo.git_api(), FlowKind::Feature, "login")
+    flow::start(repo.git_api(), FlowKind::Feature, "login", None)
         .await
         .unwrap();
 
@@ -349,7 +349,7 @@ async fn finishing_a_feature_merges_it_into_develop_and_deletes_it() {
     let repo = TestRepo::new();
     flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
 
-    flow::start(repo.git_api(), FlowKind::Feature, "login").await.unwrap();
+    flow::start(repo.git_api(), FlowKind::Feature, "login", None).await.unwrap();
     repo.write("login.txt", "work\n");
     repo.commit_all("Feature work");
 
@@ -363,6 +363,7 @@ async fn finishing_a_feature_merges_it_into_develop_and_deletes_it() {
             push: false,
             tag: true,
             tag_message: String::new(),
+            ..Default::default()
         },
     )
     .await
@@ -380,7 +381,7 @@ async fn finishing_a_release_tags_it_and_lands_on_both_branches() {
     let repo = TestRepo::new();
     flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
 
-    flow::start(repo.git_api(), FlowKind::Release, "1.0.0").await.unwrap();
+    flow::start(repo.git_api(), FlowKind::Release, "1.0.0", None).await.unwrap();
     repo.write("changelog.txt", "1.0.0\n");
     repo.commit_all("Prepare the release");
 
@@ -394,6 +395,7 @@ async fn finishing_a_release_tags_it_and_lands_on_both_branches() {
             push: false,
             tag: true,
             tag_message: "Release 1.0.0".into(),
+            ..Default::default()
         },
     )
     .await
@@ -423,7 +425,7 @@ async fn finishing_a_hotfix_without_deleting_keeps_the_branch() {
     let repo = TestRepo::new();
     flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
 
-    flow::start(repo.git_api(), FlowKind::Hotfix, "1.0.1").await.unwrap();
+    flow::start(repo.git_api(), FlowKind::Hotfix, "1.0.1", None).await.unwrap();
     repo.write("fix.txt", "patched
 ");
     repo.commit_all("Fix the thing");
@@ -438,6 +440,7 @@ async fn finishing_a_hotfix_without_deleting_keeps_the_branch() {
             push: false,
             tag: true,
             tag_message: String::new(),
+            ..Default::default()
         },
     )
     .await
@@ -455,7 +458,7 @@ async fn finishing_a_feature_without_deleting_keeps_the_branch() {
     let repo = TestRepo::new();
     flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
 
-    flow::start(repo.git_api(), FlowKind::Feature, "login").await.unwrap();
+    flow::start(repo.git_api(), FlowKind::Feature, "login", None).await.unwrap();
     repo.write("login.txt", "work
 ");
     repo.commit_all("Feature work");
@@ -470,6 +473,7 @@ async fn finishing_a_feature_without_deleting_keeps_the_branch() {
             push: false,
             tag: true,
             tag_message: String::new(),
+            ..Default::default()
         },
     )
     .await
@@ -479,6 +483,87 @@ async fn finishing_a_feature_without_deleting_keeps_the_branch() {
         repo.git(&["branch", "--list", "feature/login"]).contains("feature/login"),
         "the branch must survive when the delete option is off",
     );
+}
+
+#[tokio::test]
+async fn finishing_a_feature_squashed_lands_one_commit_and_still_deletes_the_branch() {
+    // Squashed, the branch's commits are on no other branch, so a plain
+    // `branch -d` refuses; the delete has to know that and force.
+    let repo = TestRepo::new();
+    flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
+
+    flow::start(repo.git_api(), FlowKind::Feature, "login", None).await.unwrap();
+    repo.write("a.txt", "one\n");
+    repo.commit_all("First");
+    repo.write("b.txt", "two\n");
+    repo.commit_all("Second");
+    let develop_before = repo.git(&["rev-parse", "develop"]);
+
+    flow::finish(
+        repo.git_api(),
+        FlowKind::Feature,
+        "login",
+        &FinishOptions {
+            squash: true,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    let since = repo.git(&["rev-list", "--count", &format!("{}..develop", develop_before.trim())]);
+    assert_eq!(since.trim(), "1", "two commits should have become one");
+    assert!(repo.exists("a.txt") && repo.exists("b.txt"));
+    assert!(repo.git(&["branch", "--list", "feature/login"]).trim().is_empty());
+}
+
+#[tokio::test]
+async fn a_feature_can_start_from_somewhere_other_than_develop() {
+    let repo = TestRepo::new();
+    flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
+
+    // develop moves on; the feature is cut from where develop was.
+    let old = repo.git(&["rev-parse", "develop"]);
+    repo.git(&["checkout", "develop"]);
+    repo.write("later.txt", "later\n");
+    repo.commit_all("Later on develop");
+
+    flow::start(repo.git_api(), FlowKind::Feature, "old-base", Some(old.trim()))
+        .await
+        .unwrap();
+
+    assert_eq!(repo.git(&["rev-parse", "--abbrev-ref", "HEAD"]).trim(), "feature/old-base");
+    assert_eq!(repo.git(&["rev-parse", "HEAD"]).trim(), old.trim());
+    assert!(!repo.exists("later.txt"));
+}
+
+#[tokio::test]
+async fn a_release_can_skip_the_merge_back_into_develop() {
+    let repo = TestRepo::new();
+    flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
+
+    flow::start(repo.git_api(), FlowKind::Release, "2.0.0", None).await.unwrap();
+    repo.write("notes.txt", "2.0.0\n");
+    repo.commit_all("Release notes");
+
+    flow::finish(
+        repo.git_api(),
+        FlowKind::Release,
+        "2.0.0",
+        &FinishOptions {
+            back_merge: false,
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    // Landed on production and tagged, but develop was left alone -- and
+    // that is where you are not.
+    assert_eq!(repo.git(&["rev-parse", "--abbrev-ref", "HEAD"]).trim(), "main");
+    assert!(repo.git(&["tag", "--list", "2.0.0"]).contains("2.0.0"));
+    let on_develop = repo.git(&["branch", "--contains", "2.0.0"]);
+    assert!(!on_develop.contains("develop"));
 }
 
 #[tokio::test]
@@ -496,6 +581,7 @@ async fn a_support_branch_cannot_be_finished() {
             push: false,
             tag: true,
             tag_message: String::new(),
+            ..Default::default()
         },
     )
     .await;
@@ -507,7 +593,7 @@ async fn a_support_branch_cannot_be_finished() {
 async fn starting_a_flow_branch_before_setup_is_refused() {
     let repo = TestRepo::new();
 
-    let result = flow::start(repo.git_api(), FlowKind::Feature, "login").await;
+    let result = flow::start(repo.git_api(), FlowKind::Feature, "login", None).await;
     assert!(result.is_err());
 }
 
@@ -520,7 +606,7 @@ async fn finishing_a_hotfix_without_tagging_leaves_no_tag() {
     let repo = TestRepo::new();
     flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
 
-    flow::start(repo.git_api(), FlowKind::Hotfix, "1.0.1").await.unwrap();
+    flow::start(repo.git_api(), FlowKind::Hotfix, "1.0.1", None).await.unwrap();
     repo.write("fix.txt", "fixed\n");
     repo.commit_all("Fix it");
 
@@ -534,6 +620,7 @@ async fn finishing_a_hotfix_without_tagging_leaves_no_tag() {
             push: false,
             tag: false,
             tag_message: String::new(),
+            ..Default::default()
         },
     )
     .await
@@ -548,7 +635,7 @@ async fn finishing_a_hotfix_tags_it_by_default() {
     let repo = TestRepo::new();
     flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
 
-    flow::start(repo.git_api(), FlowKind::Hotfix, "1.0.2").await.unwrap();
+    flow::start(repo.git_api(), FlowKind::Hotfix, "1.0.2", None).await.unwrap();
     repo.write("fix.txt", "fixed\n");
     repo.commit_all("Fix it");
 
@@ -562,6 +649,7 @@ async fn finishing_a_hotfix_tags_it_by_default() {
             push: false,
             tag: true,
             tag_message: String::new(),
+            ..Default::default()
         },
     )
     .await

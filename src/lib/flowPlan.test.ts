@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { planFinish } from "./flowPlan";
+import { planFinish, planStart } from "./flowPlan";
 
 const HOTFIX = "hotfix/sql-escape";
 
@@ -67,5 +67,24 @@ describe("planFinish", () => {
       true,
     );
     expect(graph.rows).toHaveLength(2);
+  });
+});
+
+describe("planStart", () => {
+  it("puts the new branch above the base it is cut from", () => {
+    const { rows, graph } = planStart("hotfix/1.0.2", "master", "Merge branch 'x'");
+
+    expect(rows.map((row) => row.key)).toEqual(["ahead", "new", "tip", "older"]);
+    expect(rows[1]!.chips[0]!.label).toBe("hotfix/1.0.2");
+    expect(rows[2]!.chips[0]!.label).toBe("master");
+    expect(rows[2]!.subject).toBe("Merge branch 'x'");
+    // The trunk holds the first lane; the new branch steps off it to the
+    // side and its link comes back into the trunk's lane at the tip.
+    expect(graph.rows[0]!.lane).toBe(0);
+    expect(graph.rows[1]!.lane).toBe(1);
+    expect(graph.rows[2]!.up).toContainEqual(expect.objectContaining({ from: 1, to: 0 }));
+    expect(graph.rows[2]!.lane).toBe(0);
+    // And keeps going below the preview: the last parent is not drawn.
+    expect(graph.rows[3]!.down.length).toBe(1);
   });
 });

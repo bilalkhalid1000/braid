@@ -65,7 +65,7 @@ import {
 import { RepoLibrary } from "./components/RepoLibrary";
 import { RepoTabs } from "./components/RepoTabs";
 import { splitUpstream } from "./lib/upstream";
-import { FlowPlan, type FlowPlanTarget } from "./components/FlowPlan";
+import { FlowPlan, FlowStartPlan, type FlowPlanTarget } from "./components/FlowPlan";
 import { BlameView } from "./components/BlameView";
 import { SearchView } from "./components/SearchView";
 import { Splash } from "./components/Splash";
@@ -1055,55 +1055,115 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
   const openFlowStart = (kind: FlowKind) => {
     if (!id) return;
     const config = flow.data?.config;
-    const base = kind === "hotfix" || kind === "support" ? config?.master : config?.develop;
+    const prefix = config?.[kind] ?? `${kind}/`;
+    const base = (kind === "hotfix" || kind === "support" ? config?.master : config?.develop) ?? "";
     const versioned = isReleaseKind(kind);
+    const noun = flowNoun[kind];
+    const existing = new Set((refs.data?.branches ?? []).map((branch) => branch.name));
+    // Spaces become underscores, as SourceTree does it: a ref cannot hold
+    // one, and refusing at the end is worse than showing the branch that
+    // will actually be made while it is being typed.
+    const clean = (value: string) => value.trim().replace(/\s+/g, "_");
+    const branchOf = (value: string) =>
+      `${prefix}${clean(value) || (versioned ? "<version>" : "<name>")}`;
+    const oidOf = (ref: string) =>
+      (refs.data?.branches ?? []).find((branch) => branch.name === ref)?.oid ?? null;
 
     setDialog({
-      title: `Start ${flowNoun[kind]}`,
-      message: `Branches from ${base ?? "the base branch"} and checks the new branch out.`,
+      title: `Start ${noun}`,
+      // The branch on its base, drawn from what is typed, so the name is
+      // seen as a chip on a graph before it is a branch.
+      graphic: (values) => {
+        const at = values.base?.trim() || base;
+        return (
+          <FlowStartPlan repoId={id} branch={branchOf(values.name ?? "")} base={at} baseOid={oidOf(at)} />
+        );
+      },
       fields: [
         {
           key: "name",
-          label: versioned ? "Version" : "Name",
+          label: versioned ? "Version" : `${noun[0]!.toUpperCase()}${noun.slice(1)} name`,
           placeholder: versioned ? "1.4.0" : "login",
+          // The full branch name, said before it exists: the prefix is
+          // configuration most people have never looked at, and a version
+          // typed with a "v" that the tag prefix then doubles is the classic
+          // mistake this catches.
+          describe: (value) => {
+            const name = clean(value) || (versioned ? "<version>" : "<name>");
+            const branch = branchOf(value);
+            if (existing.has(branch)) return `${branch} already exists.`;
+            // The tag is named here, before anything is typed: a hotfix or
+            // release is the version it will be tagged as, and the prefix
+            // that goes on it is configuration nobody remembers.
+            return versioned
+              ? `Finishing tags ${config?.master ?? "main"} as ${config?.versiontag ?? ""}${name}.`
+              : undefined;
+          },
+        },
+        {
+          // Where to cut it from. The tip of the base branch is the answer
+          // nearly always, and the field is there for the other times: a
+          // hotfix on last month's tag, a feature on a colleague's branch.
+          key: "base",
+          label: "Start at",
+          value: base,
+          placeholder: base,
+          optional: true,
+          options: refOptions(),
+          describe: (value) => {
+            const at = value.trim();
+            if (at === "" || at === base) return `The latest commit on ${base}.`;
+            return `${at}, rather than the tip of ${base}. It still finishes into ${base} later.`;
+          },
         },
       ],
-      confirmLabel: "Start",
-      onConfirm: (v) =>
-        act(`Start ${flowNoun[kind]} ${v.name}`, () => api.flowStart(id, kind, v.name)),
+      confirmLabel: `Start ${noun}`,
+      onConfirm: (v) => {
+        const at = v.base.trim();
+        const name = clean(v.name);
+        act(`Start ${noun} ${name}`, () =>
+          api.flowStart(id, kind, name, at === "" || at === base ? null : at),
+        );
+      },
     });
   };
 
   const openFlowFinish = (current: CurrentFlow) => {
     if (!id) return;
     const config = flow.data?.config;
+    const master = config?.master ?? "main";
+    const develop = config?.develop ?? "develop";
     const versioned = isReleaseKind(current.kind);
+    const noun = flowNoun[current.kind];
+    const tag = `${config?.versiontag ?? ""}${current.name}`;
+    const remote = preferredRemote();
+    // Where the branch was published, if it was: the remote copy is the
+    // thing a finish otherwise leaves behind, and whoever deletes the local
+    // branch is usually done with both.
+    const upstream = refs.data?.branches.find((branch) => branch.name === current.branch)?.upstream ?? null;
+    const published = splitUpstream(upstream);
 
     // What the merges will do, drawn. Two merges, a tag and a delete is more
     // than a sentence carries comfortably, and it is the moment to check.
     const targets: FlowPlanTarget[] = versioned
-      ? [
-          {
-            branch: config?.master ?? "main",
-            tag: `${config?.versiontag ?? ""}${current.name}`,
-          },
-          { branch: config?.develop ?? "develop" },
-        ]
-      : [{ branch: config?.develop ?? "develop" }];
+      ? [{ branch: master, tag }, { branch: develop }]
+      : [{ branch: develop }];
 
     setDialog({
-      title: `Finish ${flowNoun[current.kind]} ${current.name}`,
+      title: `Finish ${noun} ${current.name}`,
       message: versioned
-        ? `Merges ${current.branch} into ${config?.master}, tags the result, then merges it into ${config?.develop}.`
-        : `Merges ${current.branch} into ${config?.develop}.`,
+        ? `${current.branch} lands on ${master} and is tagged there, then on ${develop}. You end up on ${develop}.`
+        : `${current.branch} lands on ${develop} as a merge commit. You end up on ${develop}.`,
       graphic: <FlowPlan from={current.branch} targets={targets} />,
       fields: versioned
         ? [
             {
               key: "tagMessage",
-              label: "Tag message",
-              placeholder: `${config?.versiontag ?? ""}${current.name}`,
+              label: `Message for tag ${tag}`,
+              placeholder: tag,
               optional: true,
+              describe: (value) =>
+                value.trim() === "" ? "Annotated, with the tag's own name as its message." : undefined,
             },
           ]
         : undefined,
@@ -1111,30 +1171,66 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
         // Only where there is a tag to skip: git flow never tags a feature.
         ...(versioned
           ? [
+              { key: "tag", label: `Tag ${master} as ${tag}`, value: true },
               {
-                key: "tag",
-                label: `Tag ${config?.versiontag ?? ""}${current.name}`,
+                key: "backMerge",
+                label: `Merge into ${develop} as well`,
                 value: true,
+                note: `So ${develop} carries the ${noun} too. Off, it lands on ${master} only and you end up there.`,
+              },
+            ]
+          : [
+              {
+                key: "rebase",
+                label: `Rebase onto ${develop} first`,
+                value: false,
+                note: `Replays the ${noun}'s commits on the tip of ${develop} before merging, for a straight history. They get new hashes.`,
+              },
+            ]),
+        {
+          key: "squash",
+          label: "Squash into one commit",
+          value: false,
+          note: `Every commit on ${current.branch} becomes one, with git's summary of them as its message. The branch is then force-deleted, since git no longer sees it as merged.`,
+        },
+        { key: "delete", label: `Delete ${current.branch}`, value: true },
+        ...(published
+          ? [
+              {
+                key: "deleteRemote",
+                label: `Delete ${upstream} as well`,
+                value: false,
+                note: "The copy on the remote is otherwise left behind.",
               },
             ]
           : []),
-        { key: "delete", label: `Delete ${current.branch} afterwards`, value: true },
-        // git refuses to delete a branch it thinks is unmerged, which after
-        // the merges above should not happen -- and occasionally does, when
-        // the merge was resolved in a way git cannot see as containing it.
-        { key: "force", label: "Delete it even if git says it is unmerged" },
-        { key: "push", label: "Push the result to origin" },
+        ...(remote
+          ? [
+              {
+                key: "push",
+                label: versioned
+                  ? `Push ${master}, ${develop} and the tag to ${remote}`
+                  : `Push ${develop} to ${remote}`,
+                value: false,
+              },
+            ]
+          : []),
       ],
-      confirmLabel: "Finish",
+      confirmLabel: `Finish ${noun}`,
       onConfirm: (v) =>
-        act(`Finish ${flowNoun[current.kind]} ${current.name}`, () =>
+        act(`Finish ${noun} ${current.name}`, () =>
           api.flowFinish(id, current.kind, current.name, {
             deleteBranch: v.delete === "true",
-            forceDelete: v.force === "true",
+            forceDelete: false,
+            deleteRemote: v.delete === "true" && v.deleteRemote === "true" && published ? published.remote : null,
             push: v.push === "true",
+            remote: remote ?? null,
             // A feature has no tag box, and git flow would not tag it anyway.
             tag: !versioned || v.tag === "true",
             tagMessage: v.tagMessage ?? "",
+            rebase: v.rebase === "true",
+            squash: v.squash === "true",
+            backMerge: !versioned || v.backMerge === "true",
           }),
         ),
     });

@@ -125,10 +125,19 @@ pub struct FinishOptions {
     pub delete_branch: bool,
     /// Delete even if git thinks the branch is not fully merged. The ordinary
     /// delete refuses in that case, which is usually right and occasionally
-    /// just in the way.
+    /// just in the way. Implied by `squash`, after which nothing is merged
+    /// in git's eyes.
     #[serde(default)]
     pub force_delete: bool,
+    /// Also drop the branch on this remote, where it was published. The
+    /// remote's name rather than a flag, because the branch's upstream need
+    /// not be the remote everything else is pushed to.
+    #[serde(default)]
+    pub delete_remote: Option<String>,
     pub push: bool,
+    /// Where `push` sends the result. `origin` when unset, as before.
+    #[serde(default)]
+    pub remote: Option<String>,
     /// Whether to tag at all. A release or hotfix is tagged by default because
     /// that is the point of finishing one, but git flow can skip it and so can
     /// this.
@@ -137,6 +146,35 @@ pub struct FinishOptions {
     /// Used as the annotated tag message on a release or hotfix. Falls back to
     /// the version when empty.
     pub tag_message: String,
+    /// Replay the branch on the tip of develop before merging, git flow's
+    /// `-r`: a straight line instead of a merge bubble, at the cost of new
+    /// hashes for the branch's commits.
+    #[serde(default)]
+    pub rebase: bool,
+    /// Land the branch as one commit, git flow's `-S`.
+    #[serde(default)]
+    pub squash: bool,
+    /// After a release or hotfix lands on production, merge it into develop
+    /// too. Git flow's default; off is its `-b`.
+    #[serde(default = "yes")]
+    pub back_merge: bool,
+}
+
+impl Default for FinishOptions {
+    fn default() -> Self {
+        Self {
+            delete_branch: true,
+            force_delete: false,
+            delete_remote: None,
+            push: false,
+            remote: None,
+            tag: true,
+            tag_message: String::new(),
+            rebase: false,
+            squash: false,
+            back_merge: true,
+        }
+    }
 }
 
 pub async fn status(git: &Git) -> Result<FlowStatus> {
@@ -283,18 +321,38 @@ pub async fn init(git: &Git, config: &FlowConfig) -> Result<String> {
     Ok(log.join("\n"))
 }
 
-pub async fn start(git: &Git, kind: FlowKind, name: &str) -> Result<String> {
+/// Cut a new flow branch. `base` names where from -- any ref or commit --
+/// and defaults to the kind's own base: develop for a feature, production
+/// for a hotfix. Git flow takes the same optional argument.
+pub async fn start(git: &Git, kind: FlowKind, name: &str, base: Option<&str>) -> Result<String> {
     let (config, initialized) = read_config(git).await?;
     require_initialized(initialized)?;
 
-    let branch = format!("{}{}", kind.prefix(&config), name);
-    let base = kind.base(&config);
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(AppError::Git {
+            code: 1,
+            stderr: format!("A {} needs a name.", kind.label()),
+        });
+    }
 
-    if !branch_exists(git, base).await? {
+    let branch = format!("{}{}", kind.prefix(&config), name);
+    let default_base = kind.base(&config);
+    let base = match base.map(str::trim) {
+        Some(b) if !b.is_empty() => b,
+        _ => default_base,
+    };
+
+    let found = if base == default_base {
+        branch_exists(git, base).await?
+    } else {
+        commit_exists(git, base).await?
+    };
+    if !found {
         return Err(AppError::Git {
             code: 1,
             stderr: format!(
-                "Cannot start a {}: the branch it is cut from, {base}, does not exist.",
+                "Cannot start a {}: {base}, where it would be cut from, does not exist.",
                 kind.label()
             ),
         });
@@ -342,15 +400,22 @@ pub async fn finish(
     // then merged back so develop keeps the fix.
     let tagging = kind.is_release() && options.tag;
 
-    if kind.is_release() {
-        run_step(git, &["checkout", &config.master], &format!("Check out {}", config.master), &mut log).await?;
+    // Rebasing first is a feature's option: a release or hotfix is merged
+    // into two branches and could only be straight against one of them.
+    if options.rebase && !kind.is_release() {
+        run_step(git, &["checkout", &branch], &format!("Check out {branch}"), &mut log).await?;
         run_step(
             git,
-            &["merge", "--no-ff", "--no-edit", &branch],
-            &format!("Merge {branch} into {}", config.master),
+            &["rebase", &config.develop],
+            &format!("Rebase {branch} onto {}", config.develop),
             &mut log,
         )
         .await?;
+    }
+
+    if kind.is_release() {
+        run_step(git, &["checkout", &config.master], &format!("Check out {}", config.master), &mut log).await?;
+        merge_into(git, &branch, &config.master, options.squash, &mut log).await?;
 
         if tagging {
             let tag = format!("{}{}", config.versiontag, name);
@@ -367,26 +432,36 @@ pub async fn finish(
         pushed.push(config.master.clone());
     }
 
-    run_step(git, &["checkout", &config.develop], &format!("Check out {}", config.develop), &mut log).await?;
-    run_step(
-        git,
-        &["merge", "--no-ff", "--no-edit", &branch],
-        &format!("Merge {branch} into {}", config.develop),
-        &mut log,
-    )
-    .await?;
-    pushed.push(config.develop.clone());
+    // A feature has only develop to land on; a release lands there second,
+    // and only if asked. Skipping it leaves you on production.
+    if !kind.is_release() || options.back_merge {
+        run_step(git, &["checkout", &config.develop], &format!("Check out {}", config.develop), &mut log).await?;
+        merge_into(git, &branch, &config.develop, options.squash, &mut log).await?;
+        pushed.push(config.develop.clone());
+    }
 
     if options.delete_branch {
         // `-d` refuses if anything is unmerged, which after the merges above
         // can only mean something went wrong. Let it refuse, unless the user
-        // has said otherwise.
-        let flag = if options.force_delete { "-D" } else { "-d" };
+        // has said otherwise -- or the branch was squashed, after which its
+        // commits are on no other branch and `-d` would always refuse.
+        let flag = if options.force_delete || options.squash { "-D" } else { "-d" };
         run_step(git, &["branch", flag, &branch], &format!("Delete {branch}"), &mut log).await?;
+
+        if let Some(remote) = options.delete_remote.as_deref().filter(|r| !r.is_empty()) {
+            run_step(
+                git,
+                &["push", remote, "--delete", &branch],
+                &format!("Delete {branch} on {remote}"),
+                &mut log,
+            )
+            .await?;
+        }
     }
 
     if options.push {
-        let mut args = vec!["push", "origin"];
+        let remote = options.remote.as_deref().filter(|r| !r.is_empty()).unwrap_or("origin");
+        let mut args = vec!["push", remote];
         args.extend(pushed.iter().map(String::as_str));
 
         let tag = format!("{}{}", config.versiontag, name);
@@ -394,10 +469,43 @@ pub async fn finish(
             args.push(&tag);
         }
 
-        run_step(git, &args, "Push to origin", &mut log).await?;
+        run_step(git, &args, &format!("Push to {remote}"), &mut log).await?;
     }
 
     Ok(log.join("\n"))
+}
+
+/// Merge `branch` into the branch checked out. Squashed, the branch's work
+/// arrives as one commit with git's own summary of what it folded in; else
+/// as a merge commit, always, so the branch stays visible in the history.
+async fn merge_into(
+    git: &Git,
+    branch: &str,
+    into: &str,
+    squash: bool,
+    log: &mut Vec<String>,
+) -> Result<()> {
+    if squash {
+        run_step(
+            git,
+            &["merge", "--squash", branch],
+            &format!("Squash {branch} into {into}"),
+            log,
+        )
+        .await?;
+        // The message git wrote to SQUASH_MSG: "Squashed commit of the
+        // following:" and the list. Taken as is rather than opening an editor
+        // there is no window for.
+        run_step(git, &["commit", "--no-edit"], &format!("Commit the squash on {into}"), log).await
+    } else {
+        run_step(
+            git,
+            &["merge", "--no-ff", "--no-edit", branch],
+            &format!("Merge {branch} into {into}"),
+            log,
+        )
+        .await
+    }
 }
 
 fn require_initialized(initialized: bool) -> Result<()> {
@@ -409,6 +517,18 @@ fn require_initialized(initialized: bool) -> Result<()> {
         code: 1,
         stderr: "Git flow is not set up for this repository yet.".into(),
     })
+}
+
+/// Whether `rev` names a commit: a branch, a tag, a remote branch, a hash.
+async fn commit_exists(git: &Git, rev: &str) -> Result<bool> {
+    let out = git
+        .run_str_allowing(
+            &["rev-parse", "--verify", "--quiet", &format!("{rev}^{{commit}}")],
+            &[1],
+        )
+        .await?;
+
+    Ok(!out.is_empty())
 }
 
 async fn branch_exists(git: &Git, name: &str) -> Result<bool> {

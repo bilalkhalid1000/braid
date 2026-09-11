@@ -698,9 +698,10 @@ pub async fn flow_start(
     id: String,
     kind: FlowKind,
     name: String,
+    base: Option<String>,
 ) -> Result<String> {
     let session = registry.get(&id)?;
-    git::flow::start(&session.git, kind, &name).await
+    git::flow::start(&session.git, kind, &name, base.as_deref()).await
 }
 
 #[tauri::command]
