@@ -10,6 +10,10 @@ export interface ToolbarAction {
   disabled?: boolean;
   /** Small count on the corner of the button, as on Pull and Push. */
   badge?: number;
+  /** Something the repository would be better for doing now, in a sentence.
+   *  Marks the button with a dot and puts the sentence in its tip, so the
+   *  suggestion is seen without being in the way. */
+  attention?: string;
   /** Filled treatment. Reserved for the one action the current state is
    *  asking for, so the toolbar has a subject rather than twelve equals. */
   primary?: boolean;
@@ -52,6 +56,12 @@ const BADGE =
   "absolute -top-[5px] -right-[9px] min-w-[15px] px-2 rounded-full " +
   "font-mono text-micro leading-[15px] text-center";
 
+/* A count would claim a number there is not. A dot in the amber that marks
+   uncommitted work on a tab says "worth a look" and nothing more. */
+const ATTENTION =
+  "absolute -top-[3px] -right-[5px] size-[9px] rounded-full bg-modified " +
+  "ring-2 ring-chrome";
+
 /* The caret sits on the label's right, small and faint: a mark that there
    is more, not a second control. */
 const CARET = "ml-1 text-[8px] leading-none text-text-faint";
@@ -91,9 +101,11 @@ export function Toolbar({ groups }: Props) {
                 action.commandId,
                 action.disabled
                   ? action.disabledReason
-                  : action.hasMenu && action.onContextMenu
-                    ? "Right-click for more"
-                    : undefined,
+                  : action.attention
+                    ? action.attention
+                    : action.hasMenu && action.onContextMenu
+                      ? "Right-click for more"
+                      : undefined,
               )}
             >
               <span
@@ -114,6 +126,9 @@ export function Toolbar({ groups }: Props) {
                   >
                     {action.badge}
                   </span>
+                ) : null}
+                {!action.busy && !action.badge && action.attention ? (
+                  <span className={ATTENTION} aria-label="Suggested" />
                 ) : null}
               </span>
               <span className="flex items-center text-small">

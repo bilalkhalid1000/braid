@@ -70,6 +70,7 @@ import { FlowPlan, FlowStartPlan, type FlowPlanTarget } from "./components/FlowP
 import { BlameView } from "./components/BlameView";
 import { SearchView } from "./components/SearchView";
 import { Splash } from "./components/Splash";
+import { CleanupFacts } from "./components/CleanupFacts";
 import { IconSearch, IconSettings } from "./components/icons";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Toaster } from "./components/Toaster";
@@ -106,6 +107,7 @@ import {
   IconStash,
   IconSubmodule,
   IconWorktree,
+  IconCleanup,
 } from "./components/icons";
 import "./styles.css";
 
@@ -368,6 +370,19 @@ export default function App() {
     queryFn: () => api.reflog(activeId!, 200),
     enabled: activeId !== null && status.data !== undefined,
     ...eventDriven,
+  });
+
+  // Whether the object store could do with a clean-up. Not on every change
+  // like the rest: clutter builds up over weeks, and counting it after each
+  // saved file would be a git process for nothing. Every ten minutes, and
+  // straight after a clean-up.
+  const health = useQuery({
+    queryKey: ["health", activeId],
+    queryFn: () => api.repoHealth(activeId!),
+    enabled: activeId !== null && status.data !== undefined,
+    staleTime: 10 * 60_000,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
   });
 
   const worktrees = useQuery({
@@ -1636,6 +1651,33 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
         typeof result === "string" && /already up to date/i.test(result) ? undefined : confirmUndo,
     );
 
+  /** Clean up the object store, having said what that does.
+   *
+   *  Counted again as the question is asked rather than trusted from the
+   *  query, which may be ten minutes old -- the numbers are the reason for
+   *  saying yes. */
+  const confirmGc = async () => {
+    if (!id) return;
+
+    const repo = activeRepo?.name ?? "this repository";
+    const current = await api.repoHealth(id).catch(() => health.data);
+    const pressing = (current?.reasons.length ?? 0) > 0;
+
+    setDialog({
+      title: `Clean up ${repo}`,
+      message:
+        (pressing ? "" : "Nothing here needs it yet, but it does no harm.\n\n") +
+        "Runs git gc. Loose objects are packed into one compressed file, packs are merged, and leftover files are removed. Objects nothing refers to are deleted once they are more than two weeks old -- younger ones are kept, so nothing another tool has just written can be lost.\n\n" +
+        "Commits, branches, tags, stashes, the reflog and your working files are not touched. On a large repository it can take a minute or more, and other actions on it wait until it finishes.",
+      graphic: current ? <CleanupFacts health={current} /> : undefined,
+      confirmLabel: "Clean up",
+      onConfirm: () =>
+        void perform(`Clean up ${repo}`, () => api.gc(id), "gc").then(() =>
+          queryClient.invalidateQueries({ queryKey: ["health", id] }),
+        ),
+    });
+  };
+
   const confirmForcePush = () =>
     setDialog({
       title: `Force push ${head?.head ?? "HEAD"}`,
@@ -2782,6 +2824,20 @@ The stashed changes are discarded.`,
         ],
         [
           {
+            // Beside Search and Open in: looking after the repository rather
+            // than changing what is in it. Always there, and marked when the
+            // object store has got into a state worth cleaning.
+            key: "gc",
+            commandId: "git.gc",
+            label: "Clean up",
+            icon: <IconCleanup />,
+            busy: workingOn.has("gc"),
+            attention: health.data?.reasons.length
+              ? `Worth cleaning up: ${health.data.reasons[0]}`
+              : undefined,
+            onClick: () => void confirmGc(),
+          },
+          {
             // Beside Explorer and Terminal: all three are ways of going and
             // looking at something rather than changing it.
             key: "search",
@@ -2964,6 +3020,7 @@ The stashed changes are discarded.`,
     "git.stash": id ? openStash : undefined,
     "git.discardAll": id ? () => confirmDiscard(discardablePaths()) : undefined,
     "git.worktree": id ? openAddWorktree : undefined,
+    "git.gc": id ? () => void confirmGc() : undefined,
     "git.flow": id ? () => openFlowMenu(...menuAnchor("Git Flow")) : undefined,
   };
 

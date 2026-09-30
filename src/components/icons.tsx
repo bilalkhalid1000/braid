@@ -117,6 +117,14 @@ export const IconFlow = () => (
 
 /** A gear. The standard six-lobe outline rather than a circle with spokes
  *  around it, which reads as a sun at any size worth using. */
+/** A broom: sweeping up, rather than changing anything. */
+export const IconCleanup = () => (
+  <svg {...base}>
+    <path d="M19 3l-7.5 7.5M8 10.5l5.5 5.5M8 10.5C5 11 3.5 13 3 21c8-.5 10-2 10.5-5" />
+    <path d="M6.5 16.5L4.5 18.5M9.5 18L8 20" />
+  </svg>
+);
+
 export const IconSearch = () => (
   <svg {...base}>
     <circle cx="11" cy="11" r="6.5" />

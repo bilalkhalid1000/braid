@@ -642,6 +642,20 @@ pub async fn prune_worktrees(registry: State<'_, RepoRegistry>, id: String) -> R
     git::worktree::prune(&session.git).await
 }
 
+// --- maintenance ----------------------------------------------------------
+
+#[tauri::command]
+pub async fn repo_health(registry: State<'_, RepoRegistry>, id: String) -> Result<git::RepoHealth> {
+    let session = registry.get(&id)?;
+    git::maintenance::health(&session.git).await
+}
+
+#[tauri::command]
+pub async fn gc_repo(registry: State<'_, RepoRegistry>, id: String) -> Result<String> {
+    let session = registry.get(&id)?;
+    git::maintenance::gc(&session.git).await
+}
+
 // --- submodules -----------------------------------------------------------
 
 #[tauri::command]

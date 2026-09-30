@@ -212,6 +212,22 @@ export interface LogPage {
   durationMs: number;
 }
 
+// --- maintenance -------------------------------------------------------------
+
+/** The object store's counts, from `git count-objects -v`. */
+export interface RepoHealth {
+  /** Objects stored one file each. */
+  loose: number;
+  looseKib: number;
+  packs: number;
+  packKib: number;
+  /** Files in the object store that are not objects. */
+  garbage: number;
+  garbageKib: number;
+  /** Why a clean-up is worth it; empty when it is not. */
+  reasons: string[];
+}
+
 // --- worktrees and submodules ---------------------------------------------
 
 export interface Worktree {
@@ -575,6 +591,9 @@ export const api = {
   removeWorktree: (id: string, path: string, force: boolean) =>
     invoke<string>("remove_worktree", { id, path, force }),
   pruneWorktrees: (id: string) => invoke<string>("prune_worktrees", { id }),
+  repoHealth: (id: string) => invoke<RepoHealth>("repo_health", { id }),
+  /** Returns what changed, as a sentence. */
+  gc: (id: string) => invoke<string>("gc_repo", { id }),
 
   listSubmodules: (id: string) => invoke<Submodule[]>("list_submodules", { id }),
   updateSubmodules: (id: string, path: string, recursive: boolean) =>

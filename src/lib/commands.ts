@@ -150,6 +150,7 @@ export const COMMANDS: CommandDef[] = [
   { id: "git.stash", label: "Stash changes", category: "Git", scope: "global", binding: ["S"], needsRepo: true, short: "stash" },
   { id: "git.discardAll", label: "Discard all changes", category: "Git", scope: "global", binding: ["Shift+D"], needsRepo: true, short: "discard all" },
   { id: "git.worktree", label: "Add a worktree", category: "Git", scope: "global", binding: ["Shift+W"], needsRepo: true },
+  { id: "git.gc", label: "Clean up the repository (git gc)", category: "Git", scope: "global", binding: ["G C"], needsRepo: true, short: "clean up" },
   { id: "git.flow", label: "Git flow", category: "Git", scope: "global", binding: ["G F"], needsRepo: true },
   // The variants of Pull and Push sit behind G, the way git flow does: the
   // plain key is the common case and the sequence is the qualified one.

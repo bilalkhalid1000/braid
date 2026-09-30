@@ -111,6 +111,8 @@ pub fn run() {
             ipc::add_worktree,
             ipc::remove_worktree,
             ipc::prune_worktrees,
+            ipc::repo_health,
+            ipc::gc_repo,
             ipc::list_submodules,
             ipc::update_submodules,
             ipc::sync_submodules,
