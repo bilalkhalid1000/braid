@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type QueryClient, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useKeyHold } from "@tanstack/react-hotkeys";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
@@ -55,6 +55,7 @@ import { Dialog, type DialogSpec } from "./components/Dialog";
 import type { ComboOption } from "./components/Combo";
 import { cloneDestination, repoNameFromUrl } from "./lib/cloneTarget";
 import { applyOrder, moveItem } from "./lib/tabOrder";
+import { createRepoInvalidator } from "./lib/repoInvalidation";
 import { useLibrary } from "./lib/useLibrary";
 import {
   displayName,
@@ -118,36 +119,6 @@ const BOOT_BUDGET_MS = 8000;
  *  disk, and several at once can take a while on Windows without anything
  *  being wrong. */
 const RESTORE_BUDGET_MS = 45_000;
-
-/** Cache keys invalidated when a repo reports that its state changed. */
-const REPO_QUERY_KEYS = [
-  "status",
-  "refs",
-  "log",
-  "diff",
-  "worktrees",
-  "submodules",
-  "flow",
-  "reflog",
-  "bisect",
-  // Commits, file contents and paths: all three move with the repository.
-  "search",
-];
-
-/** Mark everything read from a repository as out of date.
- *
- *  Only what is on screen refetches now; the rest waits until it is looked
- *  at. Keyed by commit ("commit", "commitFile") is left alone, because a commit
- *  never changes. Blame is the same except for the working copy's. */
-function invalidateRepo(queryClient: QueryClient, id: string) {
-  for (const key of REPO_QUERY_KEYS) {
-    void queryClient.invalidateQueries({ queryKey: [key, id] });
-  }
-  void queryClient.invalidateQueries({
-    queryKey: ["blame", id],
-    predicate: (query) => query.queryKey[3] === null,
-  });
-}
 
 const TABS =
   "flex h-15 flex-none items-stretch bg-chrome-alt border-b border-b-border";
@@ -516,10 +487,20 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryClient, settingsLoaded]);
 
+  // Made in an effect rather than a memo: it subscribes to the cache, and
+  // StrictMode's second mount would otherwise find the first one disposed.
+  const invalidator = useRef<ReturnType<typeof createRepoInvalidator> | null>(null);
+  useEffect(() => {
+    const made = createRepoInvalidator(queryClient);
+    invalidator.current = made;
+    return made.dispose;
+  }, [queryClient]);
+  const invalidateRepo = (repoId: string) => invalidator.current?.invalidate(repoId);
+
   // A background repo emitting a change only invalidates its own cache entries.
   // Nothing is recomputed until that tab is actually looked at.
   useEffect(() => {
-    const unlisten = onRepoChanged((id) => invalidateRepo(queryClient, id));
+    const unlisten = onRepoChanged((id) => invalidateRepo(id));
     return () => {
       void unlisten.then((fn) => fn());
     };
@@ -669,7 +650,7 @@ export default function App() {
     // Failed or not: a merge that stops on conflicts, a cherry-pick, a pull
     // or a stash pop all report failure and have still changed the
     // repository -- that is what the conflict is.
-    if (id) invalidateRepo(queryClient, id);
+    if (id) invalidateRepo(id);
 
     return ok;
   };
@@ -3013,7 +2994,7 @@ The stashed changes are discarded.`,
       try {
         await api.fetch(id);
         lastError = "";
-        invalidateRepo(queryClient, id);
+        invalidateRepo(id);
       } catch (error) {
         const message = messageOf(error);
         if (message !== lastError) {
