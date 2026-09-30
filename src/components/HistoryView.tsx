@@ -110,6 +110,10 @@ export function HistoryView({
     getNextPageParam: (last, pages) =>
       last.hasMore ? pages.length * pageSize : undefined,
     staleTime: Infinity,
+    // The whole history is kept while its tab is open, however long the tab
+    // sits behind another: returning to it should show it, not read it again.
+    // A walk narrowed to one file is a passing look and is let go as usual.
+    gcTime: path ? undefined : Infinity,
   });
 
   const commits = useMemo(
@@ -201,6 +205,25 @@ export function HistoryView({
     shownHead.current = headOid;
     virtualizer.scrollToIndex(at, { align: "auto" });
   }, [headOid, commits, log, virtualizer]);
+
+  // The selection is a copy of a row, taken when it was picked. When the
+  // history is re-read it is swapped for the fresh one, so the menu offers
+  // the branches the commit has now, and dropped when the commit is gone --
+  // amended or reset away -- rather than going on describing it.
+  //
+  // Gone only when the whole history is loaded. Pages are read by offset, so
+  // new commits at the top push the last loaded rows onto a page not read
+  // yet, and a commit missing from what is loaded may simply be further down.
+  useEffect(() => {
+    if (!selected || log.isFetching) return;
+
+    const fresh = commits.find((commit) => commit.oid === selected.oid);
+    if (fresh) {
+      if (fresh !== selected) setSelected(fresh);
+    } else if (!log.hasNextPage) {
+      setSelected(null);
+    }
+  }, [commits, selected, log.isFetching, log.hasNextPage]);
 
   // Picking a different commit puts the keyboard back on the commit list: the
   // file list under it has just been replaced by another commit's.

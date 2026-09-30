@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useKeyHold } from "@tanstack/react-hotkeys";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
@@ -130,7 +130,24 @@ const REPO_QUERY_KEYS = [
   "flow",
   "reflog",
   "bisect",
+  // Commits, file contents and paths: all three move with the repository.
+  "search",
 ];
+
+/** Mark everything read from a repository as out of date.
+ *
+ *  Only what is on screen refetches now; the rest waits until it is looked
+ *  at. Keyed by commit ("commit", "commitFile") is left alone, because a commit
+ *  never changes. Blame is the same except for the working copy's. */
+function invalidateRepo(queryClient: QueryClient, id: string) {
+  for (const key of REPO_QUERY_KEYS) {
+    void queryClient.invalidateQueries({ queryKey: [key, id] });
+  }
+  void queryClient.invalidateQueries({
+    queryKey: ["blame", id],
+    predicate: (query) => query.queryKey[3] === null,
+  });
+}
 
 const TABS =
   "flex h-15 flex-none items-stretch bg-chrome-alt border-b border-b-border";
@@ -338,8 +355,14 @@ export default function App() {
   // Every repo-scoped read shares these options: no polling and no refetch on
   // focus. The backend's filesystem watcher is the only thing that invalidates
   // them, which is what keeps many open tabs from costing anything at idle.
+  //
+  // Kept for as long as the tab is open, not the five minutes react-query
+  // gives a query nothing is showing. Coming back to a tab after a while
+  // used to find its cache collected and read everything again from cold;
+  // closing the tab is what lets it go.
   const eventDriven = {
     staleTime: Infinity,
+    gcTime: Infinity,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   } as const;
@@ -496,11 +519,7 @@ export default function App() {
   // A background repo emitting a change only invalidates its own cache entries.
   // Nothing is recomputed until that tab is actually looked at.
   useEffect(() => {
-    const unlisten = onRepoChanged((id) => {
-      for (const key of REPO_QUERY_KEYS) {
-        queryClient.invalidateQueries({ queryKey: [key, id] });
-      }
-    });
+    const unlisten = onRepoChanged((id) => invalidateRepo(queryClient, id));
     return () => {
       void unlisten.then((fn) => fn());
     };
@@ -528,10 +547,21 @@ export default function App() {
   // entry, and refetches only on that repository's own change events -- a
   // background tab costs a status call when its tree changes, and nothing
   // while it sits still.
+  //
+  // The tabs behind wait for the one in front to have its status and refs.
+  // At launch every open repository used to ask at once, and the repository
+  // being looked at queued behind five that were not.
+  const frontSettled =
+    activeId === null ||
+    activeId === LIBRARY_TAB ||
+    (status.data !== undefined && refs.data !== undefined) ||
+    status.isError ||
+    refs.isError;
   const tabStatuses = useQueries({
     queries: repoTabs.map((repo) => ({
       queryKey: ["status", repo.id],
       queryFn: () => api.repoStatus(repo.id),
+      enabled: repo.id === activeId || frontSettled,
       ...eventDriven,
     })),
   });
@@ -635,11 +665,11 @@ export default function App() {
     // Refresh straight away rather than waiting on the filesystem watcher.
     // Some operations (fetch, in particular) change refs without touching
     // anything the watcher would notice quickly.
-    if (ok && id) {
-      for (const key of REPO_QUERY_KEYS) {
-        void queryClient.invalidateQueries({ queryKey: [key, id] });
-      }
-    }
+    //
+    // Failed or not: a merge that stops on conflicts, a cherry-pick, a pull
+    // or a stash pop all report failure and have still changed the
+    // repository -- that is what the conflict is.
+    if (id) invalidateRepo(queryClient, id);
 
     return ok;
   };
@@ -928,12 +958,29 @@ Takes it off this list only. Nothing on disk is touched, and you can add it agai
       return;
     }
 
-    await api.closeRepo(repoId);
-    await queryClient.invalidateQueries({ queryKey: ["repos"] });
+    // Away from it first, so nothing on screen is still reading a repository
+    // the backend is about to forget.
     if (activeId === repoId) {
       setActiveId(tabs.find((r) => r.id !== repoId)?.id ?? null);
     }
+    await api.closeRepo(repoId);
+    await queryClient.invalidateQueries({ queryKey: ["repos"] });
   };
+
+  // A repository's reads are kept for as long as its tab is open, so they go
+  // when it closes. After the render that dropped the tab rather than inside
+  // closeRepo: removed while the strip still showed it, its status was read
+  // again at once, against a session that no longer existed.
+  const openIds = repoTabs.map((repo) => repo.id).join("\n");
+  useEffect(() => {
+    const open = new Set(openIds.split("\n"));
+    queryClient.removeQueries({
+      predicate: (query) => {
+        const repo = query.queryKey[1];
+        return typeof repo === "string" && query.queryKey[0] !== "repos" && !open.has(repo);
+      },
+    });
+  }, [openIds, queryClient]);
 
   // --- dialogs ------------------------------------------------------------
 
@@ -2966,9 +3013,7 @@ The stashed changes are discarded.`,
       try {
         await api.fetch(id);
         lastError = "";
-        for (const key of ["refs", "status", "log"]) {
-          void queryClient.invalidateQueries({ queryKey: [key, id] });
-        }
+        invalidateRepo(queryClient, id);
       } catch (error) {
         const message = messageOf(error);
         if (message !== lastError) {

@@ -14,6 +14,10 @@ use crate::watcher::RepoWatcher;
 /// a background tab costs nothing until that tab is looked at.
 pub const REPO_CHANGED_EVENT: &str = "repo://changed";
 
+/// How long a newly opened repository waits before asking git which of its
+/// directories are ignored. See `RepoRegistry::open`.
+const IGNORED_DIRS_DELAY: std::time::Duration = std::time::Duration::from_secs(3);
+
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct RepoInfo {
@@ -80,10 +84,14 @@ impl RepoRegistry {
             Vec::new()
         };
 
+        // A linked worktree or a submodule keeps its git state outside the
+        // tree, so where that is has to be asked before the watch can cover it.
+        let git_dirs = crate::watcher::git_dirs(&git).await;
+
         let watcher = {
             let app = app.clone();
             let id = id.clone();
-            RepoWatcher::start(root.clone(), git.clone(), ignored, move || {
+            RepoWatcher::start(root.clone(), git_dirs, git.clone(), ignored, move || {
                 let _ = app.emit(REPO_CHANGED_EVENT, &id);
             })?
         };
@@ -97,6 +105,12 @@ impl RepoRegistry {
         if !cfg!(target_os = "linux") {
             let session = Arc::clone(&session);
             tauri::async_runtime::spawn(async move {
+                // Not straight away. It is the slowest thing a repository asks
+                // at open -- a second on a PHP tree with vendor folders -- and
+                // at launch it ran for every tab at once, alongside the reads
+                // the window was waiting on. The filter manages on the
+                // noisy-name backstop until then.
+                tokio::time::sleep(IGNORED_DIRS_DELAY).await;
                 let dirs = crate::watcher::ignored_dirs(&session.git).await;
                 session._watcher.set_ignored(dirs);
             });
