@@ -37,7 +37,7 @@ const MENU =
    the cap has to lift off the accent behind it, and it cannot ask about its
    parent's hover on its own. */
 const ITEM =
-  "group flex w-full items-center gap-8 px-4 py-[5px] bg-transparent border-0 rounded-sm " +
+  "group flex w-full items-center gap-8 px-4 py-[5px] border-0 rounded-sm " +
   "text-body text-left whitespace-nowrap cursor-pointer " +
   "disabled:text-text-faint disabled:cursor-default";
 
@@ -136,8 +136,14 @@ export function ContextMenu({ state, onClose }: { state: MenuState; onClose: () 
                 entry.danger ? DANGER : PLAIN,
                 // The keyboard cursor wears what hovering would give it. It
                 // never lands on a disabled entry, so there is no state where
-                // this and :disabled both apply.
-                at === cursor && (entry.danger ? "bg-removed text-white" : "bg-accent text-white"),
+                // this and :disabled both apply. The resting background is
+                // only given to the other rows: `bg-transparent` is emitted
+                // after `bg-accent` and would win over it on the same row.
+                at === cursor
+                  ? entry.danger
+                    ? "bg-removed text-white"
+                    : "bg-accent text-white"
+                  : "bg-transparent",
               ]
                 .filter(Boolean)
                 .join(" ")}
