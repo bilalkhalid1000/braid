@@ -15,6 +15,7 @@ import { useCopy } from "../lib/useCopy";
 import { CopyHash } from "./CopyHash";
 import { DiffView } from "./DiffView";
 import { Splitter, usePaneSize } from "./Splitter";
+import { PathLabel } from "./PathLabel";
 import { useTip } from "./Tip";
 
 const ROW_HEIGHT = 22;
@@ -51,7 +52,7 @@ export interface CommitDetailHandle {
  *  terminal: padded columns, paths abbreviated to fit a width it guessed, and a
  *  bar of plus signs capped at about twenty characters so a 1,300-line file and
  *  a 300-line one look nearly the same. Reading the numbers instead means the
- *  layout can use the width it actually has, and the bars can be true to scale.
+ *  layout can use the width it actually has.
  */
 const FRAME = "grid h-full min-h-0";
 
@@ -78,19 +79,13 @@ const SUMMARY =
 const FILE_ROW =
   "absolute top-0 left-0 flex w-full items-center gap-4 px-6 border-l-2 cursor-default";
 
+/* Clipped, so nothing in a path can run under the counts beside it. */
 const FILE_PATH =
-  "flex min-w-0 flex-1 items-baseline font-mono text-small whitespace-nowrap";
+  "flex min-w-0 flex-1 items-baseline overflow-hidden font-mono text-small whitespace-nowrap";
 
-/* The directory is what gets cut; the filename is the part being named. */
-const PATH_DIR =
-  "min-w-0 shrink basis-auto overflow-hidden text-ellipsis [unicode-bidi:plaintext] text-text-dim";
-
-/* A fixed width so the meters line up as a column rather than stepping in and
-   out with the size of the numbers beside them. */
-const COUNTS = "flex min-w-[76px] justify-end gap-3 font-mono text-micro";
-
-const METER =
-  "flex h-3 w-32 gap-[2px] overflow-hidden rounded-sm bg-border-soft";
+/* A fixed width so the counts line up as a column rather than stepping in and
+   out with the size of the numbers. */
+const COUNTS = "flex min-w-[76px] flex-none justify-end gap-3 font-mono text-micro";
 
 export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function CommitDetail(
   { repoId, oid, focused, onFileMenu, initialPath }: Props,
@@ -122,13 +117,6 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
       setSelected(initialPath);
     }
   }, [files, initialPath]);
-
-  // Bars are scaled against the largest file in the commit, so a row's length
-  // means something across the list rather than only within itself.
-  const largest = useMemo(
-    () => files.reduce((max, file) => Math.max(max, file.additions + file.deletions), 0),
-    [files],
-  );
 
   // A different commit is a different set of files; keeping the old selection
   // would show a diff belonging to nothing on screen.
@@ -217,8 +205,7 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
           {commit.body && <p className={BODY}>{commit.body}</p>}
         </header>
 
-        {/* Doubles as the legend: it names both quantities in their own colours,
-            right above the bars that use them. */}
+        {/* The totals, in the colours the rows below use for theirs. */}
         <div className={SUMMARY}>
           <span>
             {files.length} {files.length === 1 ? "file" : "files"}
@@ -262,7 +249,7 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
                     <PathLabel path={file.path} />
                   </span>
 
-                  <FileMeter file={file} largest={largest} />
+                  <FileCounts file={file} />
                 </div>
               );
             })}
@@ -285,54 +272,23 @@ export const CommitDetail = forwardRef<CommitDetailHandle, Props>(function Commi
   );
 });
 
-/** Additions and deletions as one bar, scaled against the biggest file here.
+/** A file's additions and deletions. Additions always come first, so the two
+ *  are told apart by place as well as by red and green, a pair many people
+ *  cannot separate.
  *
- *  Colour alone would not carry this — red and green are the classic pair
- *  people cannot separate — so the counts sit beside it and the order is always
- *  additions then deletions. */
-function FileMeter({ file, largest }: { file: FileStat; largest: number }) {
+ *  There was a bar beside them, scaled against the biggest file. It said
+ *  again what the numbers say, and took a third of the list's width from
+ *  the paths. */
+function FileCounts({ file }: { file: FileStat }) {
   if (file.binary) {
-    return (
-      <span className="flex flex-none items-center gap-3">
-        <span className="min-w-[76px] text-right text-micro text-text-faint">binary</span>
-      </span>
-    );
+    return <span className={`${COUNTS} text-text-faint`}>binary</span>;
   }
 
-  const scale = largest > 0 ? 100 / largest : 0;
-
   return (
-    <span className="flex flex-none items-center gap-3">
-      <span className={COUNTS}>
-        {file.additions > 0 && <span className="added">+{file.additions}</span>}
-        {file.deletions > 0 && <span className="removed">&minus;{file.deletions}</span>}
-      </span>
-
-      <span className={METER} aria-hidden="true">
-        <span className="h-full rounded-sm bg-added" style={{ width: `${file.additions * scale}%` }} />
-        <span className="h-full rounded-sm bg-removed" style={{ width: `${file.deletions * scale}%` }} />
-      </span>
+    <span className={COUNTS}>
+      {file.additions > 0 && <span className="added">+{file.additions}</span>}
+      {file.deletions > 0 && <span className="removed">&minus;{file.deletions}</span>}
     </span>
-  );
-}
-
-/** The directory dimmed, the filename bright and never truncated.
- *
- *  Only the directory shrinks, and it loses characters from its front rather
- *  than its end — the part of a path nearest the file is the part that
- *  identifies it, and `AttendanceApp/dist/gui/` is far less useful than
- *  `…/dist/gui/`. */
-function PathLabel({ path }: { path: string }) {
-  const cut = path.lastIndexOf("/");
-  if (cut === -1) return <span className="flex-none">{path}</span>;
-
-  return (
-    <>
-      <span className={PATH_DIR} dir="rtl">
-        {path.slice(0, cut + 1)}
-      </span>
-      <span className="flex-none">{path.slice(cut + 1)}</span>
-    </>
   );
 }
 

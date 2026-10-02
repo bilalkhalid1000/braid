@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 
 import { badgeFor, type StatusEntry } from "../lib/api";
 import { useTip } from "./Tip";
+import { PathLabel } from "./PathLabel";
 
 /* flex-1 because the two lists divide the column between them: the rule that
    said so lived on the parent, keyed on this class. */
@@ -167,7 +168,7 @@ export function FileList({
                 <span className={`badge badge-${badgeClass(badge)}`} {...tip(meaning)}>
                   {badge}
                 </span>
-                <span className="overflow-hidden text-ellipsis whitespace-nowrap font-mono text-small" {...tip(entry.path, undefined, meaning)}>
+                <span className="flex min-w-0 items-baseline overflow-hidden whitespace-nowrap font-mono text-small" {...tip(entry.path, undefined, meaning)}>
                   <PathLabel path={entry.path} />
                 </span>
                 {entry.origPath && <span className="ml-auto whitespace-nowrap font-mono text-micro text-text-faint">was {entry.origPath}</span>}
@@ -206,17 +207,4 @@ function badgeClass(badge: string) {
   if (badge === "?") return "untracked";
   if (badge === "!") return "conflict";
   return badge.toLowerCase();
-}
-
-/** Dim the directory so the filename is what the eye lands on. */
-function PathLabel({ path }: { path: string }) {
-  const cut = path.lastIndexOf("/");
-  if (cut === -1) return <span>{path}</span>;
-
-  return (
-    <>
-      <span className="text-text-dim">{path.slice(0, cut + 1)}</span>
-      <span>{path.slice(cut + 1)}</span>
-    </>
-  );
 }
