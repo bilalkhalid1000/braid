@@ -481,6 +481,11 @@ pub async fn checkout(
 ///
 /// An absent or empty `base` is left off the command entirely, which is how
 /// git already spells "from where I am".
+///
+/// Never tracking the base. Cut from `origin/develop`, git would make that
+/// its upstream, and the new branch then showed as ahead and behind a remote
+/// it had never been pushed to -- a pull on it would merge develop. Its
+/// upstream is its own, set when it is published.
 pub async fn create_branch(
     registry: State<'_, RepoRegistry>,
     id: String,
@@ -492,9 +497,9 @@ pub async fn create_branch(
     let base = base.filter(|b| !b.trim().is_empty());
 
     let mut args: Vec<&str> = if checkout_after {
-        vec!["checkout", "-b", &name]
+        vec!["checkout", "--no-track", "-b", &name]
     } else {
-        vec!["branch", &name]
+        vec!["branch", "--no-track", &name]
     };
 
     if let Some(base) = base.as_deref() {

@@ -344,6 +344,33 @@ async fn starting_a_feature_branches_from_develop_and_checks_it_out() {
     assert_eq!(current.branch, "feature/login");
 }
 
+/// Cut from a remote branch, git would make that the new branch's upstream
+/// -- and the feature then showed as behind a remote it was never pushed to.
+#[tokio::test]
+async fn a_feature_started_from_a_remote_branch_does_not_track_it() {
+    let repo = TestRepo::new();
+    flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
+
+    // A remote whose develop is known, as after a fetch.
+    let remote = repo.path().with_extension("remote.git");
+    let _ = std::fs::remove_dir_all(&remote);
+    repo.git(&["clone", "--quiet", "--bare", ".", remote.to_str().unwrap()]);
+    repo.git(&["remote", "add", "origin", remote.to_str().unwrap()]);
+    repo.git(&["fetch", "--quiet", "origin"]);
+
+    flow::start(repo.git_api(), FlowKind::Feature, "seed", Some("origin/develop"))
+        .await
+        .unwrap();
+
+    assert_eq!(repo.git(&["branch", "--show-current"]).trim(), "feature/seed");
+    assert!(
+        !repo.git_allow_failure(&["config", "--get", "branch.feature/seed.merge"]),
+        "feature/seed should have no upstream until it is published",
+    );
+
+    let _ = std::fs::remove_dir_all(&remote);
+}
+
 #[tokio::test]
 async fn finishing_a_feature_merges_it_into_develop_and_deletes_it() {
     let repo = TestRepo::new();

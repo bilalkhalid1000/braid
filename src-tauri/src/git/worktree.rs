@@ -86,6 +86,9 @@ pub async fn add(git: &Git, path: &str, branch: &str, new_branch: bool) -> Resul
     let mut args = vec!["worktree", "add"];
 
     if new_branch {
+        // A new branch is its own; see `create_branch` on why it does not
+        // track where it was cut from.
+        args.push("--no-track");
         args.push("-b");
         args.push(branch);
         args.push(path);

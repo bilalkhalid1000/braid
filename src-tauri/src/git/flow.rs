@@ -358,10 +358,13 @@ pub async fn start(git: &Git, kind: FlowKind, name: &str, base: Option<&str>) ->
         });
     }
 
+    // Not tracking its base: started from origin/develop, git would make that
+    // the feature's upstream, and it showed as behind a remote branch it was
+    // never pushed to. Publishing gives it its own.
     let mut log = Vec::new();
     run_step(
         git,
-        &["checkout", "-b", &branch, base],
+        &["checkout", "--no-track", "-b", &branch, base],
         &format!("Create {branch} from {base}"),
         &mut log,
     )
