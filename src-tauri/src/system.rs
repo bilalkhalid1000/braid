@@ -197,6 +197,9 @@ pub fn named_terminal(id: &str, path: &str) -> Option<(String, Vec<String>)> {
         // Takes no directory flag; it inherits the working directory we spawn
         // it with, which is the same place.
         "xterm" => ("xterm", vec![]),
+        // The freedesktop default-terminal launcher: opens whatever the user
+        // set as their terminal (Omarchy and friends ship nothing else).
+        "xdg-terminal-exec" => ("xdg-terminal-exec", vec![format!("--dir={native}")]),
 
         _ => return None,
     };
@@ -270,7 +273,7 @@ pub fn terminal_commands(path: &str) -> Vec<(String, Vec<String>)> {
     } else if cfg!(target_os = "macos") {
         &["terminal"]
     } else {
-        &["gnome-terminal", "konsole", "xterm"]
+        &["xdg-terminal-exec", "gnome-terminal", "konsole", "xterm"]
     };
 
     let mut candidates: Vec<(String, Vec<String>)> =
@@ -417,12 +420,16 @@ pub(crate) fn system_command(program: &str) -> Command {
 
 /// The `:`-separated entries of `value` that did not come out of the bundle.
 ///
+/// Any AppImage mount counts, not just ours: an instance started by a previous
+/// one (an update relaunch, a terminal opened from Braid) inherits that one's
+/// paths too, and its mount still has the mismatched libraries in it.
+///
 /// `None` means nothing did and the variable should be left alone — which is
 /// most of them, including values that are not paths at all.
 fn without_appdir(value: &str, appdir: &str) -> Option<String> {
     let kept: Vec<&str> = value
         .split(':')
-        .filter(|entry| !entry.starts_with(appdir))
+        .filter(|entry| !entry.starts_with(appdir) && !entry.contains("/.mount_"))
         .collect();
 
     (kept.len() != value.split(':').count()).then(|| kept.join(":"))
@@ -720,6 +727,11 @@ mod tests {
             Some(String::new())
         );
         assert_eq!(without_appdir("/usr/lib", "/tmp/.mount_Braid"), None);
+        // A previous instance's mount, inherited across a relaunch.
+        assert_eq!(
+            without_appdir("/tmp/.mount_Braid/usr/lib/:/tmp/.mount_Braid.old/usr/lib/:", "/tmp/.mount_Braid"),
+            Some(String::new())
+        );
         // Not every variable is a path list.
         assert_eq!(without_appdir("Adwaita", "/tmp/.mount_Braid"), None);
     }
@@ -898,6 +910,10 @@ pub fn terminal_running(id: &str, path: &str, program: &str) -> Option<(String, 
         ),
         "kitty" => ("kitty".into(), vec!["--directory".into(), native, program.into(), ".".into()]),
         "xterm" => ("xterm".into(), vec!["-e".into(), program.into(), ".".into()]),
+        "xdg-terminal-exec" => (
+            "xdg-terminal-exec".into(),
+            vec![format!("--dir={native}"), "--".into(), program.into(), ".".into()],
+        ),
         _ => return None,
     };
 
@@ -916,7 +932,7 @@ fn hosted(path: &str, program: &str, terminal: &str) -> Option<(String, Vec<Stri
     } else if cfg!(target_os = "macos") {
         &["terminal"]
     } else {
-        &["gnome-terminal", "konsole", "xfce4-terminal", "alacritty", "kitty", "xterm"]
+        &["xdg-terminal-exec", "gnome-terminal", "konsole", "xfce4-terminal", "alacritty", "kitty", "xterm"]
     };
 
     ids.iter().find_map(|id| terminal_running(id, path, program))
