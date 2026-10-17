@@ -260,6 +260,23 @@ impl Git {
         Ok(join_output(stdout.trim(), stderr.trim()))
     }
 
+    /// Run git and return stdout and stderr apart, for a command whose
+    /// warnings carry something worth reading: `count-objects -v` names each
+    /// leftover file there, and only there.
+    pub async fn run_both(&self, args: &[&str]) -> Result<(String, String)> {
+        let _turn = self.turn(args).await;
+        let run = trace::started(args);
+        let output = self.command(args).output().await?;
+        let code = output.status.code().unwrap_or(-1);
+        run.finished(code);
+
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        if !output.status.success() {
+            return Err(AppError::Git { code, stderr });
+        }
+        Ok((String::from_utf8_lossy(&output.stdout).trim_end().to_string(), stderr))
+    }
+
     pub async fn run_str(&self, args: &[&str]) -> Result<String> {
         let out = self.run(args).await?;
         Ok(String::from_utf8_lossy(&out).trim_end().to_string())

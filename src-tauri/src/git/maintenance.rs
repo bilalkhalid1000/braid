@@ -8,6 +8,9 @@
 //! repository took eight seconds to read a page of history cold -- about fifty
 //! times what it took once the same objects were packed.
 
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
+
 use serde::Serialize;
 
 use super::cli::Git;
@@ -40,10 +43,79 @@ impl RepoHealth {
     }
 }
 
+/// How old a temporary file in the object store has to be before `git gc`
+/// removes it: `gc.pruneExpire`'s default. Younger ones may belong to a fetch
+/// that is still running, and git leaves them be.
+const TEMP_EXPIRY: Duration = Duration::from_secs(14 * 24 * 60 * 60);
+
 /// Read the object store's counts.
+///
+/// Leftover files are counted only where a clean-up removes them. Git's own
+/// count takes in temporary files younger than two weeks, which `gc` keeps on
+/// purpose, and files it does not recognise, which it never touches -- so
+/// the button asked to be pressed, was pressed, and went on asking.
 pub async fn health(git: &Git) -> Result<RepoHealth> {
-    let text = git.run_str(&["count-objects", "-v"]).await?;
-    Ok(parse(&text))
+    let (text, warnings) = git.run_both(&["count-objects", "-v"]).await?;
+    let mut health = parse(&text);
+
+    let now = SystemTime::now();
+    let removable: Vec<PathBuf> = leftovers(&warnings)
+        .into_iter()
+        .map(|(path, kind)| (git.workdir().join(path), kind))
+        .filter(|(path, kind)| match kind {
+            Leftover::Orphan => true,
+            Leftover::Temporary => std::fs::metadata(path)
+                .and_then(|m| m.modified())
+                .is_ok_and(|at| now.duration_since(at).unwrap_or_default() >= TEMP_EXPIRY),
+            Leftover::Unknown => false,
+        })
+        .map(|(path, _)| path)
+        .collect();
+
+    health.garbage = removable.len() as u64;
+    health.garbage_kib = removable
+        .iter()
+        .filter_map(|path| std::fs::metadata(path).ok())
+        .map(|m| m.len().div_ceil(1024))
+        .sum();
+    health.reasons = reasons(&health);
+    Ok(health)
+}
+
+/// A file `count-objects -v` reported as not belonging in the object store.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Leftover {
+    /// Half of a pack, the other half gone. `gc` removes it.
+    Orphan,
+    /// A `tmp_` file from a write that never finished. `gc` removes it once
+    /// it is old enough.
+    Temporary,
+    /// Anything else. `gc` leaves it alone.
+    Unknown,
+}
+
+/// The leftover files git named in its warnings, as it wrote their paths:
+/// `warning: garbage found: <path>` and `warning: no corresponding .pack: <path>`.
+fn leftovers(warnings: &str) -> Vec<(&str, Leftover)> {
+    warnings
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("warning: "))
+        .filter_map(|rest| {
+            if let Some(path) = rest.strip_prefix("garbage found: ") {
+                let name = Path::new(path).file_name()?.to_string_lossy();
+                let kind = if name.starts_with("tmp_") {
+                    Leftover::Temporary
+                } else {
+                    Leftover::Unknown
+                };
+                Some((path, kind))
+            } else if rest.starts_with("no corresponding .") {
+                Some((rest.split_once(": ")?.1, Leftover::Orphan))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 /// Pack loose objects, merge packs, and drop what nothing refers to.
@@ -170,6 +242,25 @@ mod tests {
     fn many_packs_is_a_reason_on_its_own() {
         let health = parse("count: 0\npacks: 50\ngarbage: 0\n");
         assert_eq!(health.reasons.len(), 1);
+    }
+
+    #[test]
+    fn leftovers_are_sorted_by_whether_a_clean_up_removes_them() {
+        let warnings = concat!(
+            "warning: garbage found: .git/objects/pack/tmp_pack_Ab12\n",
+            "warning: garbage found: .git/objects/pack/notes.txt\n",
+            "warning: no corresponding .pack: .git/objects/pack/pack-00ff.idx\n",
+            "warning: in the working copy of 'f1', LF will be replaced by CRLF\n",
+        );
+
+        assert_eq!(
+            leftovers(warnings),
+            vec![
+                (".git/objects/pack/tmp_pack_Ab12", Leftover::Temporary),
+                (".git/objects/pack/notes.txt", Leftover::Unknown),
+                (".git/objects/pack/pack-00ff.idx", Leftover::Orphan),
+            ]
+        );
     }
 
     #[test]
