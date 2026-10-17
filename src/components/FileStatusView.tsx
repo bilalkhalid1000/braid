@@ -276,8 +276,12 @@ export function FileStatusView({
         )}
 
         <DiffView
-          diff={diff.data}
-          loading={diff.isFetching}
+          // Only while something is selected. keepPreviousData holds the last
+          // file's diff even once the query is disabled, so a file committed
+          // or discarded while selected stayed up by name -- refetched empty,
+          // a header over nothing, for a file listed nowhere.
+          diff={selected ? diff.data : undefined}
+          loading={Boolean(selected) && diff.isFetching}
           staged={selected?.staged}
           // An untracked file has no diff git can apply a patch against, so it
           // is staged whole or not at all.
