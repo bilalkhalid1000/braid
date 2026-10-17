@@ -164,6 +164,15 @@ impl Git {
         // status refresh can block the user's own git commands in a terminal.
         cmd.arg("--no-optional-locks");
 
+        // Git for Windows stops at MAX_PATH unless told otherwise, and a
+        // node_modules gets past 260 characters easily. Removing a worktree
+        // then failed with "Filename too long" half way through -- after its
+        // `.git` file had gone, so git no longer knew the leftover folder and
+        // a retry could not finish the job. Not a performance setting, so the
+        // plain runner takes it too.
+        #[cfg(windows)]
+        cmd.arg("-c").arg("core.longpaths=true");
+
         if self.perf {
             for kv in PERF_CONFIG {
                 cmd.arg("-c").arg(kv);

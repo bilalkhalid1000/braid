@@ -166,6 +166,35 @@ async fn adding_a_worktree_lists_it_alongside_the_main_one() {
 }
 
 #[tokio::test]
+async fn a_worktree_holding_paths_past_max_path_can_be_removed() {
+    // An installed node_modules goes past Windows' 260 characters easily, and
+    // git for Windows gave up on it: "Filename too long", half deleted.
+    let repo = TestRepo::new();
+    let extra = repo.path().parent().unwrap().join(format!(
+        "{}-deep",
+        repo.path().file_name().unwrap().to_string_lossy()
+    ));
+    let extra_path = extra.to_string_lossy().to_string();
+    worktree::add(repo.git_api(), &extra_path, "deep", true)
+        .await
+        .unwrap();
+
+    let mut deep = extra.join("node_modules");
+    for i in 0..30 {
+        deep.push(format!("pkg_{i:02}_abcdef"));
+    }
+    // std reaches past MAX_PATH on its own; git is the one that needed telling.
+    std::fs::create_dir_all(&deep).unwrap();
+    std::fs::write(deep.join("index.js"), "x").unwrap();
+    assert!(deep.as_os_str().len() > 260);
+
+    worktree::remove(repo.git_api(), &extra_path, true).await.unwrap();
+
+    assert!(!extra.exists(), "the folder is gone, not half deleted");
+    assert_eq!(worktree::list(repo.git_api()).await.unwrap().len(), 1);
+}
+
+#[tokio::test]
 async fn adding_a_worktree_for_a_branch_that_does_not_exist_is_refused() {
     let repo = TestRepo::new();
     let extra = repo.path().parent().unwrap().join("braid-missing-branch-wt");

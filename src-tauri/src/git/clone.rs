@@ -49,6 +49,9 @@ pub async fn clone(
     }
 
     let mut command = crate::system::system_command("git");
+    // A checkout past MAX_PATH fails without it; see `Git::command`.
+    #[cfg(windows)]
+    command.args(["-c", "core.longpaths=true"]);
     command
         // Without this git writes no progress at all: it suppresses it when
         // stderr is a pipe rather than a terminal, which is exactly our case.
