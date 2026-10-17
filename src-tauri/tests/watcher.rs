@@ -135,3 +135,30 @@ async fn the_main_checkout_sees_a_worktree_move_its_head() {
     drop(watched);
     repo.git(&["worktree", "remove", "--force", tree.to_str().unwrap()]);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_tree_that_never_goes_quiet_still_refreshes() {
+    // A dev server or a log being written keeps events coming faster than
+    // the debounce. That used to hold every refresh back until it stopped.
+    let repo = TestRepo::new();
+    let watched = Watched::start(repo.path()).await;
+
+    let noisy = repo.path().join("server.log");
+    let writer = std::thread::spawn(move || {
+        for i in 0..100 {
+            std::fs::write(&noisy, format!("{i}\n")).unwrap();
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    });
+
+    repo.git(&["checkout", "-q", "-b", "made-outside"]);
+    repo.git(&["commit", "--allow-empty", "-m", "Made outside"]);
+    // Well before the writer stops, two seconds from now.
+    tokio::time::sleep(Duration::from_millis(1000)).await;
+    assert!(
+        watched.fired.load(Ordering::SeqCst) > 0,
+        "a refresh while the tree was still busy"
+    );
+
+    writer.join().unwrap();
+}

@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
+use notify::event::Flag;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::mpsc;
 
@@ -13,6 +14,9 @@ use crate::git::Git;
 /// A single `npm install` or branch checkout produces thousands of events. Any
 /// design that refreshes per event is the polling problem wearing a costume.
 const DEBOUNCE: Duration = Duration::from_millis(60);
+
+/// The longest a burst is let run before it fires anyway.
+const MAX_BURST: Duration = Duration::from_millis(500);
 
 /// Directory names whose contents never change git state in a way the user
 /// cares about, but which produce enormous event volume.
@@ -172,12 +176,12 @@ impl RepoWatcher {
         let ignored_for_self = Arc::clone(&ignored);
 
         let watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
-            let Ok(event) = res else { return };
+            // An error means the watch may have missed something, which is
+            // the same news as a rescan: look again.
+            let event = res.unwrap_or_else(|_| Event::new(EventKind::Other).set_flag(Flag::Rescan));
 
             let dropped = filter_ignored.read().unwrap();
-            if event.paths.iter().any(|p| {
-                is_relevant(p, &filter_root, &filter_dirs) && !under_any(p, &dropped)
-            }) {
+            if wanted(&event, &filter_root, &filter_dirs, &dropped) {
                 // Send failure just means the app is shutting down.
                 let _ = tx.send(event);
             }
@@ -234,16 +238,42 @@ impl RepoWatcher {
                     watched.push(dir);
                 }
             }
+
+            // The recursive handle has one 16 KB buffer for the whole tree,
+            // `.git/objects` included, and notify 6 drops whatever overflows
+            // it without a word. A commit made beside an editor, a build or
+            // the fsmonitor daemon was lost that way: the branch it moved
+            // never appeared until something else changed. Refs and HEAD get
+            // handles of their own, which see a few events a minute and
+            // cannot overflow. Duplicates of what the big handle does catch
+            // are absorbed by the debounce.
+            if cfg!(windows) {
+                for (path, mode) in quiet_watches(&git_dirs) {
+                    // Not fatal: packed-refs, say, need not exist yet.
+                    let _ = w.watch(&path, mode);
+                }
+            }
         }
 
         let adder = Arc::clone(&watcher);
         tauri::async_runtime::spawn(async move {
             // Take one event, then swallow everything that arrives within the
-            // debounce window, then fire once for the whole burst.
+            // debounce window, then fire once for the whole burst -- or at
+            // MAX_BURST, whichever is first. A tree that never goes quiet for
+            // DEBOUNCE (a dev server, a log being written) otherwise held back
+            // every refresh, a commit made beside it included, until it did.
             while let Some(first) = rx.recv().await {
                 let mut burst = vec![first];
-                while let Ok(Some(event)) = tokio::time::timeout(DEBOUNCE, rx.recv()).await {
-                    burst.push(event);
+                let deadline = tokio::time::Instant::now() + MAX_BURST;
+                loop {
+                    let left = deadline.saturating_duration_since(tokio::time::Instant::now());
+                    if left.is_zero() {
+                        break;
+                    }
+                    match tokio::time::timeout(DEBOUNCE.min(left), rx.recv()).await {
+                        Ok(Some(event)) => burst.push(event),
+                        _ => break,
+                    }
                 }
 
                 // A directory made since the walk has no watch yet, and
@@ -295,6 +325,19 @@ impl RepoWatcher {
     pub fn set_ignored(&self, dirs: Vec<PathBuf>) {
         *self.ignored.write().unwrap() = dirs;
     }
+}
+
+/// Whether an event is worth a refresh.
+///
+/// A rescan carries no paths -- it is the backend saying its queue overflowed
+/// and events were lost -- so it cannot be judged by them and always counts.
+/// Dropped as pathless, a commit made during a burst was never shown.
+fn wanted(event: &Event, root: &Path, dirs: &GitDirs, ignored: &[PathBuf]) -> bool {
+    event.need_rescan()
+        || event
+            .paths
+            .iter()
+            .any(|p| is_relevant(p, root, dirs) && !under_any(p, ignored))
 }
 
 /// Whether `path` is `dir` or inside it, for any of `dirs`.
@@ -349,6 +392,22 @@ fn outside(root: &Path, dirs: &GitDirs) -> Vec<PathBuf> {
         if !dir.starts_with(root) && !out.contains(dir) {
             out.push(dir.clone());
         }
+    }
+    out
+}
+
+/// The paths that decide what history shows -- branches, tags and what is
+/// checked out -- each to be watched on its own. A file is watched through
+/// its parent, filtered to its name.
+fn quiet_watches(dirs: &GitDirs) -> Vec<(PathBuf, RecursiveMode)> {
+    let mut out = vec![
+        (dirs.common.join("refs"), RecursiveMode::Recursive),
+        (dirs.common.join("packed-refs"), RecursiveMode::NonRecursive),
+        (dirs.own.join("HEAD"), RecursiveMode::NonRecursive),
+    ];
+    if dirs.own != dirs.common {
+        // A linked worktree's own refs: refs/bisect, refs/worktree.
+        out.push((dirs.own.join("refs"), RecursiveMode::Recursive));
     }
     out
 }
@@ -527,6 +586,26 @@ mod tests {
         assert!(is_relevant(Path::new("/repo/.git/refs/heads/main"), &root(), &plain()));
         assert!(is_relevant(Path::new("/repo/.git/HEAD"), &root(), &plain()));
         assert!(is_relevant(Path::new("/repo/.git/index"), &root(), &plain()));
+    }
+
+    #[test]
+    fn a_rescan_counts_though_it_names_no_path() {
+        let rescan = Event::new(EventKind::Other).set_flag(Flag::Rescan);
+        assert!(wanted(&rescan, &root(), &plain(), &[]));
+
+        let pathless = Event::new(EventKind::Other);
+        assert!(!wanted(&pathless, &root(), &plain(), &[]));
+    }
+
+    #[test]
+    fn refs_and_head_get_watches_of_their_own() {
+        let paths: Vec<PathBuf> = quiet_watches(&linked()).into_iter().map(|(p, _)| p).collect();
+
+        assert!(paths.contains(&PathBuf::from("/main/.git/refs")));
+        assert!(paths.contains(&PathBuf::from("/main/.git/packed-refs")));
+        assert!(paths.contains(&PathBuf::from("/main/.git/worktrees/repo/HEAD")));
+        // Never the whole git directory: that is the handle that overflows.
+        assert!(!paths.contains(&PathBuf::from("/main/.git")));
     }
 
     #[test]
