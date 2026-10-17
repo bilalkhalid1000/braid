@@ -90,6 +90,7 @@ import { useCommands } from "./lib/useCommands";
 import { shortcutLabel } from "./lib/shortcutLabel";
 import { messageOf, useActivity } from "./lib/useActivity";
 import { gitCommandLine, useGitLog } from "./lib/useGitLog";
+import { useSteady } from "./lib/useSteady";
 import { useUpdater } from "./lib/useUpdater";
 import { useAppVersion } from "./lib/useAppVersion";
 import { channelCaution, channelLabel } from "./lib/version";
@@ -129,6 +130,11 @@ const SETTINGS_BUTTON =
   "flex w-17 flex-none items-center justify-center p-0 bg-transparent border-0 " +
   "border-l border-l-border text-text-dim cursor-pointer hover:bg-chrome hover:text-text " +
   "[&_svg]:size-[15px]";
+
+/** How long a call runs before the status bar says so, and how long the
+ *  line stays once it has finished. See `useSteady`. */
+const STEADY_SHOW_MS = 250;
+const STEADY_HOLD_MS = 400;
 
 const STATUSBAR =
   "flex h-12 flex-none items-center gap-8 overflow-hidden px-4 bg-chrome " +
@@ -642,6 +648,25 @@ export default function App() {
   // business, and greying every commit box in the window for it made the
   // app feel single-threaded when the backend is anything but.
   const busy = activity.running.some((entry) => entry.repo === id);
+
+  // The status bar's "running" lines, steadied so a quick call never flashes
+  // up and a run of them reads as one. Strings, so an unchanged label is the
+  // same value from one render to the next. `busy` itself stays exact: it is
+  // what disables the buttons.
+  const shownActivity = useSteady(
+    busy
+      ? activity.running[0]!.label +
+          (activity.running.length > 1 ? ` +${activity.running.length - 1}` : "")
+      : null,
+    STEADY_SHOW_MS,
+    STEADY_HOLD_MS,
+  );
+  const lastCommand = gitLog.running[gitLog.running.length - 1];
+  const shownCommand = useSteady(
+    lastCommand ? gitCommandLine(lastCommand) : null,
+    STEADY_SHOW_MS,
+    STEADY_HOLD_MS,
+  );
 
   /** Run a git action with a name attached.
    *
@@ -3464,40 +3489,32 @@ The stashed changes are discarded.`,
           </>
         )}
 
-        {busy && (
+        {shownActivity !== null && (
           <span className={ACTIVITY}>
             <span className="spinner" />
-            {activity.running[0].label}
+            {shownActivity}
             {cloning && <span className="ml-3 font-mono text-micro text-text-faint">{cloning}</span>}
-            {activity.running.length > 1 && ` +${activity.running.length - 1}`}
           </span>
         )}
 
         {/* What git is running right now. The line above says what was asked
             for; this says what is actually executing, which is the thing worth
             seeing when something takes longer than it should. */}
-        {gitLog.running.length > 0 && (
+        {shownCommand !== null && (
           <span
             className={RUNNING}
             {...tipFor(
-              gitLog.running.length === 1
-                ? "1 git command running"
-                : `${gitLog.running.length} git commands running`,
+              gitLog.running.length > 1
+                ? `${gitLog.running.length} git commands running`
+                : "1 git command running",
               undefined,
-              gitLog.running.map(gitCommandLine).join("\n"),
+              gitLog.running.length > 0
+                ? gitLog.running.map(gitCommandLine).join("\n")
+                : shownCommand,
             )}
           >
             <span className="spinner" />
-            {gitCommandLine(gitLog.running[gitLog.running.length - 1]!)}
-          </span>
-        )}
-
-        {app.channel && (
-          <span
-            className={`channel channel-${app.channel}`}
-            {...tip(`${app.version} — ${channelCaution(app.channel)}`)}
-          >
-            {channelLabel(app.channel)}
+            {shownCommand}
           </span>
         )}
 
@@ -3532,6 +3549,17 @@ The stashed changes are discarded.`,
             <span className={ERROR_COUNT}>{activity.errorCount}</span>
           )}
         </button>
+
+        {/* Last, in the corner. After the activity and the running command it
+            was pushed along every time a git call started or ended. */}
+        {app.channel && (
+          <span
+            className={`channel channel-${app.channel}`}
+            {...tip(`${app.version} — ${channelCaution(app.channel)}`)}
+          >
+            {channelLabel(app.channel)}
+          </span>
+        )}
       </footer>
 
       <Toaster
