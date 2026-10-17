@@ -473,6 +473,47 @@ async fn finishing_a_release_tags_it_and_lands_on_both_branches() {
 }
 
 #[tokio::test]
+async fn finishing_a_published_hotfix_with_unpushed_work_still_deletes_it() {
+    // `branch -d` judges a branch with an upstream against that upstream, not
+    // HEAD. Published, then given one more commit, a hotfix was refused as
+    // "not fully merged" straight after landing on main and develop both.
+    let repo = TestRepo::new();
+    flow::init(repo.git_api(), &FlowConfig::default()).await.unwrap();
+
+    let remote = repo.path().with_extension("hotfix-remote.git");
+    let _ = std::fs::remove_dir_all(&remote);
+    repo.git(&["init", "--quiet", "--bare", remote.to_str().unwrap()]);
+    repo.git(&["remote", "add", "origin", remote.to_str().unwrap()]);
+
+    flow::start(repo.git_api(), FlowKind::Hotfix, "1.0.1", None).await.unwrap();
+    repo.write("fix.txt", "patched\n");
+    repo.commit_all("Fix the thing");
+    repo.git(&["push", "--quiet", "-u", "origin", "hotfix/1.0.1"]);
+    repo.write("fix.txt", "patched again\n");
+    repo.commit_all("Fix it properly");
+
+    flow::finish(
+        repo.git_api(),
+        FlowKind::Hotfix,
+        "1.0.1",
+        &FinishOptions::default(),
+    )
+    .await
+    .unwrap();
+
+    let branches = repo.git(&["branch", "--list", "hotfix/1.0.1"]);
+    assert!(branches.trim().is_empty(), "the branch should be gone");
+    for target in ["main", "develop"] {
+        assert!(
+            repo.git(&["show", &format!("{target}:fix.txt")]).contains("again"),
+            "{target} has the unpushed commit",
+        );
+    }
+
+    let _ = std::fs::remove_dir_all(&remote);
+}
+
+#[tokio::test]
 async fn finishing_a_hotfix_without_deleting_keeps_the_branch() {
     // The delete checkbox is the one option in that dialog that destroys
     // something, so "off" has to mean off. A hotfix takes the longer path --

@@ -448,7 +448,14 @@ pub async fn finish(
         // can only mean something went wrong. Let it refuse, unless the user
         // has said otherwise -- or the branch was squashed, after which its
         // commits are on no other branch and `-d` would always refuse.
-        let flag = if options.force_delete || options.squash { "-D" } else { "-d" };
+        //
+        // Or unless it is plainly merged where it was meant to land. A branch
+        // with an upstream is judged by `-d` against that upstream, not HEAD:
+        // a hotfix published and then given one more commit was refused as
+        // "not fully merged" straight after being merged into main and
+        // develop both. Asked directly, it is safe to delete.
+        let landed = merged_into_all(git, &branch, &pushed).await;
+        let flag = if options.force_delete || options.squash || landed { "-D" } else { "-d" };
         run_step(git, &["branch", flag, &branch], &format!("Delete {branch}"), &mut log).await?;
 
         if let Some(remote) = options.delete_remote.as_deref().filter(|r| !r.is_empty()) {
@@ -520,6 +527,26 @@ fn require_initialized(initialized: bool) -> Result<()> {
         code: 1,
         stderr: "Git flow is not set up for this repository yet.".into(),
     })
+}
+
+/// Whether every commit on `branch` is on each of `targets`. False when there
+/// are no targets, so that nothing is ever deleted on the strength of none.
+async fn merged_into_all(git: &Git, branch: &str, targets: &[String]) -> bool {
+    if targets.is_empty() {
+        return false;
+    }
+    let tip = format!("refs/heads/{branch}");
+    for target in targets {
+        // Exit 1 means "not an ancestor": the failure is the answer.
+        let merged = git
+            .run(&["merge-base", "--is-ancestor", &tip, &format!("refs/heads/{target}")])
+            .await
+            .is_ok();
+        if !merged {
+            return false;
+        }
+    }
+    true
 }
 
 /// Whether `rev` names a commit: a branch, a tag, a remote branch, a hash.
